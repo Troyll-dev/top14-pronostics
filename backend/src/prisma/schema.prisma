@@ -1,0 +1,76 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           Int           @id @default(autoincrement())
+  username     String        @unique
+  email        String        @unique
+  password     String
+  avatarColor  String        @default("#3B82F6")
+  createdAt    DateTime      @default(now())
+  predictions  Prediction[]
+
+  @@map("users")
+}
+
+model Team {
+  id        Int     @id @default(autoincrement())
+  name      String  @unique
+  shortName String  @unique
+  logo      String?
+  city      String?
+
+  homeMatches Match[] @relation("HomeTeam")
+  awayMatches Match[] @relation("AwayTeam")
+
+  @@map("teams")
+}
+
+model Match {
+  id           Int           @id @default(autoincrement())
+  externalId   String?       @unique   // ID depuis l'API Rugby externe
+  round        Int                     // Journée (1-26)
+  season       String        @default("2026-2027")
+  homeTeam     Team          @relation("HomeTeam", fields: [homeTeamId], references: [id])
+  homeTeamId   Int
+  awayTeam     Team          @relation("AwayTeam", fields: [awayTeamId], references: [id])
+  awayTeamId   Int
+  kickoff      DateTime                // Date/heure du match
+  status       MatchStatus   @default(SCHEDULED)
+  homeScore    Int?                    // Score final équipe domicile
+  awayScore    Int?                    // Score final équipe extérieure
+  venue        String?
+  predictions  Prediction[]
+  updatedAt    DateTime      @updatedAt
+
+  @@map("matches")
+}
+
+enum MatchStatus {
+  SCHEDULED
+  LIVE
+  FINISHED
+  POSTPONED
+}
+
+model Prediction {
+  id             Int      @id @default(autoincrement())
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         Int
+  match          Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  matchId        Int
+  homeScorePred  Int               // Score prédit domicile
+  awayScorePred  Int               // Score prédit extérieur
+  points         Int?              // Points attribués après résultat
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([userId, matchId])
+  @@map("predictions")
+}
