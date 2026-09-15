@@ -1,5 +1,5 @@
 const router = require('express').Router();
-const { getMatches, getRounds, createMatch, updateResult, getTeams } = require('../controllers/match.controller');
+const { getMatches, getRounds, createMatch, updateResult, getTeams, getNextRound } = require('../controllers/match.controller');
 const { authenticate } = require('../middleware/auth.middleware');
 
 // Routes publiques
@@ -13,6 +13,7 @@ router.get('/', (req, res, next) => {
 }, getMatches);
 
 router.get('/rounds', getRounds);
+router.get('/next-round', getNextRound);
 router.get('/teams', getTeams);
 
 // Routes protégées
@@ -20,3 +21,5 @@ router.post('/', authenticate, createMatch);
 router.patch('/:id/result', authenticate, updateResult);
 
 module.exports = router;
+
+

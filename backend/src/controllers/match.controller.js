@@ -118,3 +118,18 @@ async function calculatePoints(match) {
     await prisma.prediction.update({ where: { id: pred.id }, data: { points } });
   }
 }
+
+// GET /api/matches/next-round — prochaine journee avec matchs a venir
+exports.getNextRound = async (req, res) => {
+  try {
+    const now = new Date();
+    const next = await prisma.match.findFirst({
+      where: { kickoff: { gt: now }, status: 'SCHEDULED' },
+      orderBy: { kickoff: 'asc' },
+      select: { round: true },
+    });
+    res.json({ round: next?.round ?? 1 });
+  } catch (err) {
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+};
