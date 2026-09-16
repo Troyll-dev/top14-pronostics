@@ -9,12 +9,11 @@ export default function MatchesPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.get('/matches/rounds').then((res) => {
-      const r = res.data;
-      setRounds(r);
-      // Sélectionner la journée en cours / la plus proche
-      const now = new Date();
-      setCurrentRound(r[0] ?? 1);
+        api.get('/matches/rounds').then((res) => {
+      setRounds(res.data);
+    });
+    api.get('/matches/next-round').then((res) => {
+      setCurrentRound(res.data.round);
     });
   }, []);
 
