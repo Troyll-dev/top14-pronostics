@@ -11,8 +11,9 @@
     "db:studio": "prisma studio",
     "db:seed": "node src/prisma/seed.js"
   },
-  "dependencies": {
+"dependencies": {
     "@prisma/client": "^5.7.0",
+    "prisma": "^5.7.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
@@ -21,9 +22,8 @@
     "jsonwebtoken": "^9.0.2",
     "node-cron": "^3.0.3",
     "axios": "^1.6.2"
-  },
-  "devDependencies": {
-    "nodemon": "^3.0.2",
-    "prisma": "^5.7.0"
-  }
+},
+"devDependencies": {
+    "nodemon": "^3.0.2"
+}
 }
