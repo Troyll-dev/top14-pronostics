@@ -119,7 +119,7 @@ async function calculatePoints(match) {
   }
 }
 
-// GET /api/matches/next-round — prochaine journee avec matchs a venir
+// GET /api/matches/next-round ï¿½ prochaine journee avec matchs a venir
 exports.getNextRound = async (req, res) => {
   try {
     const now = new Date();
@@ -133,3 +133,5 @@ exports.getNextRound = async (req, res) => {
     res.status(500).json({ error: 'Erreur serveur' });
   }
 };
+
+exports.calculatePoints = calculatePoints;
