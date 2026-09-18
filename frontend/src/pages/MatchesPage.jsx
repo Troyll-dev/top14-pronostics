@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../api/client';
 import MatchCard from '../components/MatchCard';
 
@@ -9,7 +10,7 @@ export default function MatchesPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-        api.get('/matches/rounds').then((res) => {
+    api.get('/matches/rounds').then((res) => {
       setRounds(res.data);
     });
     api.get('/matches/next-round').then((res) => {
@@ -35,11 +36,19 @@ export default function MatchesPage() {
     <div className="max-w-2xl mx-auto px-4 py-6">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Pronostics</h1>
-        {pending.length > 0 && (
-          <span className="bg-amber-500 text-black text-xs font-bold px-2 py-1 rounded-full">
-            {pending.length} à faire
-          </span>
-        )}
+        <div className="flex items-center gap-3">
+          {pending.length > 0 && (
+            <span className="bg-amber-500 text-black text-xs font-bold px-2 py-1 rounded-full">
+              {pending.length} à faire
+            </span>
+          )}
+          <Link
+            to="/pronos"
+            className="text-sm text-slate-400 hover:text-amber-400 transition-colors whitespace-nowrap"
+          >
+            Tous les pronos →
+          </Link>
+        </div>
       </div>
 
       {/* Sélecteur de journée */}
@@ -104,4 +113,3 @@ export default function MatchesPage() {
     </div>
   );
 }
-

@@ -4,6 +4,7 @@ import Navbar from './components/Navbar';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import MatchesPage from './pages/MatchesPage';
+import RoundPredictionsPage from './pages/RoundPredictionsPage';
 import LeaderboardPage from './pages/LeaderboardPage';
 import AdminPage from './pages/AdminPage';
 
@@ -28,6 +29,7 @@ function AppRoutes() {
         <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
         <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
         <Route path="/" element={<PrivateRoute><MatchesPage /></PrivateRoute>} />
+        <Route path="/pronos" element={<PrivateRoute><RoundPredictionsPage /></PrivateRoute>} />
         <Route path="/classement" element={<PrivateRoute><LeaderboardPage /></PrivateRoute>} />
         <Route path="/admin" element={<PrivateRoute><AdminPage /></PrivateRoute>} />
         <Route path="*" element={<Navigate to="/" />} />

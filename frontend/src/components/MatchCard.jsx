@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import api from '../api/client';
+import { useAuth } from '../contexts/AuthContext';
 
 function ScoreInput({ value, onChange, disabled }) {
   return (
@@ -33,7 +34,19 @@ function PointsBadge({ points }) {
   );
 }
 
+// Version compacte pour la liste des pronos des autres joueurs
+function PointsChip({ points }) {
+  if (points === null || points === undefined) return null;
+  const bg = { 3: 'bg-green-500', 2: 'bg-blue-500', 1: 'bg-slate-500', 0: 'bg-red-900/60' }[points] || 'bg-red-900/60';
+  return (
+    <span className={`${bg} text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0`}>
+      +{points}
+    </span>
+  );
+}
+
 export default function MatchCard({ match, onPredictionSaved }) {
+  const { user } = useAuth();
   const prediction = match.predictions?.[0];
   const isFinished = match.status === 'FINISHED';
   const isPast = new Date() >= new Date(match.kickoff);
@@ -44,6 +57,27 @@ export default function MatchCard({ match, onPredictionSaved }) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
+
+  // Pronostics des autres joueurs
+  const [showOthers, setShowOthers] = useState(false);
+  const [others, setOthers] = useState(null);
+  const [loadingOthers, setLoadingOthers] = useState(false);
+
+  const toggleOthers = async () => {
+    const opening = !showOthers;
+    setShowOthers(opening);
+    if (opening && others === null) {
+      setLoadingOthers(true);
+      try {
+        const res = await api.get(`/predictions/match/${match.id}`);
+        setOthers(res.data);
+      } catch {
+        setOthers([]);
+      } finally {
+        setLoadingOthers(false);
+      }
+    }
+  };
 
   const handleSave = async () => {
     if (home === '' || away === '') return;
@@ -57,6 +91,7 @@ export default function MatchCard({ match, onPredictionSaved }) {
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
+      setOthers(null);          // forcer le rechargement au prochain dépliage
       onPredictionSaved?.();
     } catch (err) {
       setError(err.response?.data?.error || 'Erreur');
@@ -150,6 +185,54 @@ export default function MatchCard({ match, onPredictionSaved }) {
           Pronostic enregistré : <span className="text-white font-bold">{prediction.homeScorePred} – {prediction.awayScorePred}</span>
         </div>
       )}
+
+      {/* Pronostics des autres joueurs */}
+      <div className="mt-3 pt-3 border-t border-slate-800">
+        <button
+          onClick={toggleOthers}
+          className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-amber-400 transition-colors"
+        >
+          <span className={`transition-transform ${showOthers ? 'rotate-90' : ''}`}>▶</span>
+          Pronos des joueurs
+          {others && <span className="text-slate-600">({others.length})</span>}
+        </button>
+
+        {showOthers && (
+          <div className="mt-2.5">
+            {loadingOthers ? (
+              <p className="text-xs text-slate-600 animate-pulse">Chargement...</p>
+            ) : !others || others.length === 0 ? (
+              <p className="text-xs text-slate-600">Aucun pronostic pour ce match.</p>
+            ) : (
+              <ul className="space-y-1.5">
+                {others.map((p) => {
+                  const isMe = p.user.id === user?.id;
+                  return (
+                    <li
+                      key={p.id}
+                      className={`flex items-center gap-2 text-sm rounded-lg px-2 py-1 ${
+                        isMe ? 'bg-amber-500/10' : ''
+                      }`}
+                    >
+                      <span
+                        className="w-2 h-2 rounded-full shrink-0"
+                        style={{ backgroundColor: p.user.avatarColor }}
+                      />
+                      <span className={`truncate ${isMe ? 'text-amber-400 font-semibold' : 'text-slate-300'}`}>
+                        {p.user.username}{isMe && ' (toi)'}
+                      </span>
+                      <span className="ml-auto font-bold text-white shrink-0 tabular-nums">
+                        {p.homeScorePred} – {p.awayScorePred}
+                      </span>
+                      <PointsChip points={p.points} />
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

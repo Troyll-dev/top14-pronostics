@@ -66,29 +66,44 @@ exports.getMyPredictions = async (req, res) => {
   }
 };
 
-// GET /api/predictions/round/:round — tous les pronostics d'une journée (après clôture)
+// GET /api/predictions/round/:round — tous les pronostics d'une journée
+// Les pronostics sont visibles en permanence par tous les joueurs.
 exports.getRoundPredictions = async (req, res) => {
   const { round } = req.params;
 
   try {
-    // Ne montrer les pronostics des autres qu'après le début du 1er match de la journée
-    const firstMatch = await prisma.match.findFirst({
-      where: { round: parseInt(round) },
-      orderBy: { kickoff: 'asc' },
-    });
-
-    const reveal = !firstMatch || new Date() >= new Date(firstMatch.kickoff);
-
     const predictions = await prisma.prediction.findMany({
       where: { match: { round: parseInt(round) } },
       include: {
         user: { select: { id: true, username: true, avatarColor: true } },
         match: { include: { homeTeam: true, awayTeam: true } },
       },
+      orderBy: [{ match: { kickoff: 'asc' } }, { user: { username: 'asc' } }],
     });
 
-    res.json({ predictions, revealed: reveal });
+    res.json({ predictions, revealed: true });
   } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+};
+
+// GET /api/predictions/match/:matchId — tous les pronostics d'un match
+exports.getMatchPredictions = async (req, res) => {
+  const { matchId } = req.params;
+
+  try {
+    const predictions = await prisma.prediction.findMany({
+      where: { matchId: parseInt(matchId) },
+      include: {
+        user: { select: { id: true, username: true, avatarColor: true } },
+      },
+      orderBy: { user: { username: 'asc' } },
+    });
+
+    res.json(predictions);
+  } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 };
