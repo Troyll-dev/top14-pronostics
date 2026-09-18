@@ -8,18 +8,22 @@ const API_KEY   = process.env.SPORTSDB_KEY    || '123';        // 123 = cle publ
 const SEASON    = process.env.SPORTSDB_SEASON || '2026-2027';
 const LEAGUE_ID = 4430;                                        // French Top 14 sur TheSportsDB
 const BASE      = `https://www.thesportsdb.com/api/v1/json/${API_KEY}`;
+const MAX_ROUNDS = 4;                                          // journees interrogees au maximum par passage
 
 /**
  * Exceptions de correspondance d'equipes.
- * Cle   = nom renvoye par TheSportsDB (en minuscules)
- * Valeur = shortName de l'equipe dans TA base
- * A completer seulement si les logs signalent une equipe non reconnue.
+ * Cle    = nom renvoye par TheSportsDB (en minuscules)
+ * Valeur = name, shortName OU city de l'equipe dans TA base
+ * "Section Paloise" ne partage aucune racine avec "Pau", d'ou l'exception.
+ * A completer si les logs signalent encore une equipe non reconnue.
  */
 const OVERRIDES = {
-  // 'racing 92': 'R92',
+  'section paloise': 'Pau',
 };
 
-// --- Utilitaires de correspondance de noms ------------------------------------
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// --- Correspondance de noms ---------------------------------------------------
 
 function normalize(s) {
   return (s || '')
@@ -44,12 +48,13 @@ function commonLength(a, b) {
 
 /**
  * Retrouve l'equipe en base correspondant a un nom TheSportsDB.
- * Ex : "Stade Toulousain" -> Toulouse, "Union Bordeaux Begles" -> Bordeaux
+ * Ex : "Lyon OU" -> Lyon, "Stade Toulousain" -> Toulouse
  */
 function resolveTeam(apiName, teams) {
   const override = OVERRIDES[(apiName || '').toLowerCase()];
   if (override) {
-    const t = teams.find((x) => x.shortName === override);
+    const o = normalize(override);
+    const t = teams.find((x) => [x.name, x.shortName, x.city].some((f) => f && normalize(f) === o));
     if (t) return t;
   }
 
@@ -62,106 +67,187 @@ function resolveTeam(apiName, teams) {
   );
   if (exact) return exact;
 
-  // 2. Correspondance partielle : plus longue sous-chaine commune (min 5 caracteres)
-  let bestTeam = null;
-  let bestScore = 4;
+  // Les passes approximatives ignorent shortName : une abreviation de 2-4 lettres
+  // produit des faux positifs ("LOU" se retrouve dans "Stade Toulousain").
+
+  // 2. Inclusion complete d'un champ dans l'autre : "lyon" est contenu dans "lyonou".
+  //    On garde le champ le plus long ("Stade Francais" l'emporte sur "Paris").
+  let inclTeam = null;
+  let inclLen = 3;                       // au moins 4 caracteres
   for (const team of teams) {
-    for (const field of [team.name, team.city, team.shortName]) {
-      const score = commonLength(n, normalize(field));
-      if (score > bestScore) {
-        bestScore = score;
-        bestTeam = team;
+    for (const field of [team.name, team.city]) {
+      const f = normalize(field);
+      if (!f || f.length <= inclLen) continue;
+      if (n.includes(f) || f.includes(n)) {
+        inclLen = f.length;
+        inclTeam = team;
       }
     }
   }
-  return bestTeam;
+  if (inclTeam) return inclTeam;
+
+  // 3. Repli : plus longue sous-chaine commune (min 5 caracteres)
+  //    Rattrape "Stade Toulousain" -> Toulouse, "Aviron Bayonnais" -> Bayonne.
+  let subTeam = null;
+  let subLen = 4;
+  for (const team of teams) {
+    for (const field of [team.name, team.city]) {
+      const s = commonLength(n, normalize(field));
+      if (s > subLen) {
+        subLen = s;
+        subTeam = team;
+      }
+    }
+  }
+  return subTeam;
+}
+
+// --- Selection des journees a interroger --------------------------------------
+
+/**
+ * Journees ayant encore au moins un match passe sans resultat.
+ * Evite le plafond de l'API sur la saison complete : on interroge journee par journee.
+ */
+async function getRoundsToSync() {
+  const pending = await prisma.match.findMany({
+    where: { kickoff: { lt: new Date() }, status: { not: 'FINISHED' }, season: SEASON },
+    select: { round: true },
+    distinct: ['round'],
+    orderBy: { round: 'desc' },
+    take: MAX_ROUNDS,
+  });
+  if (pending.length) return pending.map((r) => r.round);
+
+  // Rien en attente : on renvoie la derniere journee jouee, utile pour une verification manuelle
+  const last = await prisma.match.findFirst({
+    where: { kickoff: { lt: new Date() }, season: SEASON },
+    orderBy: { kickoff: 'desc' },
+    select: { round: true },
+  });
+  return last ? [last.round] : [];
 }
 
 // --- Synchronisation ----------------------------------------------------------
 
 /**
- * Recupere les resultats de la saison depuis TheSportsDB et met la base a jour.
- * @param {{ dryRun?: boolean }} options  dryRun = simule sans rien ecrire
+ * Recupere les resultats depuis TheSportsDB et met la base a jour.
+ * @param {{ dryRun?: boolean, rounds?: number[] }} options
+ *        dryRun = simule sans rien ecrire
+ *        rounds = forcer certaines journees (sinon calculees automatiquement)
  */
-async function syncResults({ dryRun = false } = {}) {
-  const url = `${BASE}/eventsseason.php?id=${LEAGUE_ID}&s=${SEASON}`;
-  const { data } = await axios.get(url, { timeout: 15000 });
-  const events = data && data.events ? data.events : [];
+async function syncResults({ dryRun = false, rounds = null } = {}) {
+  const targetRounds = rounds && rounds.length ? rounds : await getRoundsToSync();
 
-  if (!events.length) {
-    return { ok: false, reason: `Aucun match renvoye par l'API pour la saison ${SEASON}`, updated: 0 };
+  const report = {
+    ok: true,
+    dryRun,
+    rounds: targetRounds,
+    fetched: 0,
+    updated: 0,
+    skipped: 0,
+    unmatched: [],
+    changes: [],
+  };
+
+  if (!targetRounds.length) {
+    report.reason = 'Aucune journee a synchroniser';
+    return report;
   }
 
   const teams = await prisma.team.findMany();
-  const report = { ok: true, dryRun, total: events.length, updated: 0, skipped: 0, unmatched: [], changes: [] };
 
-  for (const ev of events) {
-    // Match pas encore joue : aucun score renvoye
-    const homeScore = parseInt(ev.intHomeScore, 10);
-    const awayScore = parseInt(ev.intAwayScore, 10);
-    if (Number.isNaN(homeScore) || Number.isNaN(awayScore)) {
-      report.skipped++;
+  for (const round of targetRounds) {
+    const url = `${BASE}/eventsround.php?id=${LEAGUE_ID}&r=${round}&s=${SEASON}`;
+
+    let events = [];
+    try {
+      const { data } = await axios.get(url, { timeout: 15000 });
+      events = (data && data.events) || [];
+    } catch (err) {
+      console.error(`[sync] J${round} : appel API echoue (${err.message})`);
       continue;
     }
 
-    // 1. Retrouver le match en base : d'abord par externalId (rapide et sur)
-    let match = await prisma.match.findFirst({ where: { externalId: String(ev.idEvent) } });
+    report.fetched += events.length;
+    if (!events.length) {
+      console.warn(`[sync] J${round} : aucun match renvoye par l'API`);
+    }
 
-    // 2. Sinon par la paire d'equipes (unique par saison en Top 14)
-    if (!match) {
-      const home = resolveTeam(ev.strHomeTeam, teams);
-      const away = resolveTeam(ev.strAwayTeam, teams);
+    for (const ev of events) {
+      const homeScore = parseInt(ev.intHomeScore, 10);
+      const awayScore = parseInt(ev.intAwayScore, 10);
 
-      if (!home || !away) {
-        report.unmatched.push(`${ev.strHomeTeam} vs ${ev.strAwayTeam} (equipe non reconnue)`);
+      // Match pas encore joue : aucun score renvoye
+      if (Number.isNaN(homeScore) || Number.isNaN(awayScore)) {
+        report.skipped++;
         continue;
       }
 
-      match = await prisma.match.findFirst({
-        where: { homeTeamId: home.id, awayTeamId: away.id, season: SEASON },
+      // 1. Retrouver le match en base par externalId (rapide et sur)
+      let match = await prisma.match.findFirst({ where: { externalId: String(ev.idEvent) } });
+
+      // 2. Sinon par la paire d'equipes (unique par saison en Top 14)
+      if (!match) {
+        const home = resolveTeam(ev.strHomeTeam, teams);
+        const away = resolveTeam(ev.strAwayTeam, teams);
+
+        if (!home || !away) {
+          const which = [!home && ev.strHomeTeam, !away && ev.strAwayTeam].filter(Boolean).join(' + ');
+          report.unmatched.push(`J${round} equipe non reconnue : ${which}`);
+          continue;
+        }
+
+        match = await prisma.match.findFirst({
+          where: { homeTeamId: home.id, awayTeamId: away.id, season: SEASON },
+        });
+
+        if (!match) {
+          report.unmatched.push(`J${round} ${ev.strHomeTeam} vs ${ev.strAwayTeam} : absent de la base`);
+          continue;
+        }
+      }
+
+      // Deja a jour : on ne reecrit pas
+      if (match.status === 'FINISHED' && match.homeScore === homeScore && match.awayScore === awayScore) {
+        report.skipped++;
+        continue;
+      }
+
+      const label = `J${match.round} ${ev.strHomeTeam} ${homeScore}-${awayScore} ${ev.strAwayTeam}`;
+      report.changes.push(label);
+
+      if (dryRun) {
+        report.updated++;
+        continue;
+      }
+
+      const updated = await prisma.match.update({
+        where: { id: match.id },
+        data: {
+          homeScore,
+          awayScore,
+          status: 'FINISHED',
+          externalId: match.externalId || String(ev.idEvent),
+        },
       });
 
-      if (!match) {
-        report.unmatched.push(`${ev.strHomeTeam} vs ${ev.strAwayTeam} (absent de la base)`);
-        continue;
-      }
-    }
+      // Recalcul des points avec EXACTEMENT la meme logique que la saisie manuelle
+      await calculatePoints(updated);
 
-    // Deja a jour : on ne reecrit pas
-    if (match.status === 'FINISHED' && match.homeScore === homeScore && match.awayScore === awayScore) {
-      report.skipped++;
-      continue;
-    }
-
-    const label = `J${match.round} ${ev.strHomeTeam} ${homeScore}-${awayScore} ${ev.strAwayTeam}`;
-    report.changes.push(label);
-
-    if (dryRun) {
       report.updated++;
-      continue;
+      console.log(`[sync] ${label}`);
     }
 
-    const updated = await prisma.match.update({
-      where: { id: match.id },
-      data: {
-        homeScore,
-        awayScore,
-        status: 'FINISHED',
-        externalId: match.externalId || String(ev.idEvent),
-      },
-    });
-
-    // Recalcul des points avec EXACTEMENT la meme logique que la saisie manuelle
-    await calculatePoints(updated);
-
-    report.updated++;
-    console.log(`[sync] ${label}`);
+    await sleep(500);   // on reste large sous la limite de l'API gratuite
   }
 
   if (report.unmatched.length) {
     console.warn('[sync] non reconnus :', report.unmatched);
   }
-  console.log(`[sync] ${dryRun ? '(simulation) ' : ''}${report.updated} mis a jour, ${report.skipped} ignores`);
+  console.log(
+    `[sync] ${dryRun ? '(simulation) ' : ''}journees ${targetRounds.join(', ')} : ` +
+    `${report.updated} mis a jour, ${report.skipped} ignores`
+  );
 
   return report;
 }
@@ -169,13 +255,12 @@ async function syncResults({ dryRun = false } = {}) {
 /**
  * Faut-il interroger l'API ?
  * Oui seulement s'il reste au moins un match passe non marque FINISHED.
- * Evite d'appeler TheSportsDB pour rien entre les journees.
  */
 async function shouldSync() {
   const pending = await prisma.match.count({
-    where: { kickoff: { lt: new Date() }, status: { not: 'FINISHED' } },
+    where: { kickoff: { lt: new Date() }, status: { not: 'FINISHED' }, season: SEASON },
   });
   return pending > 0;
 }
 
-module.exports = { syncResults, shouldSync, resolveTeam };
+module.exports = { syncResults, shouldSync, resolveTeam, getRoundsToSync };
