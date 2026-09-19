@@ -263,9 +263,28 @@ async function syncStandings({ dryRun = false, debug = false } = {}) {
     misses,
   };
 
+  // Diagnostic : on renvoie le texte reel des lignes, seul moyen de caler
+  // l'analyseur sans pouvoir inspecter la page depuis l'exterieur.
+  if (debug) {
+    const lines = toLines(String(html));
+    const grab = (re, max) => lines.filter((l) => re.test(l)).slice(0, max).map((l) => l.slice(0, 600));
+    report.diag = {
+      totalLignes: lines.length,
+      longueurHtml: String(html).length,
+      bordeaux: grab(/Bordeaux/i, 6),
+      racing: grab(/Racing/i, 6),
+      vannes: grab(/Vannes/i, 6),
+      // les lignes les plus chargees en chiffres : c'est la que vit le tableau
+      plusDeChiffres: lines
+        .map((l) => ({ l, n: (l.match(/\d+/g) || []).length }))
+        .sort((a, b) => b.n - a.n)
+        .slice(0, 8)
+        .map((x) => `[${x.n} nombres] ${x.l.slice(0, 600)}`),
+    };
+  }
+
   if (!rows.length) {
     report.reason = "Aucune ligne reconnue — la structure de la page a probablement change";
-    if (debug) report.sample = toLines(String(html)).slice(0, 60);
     return report;
   }
 
