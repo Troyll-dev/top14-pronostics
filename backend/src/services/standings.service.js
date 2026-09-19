@@ -30,111 +30,110 @@ const CLUBS = [
 ];
 
 /**
- * Position de chaque statistique dans la suite de nombres qui suit le nom du
- * club. Ordre observe sur allrugby :
- *   Pts, J, G, N, P, p, Moy p, c, Moy c, Diff, EP, EC, BO, BD
- * Si la page change d'ordre, seules ces constantes sont a corriger — le mode
- * diagnostic renvoie les nombres bruts pour le verifier.
+ * Decalage de chaque statistique par rapport a la cellule du club.
+ * Releve sur la vraie page et verifie sur dix clubs : entre la difference
+ * (+6) et les points marques (+16) s'intercalent le pourcentage de victoires
+ * et un bloc de six cellules de forme, souvent vides.
+ * Une cellule vide vaut zero — c'est ce qui faisait echouer la version
+ * precedente, qui comptait les nombres au lieu des cellules.
  */
 const COL = {
-  points: 0,
-  played: 1,
-  won: 2,
-  drawn: 3,
-  lost: 4,
-  pointsFor: 5,
-  pointsAgainst: 7,
-  diff: 9,
-  triesFor: 10,
-  triesAgainst: 11,
-  bonusOff: 12,
-  bonusDef: 13,
+  points: 1,
+  played: 2,
+  won: 3,
+  drawn: 4,
+  lost: 5,
+  diff: 6,
+  pointsFor: 16,
+  pointsAgainst: 17,
+  triesFor: 20,
+  triesAgainst: 21,
+  bonusOff: 22,
+  bonusDef: 23,
 };
-const MIN_NUMBERS = 14;
+const LAST_COL = 23;
 
 // --- Lecture de la page -------------------------------------------------------
 
-/** Transforme le HTML en lignes de texte, une par ligne de tableau. */
+/** Transforme le HTML en lignes de texte, les cellules separees par "|". */
 function toLines(html) {
   return html
     .replace(/<script[\s\S]*?<\/script>/gi, ' ')
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')
-    .replace(/<\/t[dh]>/gi, ' ¦ ')
+    .replace(/<\/t[dh]>/gi, ' \u00a6 ')
     .replace(/<\/tr>/gi, '\n')
     .replace(/<br\s*\/?>/gi, ' ')
     .replace(/<[^>]+>/g, ' ')
     .replace(/&nbsp;/gi, ' ')
     .replace(/&[a-z]+;/gi, ' ')
-    .replace(/[ \t ]+/g, ' ')
+    .replace(/[ \t\u00a0]+/g, ' ')
     .split('\n')
     .map((l) => l.trim())
     .filter(Boolean);
 }
 
-/** Nombres isoles d'une chaine : on ignore ceux colles a des lettres (R92, U18...). */
-function numbersIn(str) {
-  const out = [];
-  const re = /(^|[^\w.,])(-?\d+(?:[.,]\d+)?)(?![\w])/g;
-  let m;
-  while ((m = re.exec(str)) !== null) out.push(parseFloat(m[2].replace(',', '.')));
-  return out;
+/** Valeur numerique d'une cellule ; vide ou non numerique vaut zero. */
+function cellValue(cell) {
+  if (cell === undefined) return 0;
+  const m = String(cell).match(/-?\d+(?:[.,]\d+)?/);
+  return m ? parseFloat(m[0].replace(',', '.')) : 0;
 }
 
 /**
- * Extrait le classement du HTML.
- * @returns {{ rows: Array, misses: string[] }}
+ * Extrait le classement general.
+ * Chaque club figure trois fois sur la page — general, domicile, exterieur.
+ * On retient la ligne ou le nombre de matchs joues est le plus eleve : le
+ * total general est toujours superieur a chacun de ses deux sous-totaux.
  */
 function parseTable(html) {
-  const lines = toLines(html);
+  const lines = toLines(String(html));
   const rows = [];
   const misses = [];
 
   for (const club of CLUBS) {
-    // On retient, parmi toutes les lignes citant le club, celle qui porte
-    // assez de nombres pour etre une ligne de classement.
     let best = null;
-    for (const line of lines) {
-      const at = line.indexOf(club.label);
-      if (at === -1) continue;
-      const nums = numbersIn(line.slice(at + club.label.length));
-      if (nums.length >= MIN_NUMBERS && (!best || nums.length < best.nums.length)) {
-        best = { line, nums };
-      }
-    }
+
+    lines.forEach((line, lineIndex) => {
+      const cells = line.split('\u00a6');
+      const clubIdx = cells.findIndex((c) => c.includes(club.label));
+      if (clubIdx === -1) return;
+      if (cells.length <= clubIdx + LAST_COL) return;
+
+      const played = cellValue(cells[clubIdx + COL.played]);
+      if (played <= 0) return;
+
+      if (!best || played > best.played) best = { cells, clubIdx, played, lineIndex };
+    });
 
     if (!best) {
       misses.push(club.label);
       continue;
     }
 
-    const n = best.nums;
+    const at = (offset) => cellValue(best.cells[best.clubIdx + offset]);
     rows.push({
       label: club.label,
       shortName: club.short,
-      points: n[COL.points],
-      played: n[COL.played],
-      won: n[COL.won],
-      drawn: n[COL.drawn],
-      lost: n[COL.lost],
-      pointsFor: n[COL.pointsFor],
-      pointsAgainst: n[COL.pointsAgainst],
-      diff: n[COL.diff],
-      triesFor: n[COL.triesFor],
-      triesAgainst: n[COL.triesAgainst],
-      bonusOff: n[COL.bonusOff],
-      bonusDef: n[COL.bonusDef],
-      raw: n.slice(0, 20),
+      lineIndex: best.lineIndex,
+      points: at(COL.points),
+      played: at(COL.played),
+      won: at(COL.won),
+      drawn: at(COL.drawn),
+      lost: at(COL.lost),
+      pointsFor: at(COL.pointsFor),
+      pointsAgainst: at(COL.pointsAgainst),
+      diff: at(COL.diff),
+      triesFor: at(COL.triesFor),
+      triesAgainst: at(COL.triesAgainst),
+      bonusOff: at(COL.bonusOff),
+      bonusDef: at(COL.bonusDef),
+      raw: best.cells.slice(best.clubIdx, best.clubIdx + LAST_COL + 1).map((c) => c.trim()),
     });
   }
 
-  // Classement : points, puis difference, puis essais marques
-  rows.sort(
-    (a, b) =>
-      b.points - a.points ||
-      b.diff - a.diff ||
-      b.triesFor - a.triesFor ||
-      a.label.localeCompare(b.label)
-  );
+  // On respecte l'ordre d'affichage du site, qui applique les departages
+  // officiels ; les points ne servent que de filet.
+  rows.sort((a, b) => a.lineIndex - b.lineIndex || b.points - a.points);
   rows.forEach((r, i) => { r.rank = i + 1; });
 
   return { rows, misses };
