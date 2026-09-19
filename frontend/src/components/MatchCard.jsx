@@ -12,7 +12,9 @@ function ScoreInput({ value, onChange, disabled }) {
       min="0"
       max="150"
       value={value}
-      onChange={(e) => onChange(Number(e.target.value))}
+      // On laisse passer la chaine vide : convertir tout de suite afficherait
+      // un 0 des que l'on efface le champ.
+      onChange={(e) => onChange(e.target.value === '' ? '' : Number(e.target.value))}
       disabled={disabled}
       className="w-[52px] h-11 text-center font-display text-xl font-bold tabular-nums
                  bg-slate-950 border-[1.5px] border-slate-800 rounded-md text-white
@@ -54,15 +56,27 @@ function PointsChip({ points }) {
   );
 }
 
-export default function MatchCard({ match, onPredictionSaved }) {
+/**
+ * Les scores saisis ne vivent plus dans cette carte mais dans MatchesPage,
+ * qui les sauvegarde dans le navigateur et sait tout valider d'un coup.
+ * La carte est donc pilotee par `draft` et remonte chaque frappe.
+ */
+export default function MatchCard({ match, draft, onDraftChange, onPredictionSaved }) {
   const { user } = useAuth();
   const prediction = match.predictions?.[0];
   const isFinished = match.status === 'FINISHED';
   const isPast = new Date() >= new Date(match.kickoff);
   const locked = isPast || isFinished;
 
-  const [home, setHome] = useState(prediction?.homeScorePred ?? '');
-  const [away, setAway] = useState(prediction?.awayScorePred ?? '');
+  // Un brouillon a la priorite sur ce qui est enregistre ; sinon on repart du
+  // pronostic en base, sinon du vide.
+  const home = draft?.home ?? prediction?.homeScorePred ?? '';
+  const away = draft?.away ?? prediction?.awayScorePred ?? '';
+  const complete = home !== '' && away !== '';
+  const dirty =
+    complete &&
+    (!prediction || prediction.homeScorePred !== home || prediction.awayScorePred !== away);
+
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
@@ -88,11 +102,11 @@ export default function MatchCard({ match, onPredictionSaved }) {
   };
 
   const handleSave = async () => {
-    if (home === '' || away === '') return;
+    if (!complete) return;
     setSaving(true);
     setError('');
     try {
-      await api.post('/predictions', {
+      const res = await api.post('/predictions', {
         matchId: match.id,
         homeScorePred: home,
         awayScorePred: away,
@@ -100,7 +114,7 @@ export default function MatchCard({ match, onPredictionSaved }) {
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
       setOthers(null);
-      onPredictionSaved?.();
+      onPredictionSaved?.(match.id, res.data);
     } catch (err) {
       setError(err.response?.data?.error || 'Erreur');
     } finally {
@@ -155,9 +169,9 @@ export default function MatchCard({ match, onPredictionSaved }) {
             </>
           ) : (
             <>
-              <ScoreInput value={home} onChange={setHome} disabled={locked} />
+              <ScoreInput value={home} onChange={(v) => onDraftChange(match.id, 'home', v)} disabled={locked} />
               <span className="text-slate-500 text-base">–</span>
-              <ScoreInput value={away} onChange={setAway} disabled={locked} />
+              <ScoreInput value={away} onChange={(v) => onDraftChange(match.id, 'away', v)} disabled={locked} />
             </>
           )}
         </div>
@@ -186,13 +200,23 @@ export default function MatchCard({ match, onPredictionSaved }) {
 
       {/* Saisie */}
       {!locked && (
-        <div className="relative z-10 mt-3.5 pt-3 border-t border-slate-800 flex items-center gap-3">
-          <button onClick={handleSave} disabled={saving || home === '' || away === ''} className="btn-primary text-[13px] py-2">
+        <div className="relative z-10 mt-3.5 pt-3 border-t border-slate-800 flex items-center gap-3 flex-wrap">
+          <button
+            onClick={handleSave}
+            disabled={saving || !complete || (!dirty && !!prediction)}
+            className="btn-primary text-[13px] py-2"
+          >
             {saving ? '…' : saved ? '✅ Enregistré' : prediction ? 'Modifier' : 'Valider'}
           </button>
-          {prediction && !saving && !saved && (
+
+          {dirty && !saving && !saved && (
+            <span className="font-display text-[11px] font-bold uppercase tracking-wider px-2 py-1 rounded bg-amber-500/20 text-amber-500 border border-amber-500/45">
+              non enregistré
+            </span>
+          )}
+          {!dirty && prediction && !saving && !saved && (
             <span className="text-[11.5px] text-slate-500">
-              Actuel : {prediction.homeScorePred}–{prediction.awayScorePred}
+              Enregistré : {prediction.homeScorePred}–{prediction.awayScorePred}
             </span>
           )}
           {error && <span className="text-[11.5px] text-red-400">{error}</span>}

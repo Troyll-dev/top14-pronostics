@@ -3,20 +3,48 @@ import { Link } from 'react-router-dom';
 import api from '../api/client';
 import MatchCard from '../components/MatchCard';
 
+const DRAFT_KEY = 't14-brouillons';
+const DRAFT_TTL = 30 * 24 * 3600 * 1000; // un mois
+
+/** Brouillons enregistres dans le navigateur, purges des entrees trop vieilles. */
+function loadDrafts() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(DRAFT_KEY)) || {};
+    const now = Date.now();
+    const kept = {};
+    for (const [id, d] of Object.entries(raw)) {
+      if (d && typeof d === 'object' && now - (d.t || 0) < DRAFT_TTL) kept[id] = d;
+    }
+    return kept;
+  } catch {
+    // navigation privee ou stockage bloque : on repart simplement de zero
+    return {};
+  }
+}
+
 export default function MatchesPage() {
   const [rounds, setRounds] = useState([]);
   const [currentRound, setCurrentRound] = useState(null);
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const [drafts, setDrafts] = useState(loadDrafts);
+  const [bulkSaving, setBulkSaving] = useState(false);
+  const [bulkResult, setBulkResult] = useState(null);
+
   useEffect(() => {
-    api.get('/matches/rounds').then((res) => {
-      setRounds(res.data);
-    });
-    api.get('/matches/next-round').then((res) => {
-      setCurrentRound(res.data.round);
-    });
+    api.get('/matches/rounds').then((res) => setRounds(res.data)).catch(console.error);
+    api.get('/matches/next-round').then((res) => setCurrentRound(res.data.round)).catch(console.error);
   }, []);
+
+  // Sauvegarde automatique a chaque frappe
+  useEffect(() => {
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(drafts));
+    } catch {
+      // stockage indisponible : les brouillons restent valables pour la session
+    }
+  }, [drafts]);
 
   const fetchMatches = useCallback(() => {
     if (!currentRound) return;
@@ -28,11 +56,72 @@ export default function MatchesPage() {
   }, [currentRound]);
 
   useEffect(() => { fetchMatches(); }, [fetchMatches]);
+  useEffect(() => { setBulkResult(null); }, [currentRound]);
+
+  const setDraft = useCallback((matchId, side, value) => {
+    setDrafts((prev) => ({
+      ...prev,
+      [matchId]: { ...prev[matchId], [side]: value, t: Date.now() },
+    }));
+  }, []);
+
+  /**
+   * Apres une validation on remplace le pronostic du seul match concerne, et
+   * on oublie son brouillon. Surtout ne pas rappeler fetchMatches ici : il
+   * repasse loading a vrai, ce qui demonte toute la liste et effacerait les
+   * scores saisis mais pas encore valides sur les autres matchs.
+   */
+  const handleSaved = useCallback((matchId, prediction) => {
+    setMatches((prev) =>
+      prev.map((m) => (m.id === matchId ? { ...m, predictions: [prediction] } : m))
+    );
+    setDrafts((prev) => {
+      const next = { ...prev };
+      delete next[matchId];
+      return next;
+    });
+  }, []);
 
   const hasPrediction = (m) => m.predictions?.length > 0;
-  const pending = matches.filter(
-    (m) => m.status === 'SCHEDULED' && !hasPrediction(m) && new Date() < new Date(m.kickoff)
-  );
+  const isOpen = (m) => m.status === 'SCHEDULED' && new Date() < new Date(m.kickoff);
+  const pending = matches.filter((m) => isOpen(m) && !hasPrediction(m));
+
+  // Matchs ouverts dont le brouillon est complet et differe de ce qui est enregistre
+  const toSave = matches.filter((m) => {
+    if (!isOpen(m)) return false;
+    const d = drafts[m.id];
+    if (!d || d.home === '' || d.home === undefined || d.away === '' || d.away === undefined) return false;
+    const p = m.predictions?.[0];
+    return !p || p.homeScorePred !== d.home || p.awayScorePred !== d.away;
+  });
+
+  const saveAll = async () => {
+    setBulkSaving(true);
+    setBulkResult(null);
+    let ok = 0;
+    const failed = [];
+
+    // En serie plutot qu'en parallele : sept requetes, et les erreurs restent lisibles
+    for (const m of toSave) {
+      const d = drafts[m.id];
+      try {
+        const res = await api.post('/predictions', {
+          matchId: m.id,
+          homeScorePred: d.home,
+          awayScorePred: d.away,
+        });
+        handleSaved(m.id, res.data);
+        ok++;
+      } catch (err) {
+        failed.push(
+          `${m.homeTeam.shortName}–${m.awayTeam.shortName} : ${err.response?.data?.error || 'erreur'}`
+        );
+      }
+    }
+
+    setBulkSaving(false);
+    setBulkResult({ ok, failed });
+  };
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6">
@@ -83,14 +172,63 @@ export default function MatchesPage() {
       ) : (
         <div className="space-y-3">
           {matches.map((match) => (
-            <MatchCard key={match.id} match={match} onPredictionSaved={fetchMatches} />
+            <MatchCard
+              key={match.id}
+              match={match}
+              draft={drafts[match.id]}
+              onDraftChange={setDraft}
+              onPredictionSaved={handleSaved}
+            />
           ))}
+        </div>
+      )}
+
+      {/* Tout valider */}
+      {!loading && (toSave.length > 0 || bulkResult) && (
+        <div className="card mt-5 border-l-4 border-l-amber-500">
+          {toSave.length > 0 ? (
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div>
+                <p className="font-display font-bold text-[15px]">
+                  {toSave.length} prono{toSave.length > 1 ? 's' : ''} en attente
+                </p>
+                <p className="text-[12px] text-slate-500 mt-0.5">
+                  Saisis mais pas encore envoyés. Ils sont conservés dans ce navigateur.
+                </p>
+              </div>
+              <button onClick={saveAll} disabled={bulkSaving} className="btn-primary text-[13.5px] shrink-0">
+                {bulkSaving ? 'Envoi…' : 'Tout valider'}
+              </button>
+            </div>
+          ) : (
+            <p className="font-display font-bold text-[15px] text-green-400">
+              ✅ Tous tes pronos sont enregistrés
+            </p>
+          )}
+
+          {bulkResult && (
+            <div className="mt-3 pt-3 border-t border-slate-800 text-[12.5px]">
+              {bulkResult.ok > 0 && (
+                <p className="text-green-400">
+                  {bulkResult.ok} prono{bulkResult.ok > 1 ? 's' : ''} enregistré{bulkResult.ok > 1 ? 's' : ''}
+                </p>
+              )}
+              {bulkResult.failed.length > 0 && (
+                <div className="mt-1 text-red-400">
+                  <p>{bulkResult.failed.length} en échec :</p>
+                  <ul className="mt-0.5 space-y-0.5">
+                    {bulkResult.failed.map((f, i) => <li key={i}>· {f}</li>)}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
       {/* Récapitulatif */}
       {!loading && matches.length > 0 && (
-        <div className="card mt-6">
+        <div className="card mt-5">
           <h3 className="rule-label mb-4">Récapitulatif</h3>
           <div className="grid grid-cols-3 gap-4 text-center">
             <div>
