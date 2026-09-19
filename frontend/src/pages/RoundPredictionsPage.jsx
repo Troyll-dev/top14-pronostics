@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
+import TeamCrest from '../components/TeamCrest';
 
 function cellClass(points) {
   if (points === null || points === undefined) return 'bg-slate-800/45 text-slate-400';
@@ -102,10 +103,10 @@ export default function RoundPredictionsPage() {
                   </th>
                   {matches.map((m) => (
                     <th key={m.id} className="px-1.5 pb-2.5 min-w-[4.6rem] align-bottom">
-                      <div className="font-display text-[10.5px] font-bold uppercase tracking-wide text-slate-500 leading-tight">
-                        {m.homeTeam.shortName}
-                        <span className="text-slate-600"> – </span>
-                        {m.awayTeam.shortName}
+                      <div className="flex items-center justify-center gap-1">
+                        <TeamCrest team={m.homeTeam} size={18} />
+                        <span className="text-slate-600 text-[10px]">–</span>
+                        <TeamCrest team={m.awayTeam} size={18} />
                       </div>
                       <div className="font-display text-[11.5px] font-bold mt-0.5">
                         {m.status === 'FINISHED' ? (

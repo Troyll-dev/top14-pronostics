@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import api from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
+import TeamCrest from './TeamCrest';
 
 function ScoreInput({ value, onChange, disabled }) {
   return (
@@ -133,9 +134,12 @@ export default function MatchCard({ match, onPredictionSaved }) {
 
       {/* Affiche */}
       <div className="relative z-10 flex items-center gap-2.5 sm:gap-4">
-        <div className="flex-1 min-w-0 text-right">
-          <p className="font-display font-bold text-[15.5px] leading-tight">{match.homeTeam.name}</p>
-          <p className="text-[10.5px] italic text-slate-500 mt-0.5">{match.venue || match.homeTeam.city}</p>
+        <div className="flex-1 min-w-0 flex items-center justify-end gap-2.5">
+          <div className="min-w-0 text-right">
+            <p className="font-display font-bold text-[15.5px] leading-tight truncate">{match.homeTeam.name}</p>
+            <p className="text-[10.5px] italic text-slate-500 mt-0.5 truncate">{match.venue || match.homeTeam.city}</p>
+          </div>
+          <TeamCrest team={match.homeTeam} size={28} />
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
@@ -158,9 +162,12 @@ export default function MatchCard({ match, onPredictionSaved }) {
           )}
         </div>
 
-        <div className="flex-1 min-w-0">
-          <p className="font-display font-bold text-[15.5px] leading-tight">{match.awayTeam.name}</p>
-          <p className="text-[10.5px] italic text-slate-500 mt-0.5">{match.awayTeam.city}</p>
+        <div className="flex-1 min-w-0 flex items-center gap-2.5">
+          <TeamCrest team={match.awayTeam} size={28} />
+          <div className="min-w-0">
+            <p className="font-display font-bold text-[15.5px] leading-tight truncate">{match.awayTeam.name}</p>
+            <p className="text-[10.5px] italic text-slate-500 mt-0.5 truncate">{match.awayTeam.city}</p>
+          </div>
         </div>
       </div>
 

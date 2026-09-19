@@ -7,7 +7,7 @@ export default function Navbar() {
   const { pathname } = useLocation();
 
   const [theme, setTheme] = useState(
-    () => document.documentElement.dataset.theme || 'nuit'
+    () => document.documentElement.dataset.theme || 'creme'
   );
 
   const toggleTheme = () => {
