@@ -13,33 +13,41 @@ function ScoreInput({ value, onChange, disabled }) {
       value={value}
       onChange={(e) => onChange(Number(e.target.value))}
       disabled={disabled}
-      className="w-14 text-center text-xl font-bold bg-slate-800 border border-slate-600 rounded-lg py-2 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-white"
+      className="w-[52px] h-11 text-center font-display text-xl font-bold tabular-nums
+                 bg-slate-950 border-[1.5px] border-slate-800 rounded-md text-white
+                 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/25
+                 disabled:opacity-45 disabled:cursor-not-allowed transition-colors"
     />
   );
 }
 
+const POINTS = {
+  3: { cls: 'bg-green-500 text-slate-950', label: '🎯 Score exact +3' },
+  2: { cls: 'bg-amber-500/20 text-amber-400 border border-amber-500/45', label: '✅ Bon vainqueur +2' },
+  1: { cls: 'bg-slate-700/40 text-slate-400 border border-slate-700', label: '✅ Bon vainqueur +1' },
+  0: { cls: 'bg-slate-800/60 text-slate-500 border border-slate-800', label: '❌ Raté 0' },
+};
+
 function PointsBadge({ points }) {
   if (points === null || points === undefined) return null;
-  const config = {
-    3: { bg: 'bg-green-500', label: '🎯 Score exact (+3)' },
-    2: { bg: 'bg-blue-500', label: '✅ Bon vainqueur (+2)' },
-    1: { bg: 'bg-slate-500', label: '✅ Bon vainqueur (+1)' },
-    0: { bg: 'bg-red-900/60', label: '❌ Raté (0)' },
-  };
-  const c = config[points] || config[0];
+  const c = POINTS[points] || POINTS[0];
   return (
-    <span className={`${c.bg} text-white text-xs font-bold px-2 py-0.5 rounded-full`}>
+    <span className={`font-display text-[10.5px] font-bold uppercase tracking-wider px-2.5 py-1 rounded whitespace-nowrap ${c.cls}`}>
       {c.label}
     </span>
   );
 }
 
-// Version compacte pour la liste des pronos des autres joueurs
 function PointsChip({ points }) {
   if (points === null || points === undefined) return null;
-  const bg = { 3: 'bg-green-500', 2: 'bg-blue-500', 1: 'bg-slate-500', 0: 'bg-red-900/60' }[points] || 'bg-red-900/60';
+  const cls = {
+    3: 'bg-green-500 text-slate-950',
+    2: 'bg-amber-500/20 text-amber-400',
+    1: 'bg-slate-700/45 text-slate-400',
+    0: 'bg-slate-800/60 text-slate-500',
+  }[points] || 'bg-slate-800/60 text-slate-500';
   return (
-    <span className={`${bg} text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0`}>
+    <span className={`font-display text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${cls}`}>
       +{points}
     </span>
   );
@@ -58,7 +66,6 @@ export default function MatchCard({ match, onPredictionSaved }) {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
 
-  // Pronostics des autres joueurs
   const [showOthers, setShowOthers] = useState(false);
   const [others, setOthers] = useState(null);
   const [loadingOthers, setLoadingOthers] = useState(false);
@@ -91,7 +98,7 @@ export default function MatchCard({ match, onPredictionSaved }) {
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
-      setOthers(null);          // forcer le rechargement au prochain dépliage
+      setOthers(null);
       onPredictionSaved?.();
     } catch (err) {
       setError(err.response?.data?.error || 'Erreur');
@@ -100,99 +107,107 @@ export default function MatchCard({ match, onPredictionSaved }) {
     }
   };
 
-  const kickoffDate = new Date(match.kickoff);
-  const dateStr = format(kickoffDate, 'EEE d MMM · HH:mm', { locale: fr });
+  const dateStr = format(new Date(match.kickoff), "EEEE d MMMM · HH'h'mm", { locale: fr });
+  const homeWon = isFinished && match.homeScore > match.awayScore;
+  const awayWon = isFinished && match.awayScore > match.homeScore;
 
   return (
-    <div className={`card transition-all ${isFinished ? 'border-slate-700' : 'hover:border-slate-600'}`}>
-      {/* Infos match */}
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-xs text-slate-500">{dateStr}</span>
-        {isFinished && (
-          <span className="text-xs bg-green-900/50 text-green-400 px-2 py-0.5 rounded-full">Terminé</span>
-        )}
-        {!isFinished && locked && (
-          <span className="text-xs bg-red-900/50 text-red-400 px-2 py-0.5 rounded-full">🔒 Clôturé</span>
-        )}
-        {!locked && (
-          <span className="text-xs bg-amber-900/50 text-amber-400 px-2 py-0.5 rounded-full">Ouvert</span>
+    <div className={`card stitched laced ${!locked ? 'border-l-4 border-l-amber-500' : ''}`}>
+      {/* En-tête */}
+      <div className="relative z-10 flex items-center justify-between mb-3">
+        <span className="text-[11.5px] italic text-slate-500 first-letter:uppercase">{dateStr}</span>
+        {isFinished ? (
+          <span className="font-display text-[10.5px] font-bold uppercase tracking-wider px-2.5 py-1 rounded bg-green-500/20 text-green-400 border border-green-500/40">
+            Terminé
+          </span>
+        ) : locked ? (
+          <span className="font-display text-[10.5px] font-bold uppercase tracking-wider px-2.5 py-1 rounded bg-slate-800/60 text-slate-500 border border-slate-800">
+            🔒 Clôturé
+          </span>
+        ) : (
+          <span className="font-display text-[10.5px] font-bold uppercase tracking-wider px-2.5 py-1 rounded chip-accent">
+            Ouvert
+          </span>
         )}
       </div>
 
-      {/* Équipes + scores */}
-      <div className="flex items-center gap-2 sm:gap-4">
-        {/* Équipe domicile */}
-        <div className="flex-1 text-right">
-          <p className="font-bold text-sm sm:text-base leading-tight">{match.homeTeam.name}</p>
-          <p className="text-xs text-slate-500">{match.homeTeam.city}</p>
+      {/* Affiche */}
+      <div className="relative z-10 flex items-center gap-2.5 sm:gap-4">
+        <div className="flex-1 min-w-0 text-right">
+          <p className="font-display font-bold text-[15.5px] leading-tight">{match.homeTeam.name}</p>
+          <p className="text-[10.5px] italic text-slate-500 mt-0.5">{match.venue || match.homeTeam.city}</p>
         </div>
 
-        {/* Scores */}
-        <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
           {isFinished ? (
             <>
-              <span className="text-2xl font-black text-white">{match.homeScore}</span>
-              <span className="text-slate-500">–</span>
-              <span className="text-2xl font-black text-white">{match.awayScore}</span>
+              <span className={`font-display font-extrabold text-[29px] leading-none tabular-nums ${homeWon ? 'text-amber-400' : ''}`}>
+                {match.homeScore}
+              </span>
+              <span className="text-slate-500 text-base">–</span>
+              <span className={`font-display font-extrabold text-[29px] leading-none tabular-nums ${awayWon ? 'text-amber-400' : ''}`}>
+                {match.awayScore}
+              </span>
             </>
           ) : (
             <>
               <ScoreInput value={home} onChange={setHome} disabled={locked} />
-              <span className="text-slate-500 font-bold">–</span>
+              <span className="text-slate-500 text-base">–</span>
               <ScoreInput value={away} onChange={setAway} disabled={locked} />
             </>
           )}
         </div>
 
-        {/* Équipe extérieure */}
-        <div className="flex-1">
-          <p className="font-bold text-sm sm:text-base leading-tight">{match.awayTeam.name}</p>
-          <p className="text-xs text-slate-500">{match.awayTeam.city}</p>
+        <div className="flex-1 min-w-0">
+          <p className="font-display font-bold text-[15.5px] leading-tight">{match.awayTeam.name}</p>
+          <p className="text-[10.5px] italic text-slate-500 mt-0.5">{match.awayTeam.city}</p>
         </div>
       </div>
 
-      {/* Pronostic soumis / points */}
+      {/* Ton pronostic + points */}
       {isFinished && prediction && (
-        <div className="mt-3 pt-3 border-t border-slate-800 flex items-center justify-between">
-          <span className="text-sm text-slate-400">
-            Ton pronostic : <span className="text-white font-bold">{prediction.homeScorePred} – {prediction.awayScorePred}</span>
+        <div className="relative z-10 mt-3.5 pt-3 border-t border-slate-800 flex items-center justify-between gap-2.5">
+          <span className="text-[12.5px] text-slate-400">
+            Ton pronostic{' '}
+            <b className="font-display text-sm text-white">
+              {prediction.homeScorePred} – {prediction.awayScorePred}
+            </b>
           </span>
           <PointsBadge points={prediction.points} />
         </div>
       )}
 
-      {/* Bouton sauvegarder */}
+      {/* Saisie */}
       {!locked && (
-        <div className="mt-3 flex items-center gap-2">
-          <button
-            onClick={handleSave}
-            disabled={saving || home === '' || away === ''}
-            className="btn-primary text-sm py-1.5 px-4"
-          >
-            {saving ? '...' : saved ? '✅ Sauvegardé !' : prediction ? 'Modifier' : 'Valider'}
+        <div className="relative z-10 mt-3.5 pt-3 border-t border-slate-800 flex items-center gap-3">
+          <button onClick={handleSave} disabled={saving || home === '' || away === ''} className="btn-primary text-[13px] py-2">
+            {saving ? '…' : saved ? '✅ Enregistré' : prediction ? 'Modifier' : 'Valider'}
           </button>
           {prediction && !saving && !saved && (
-            <span className="text-xs text-slate-500">
+            <span className="text-[11.5px] text-slate-500">
               Actuel : {prediction.homeScorePred}–{prediction.awayScorePred}
             </span>
           )}
-          {error && <span className="text-xs text-red-400">{error}</span>}
+          {error && <span className="text-[11.5px] text-red-400">{error}</span>}
         </div>
       )}
 
       {locked && !isFinished && prediction && (
-        <div className="mt-2 text-sm text-slate-400">
-          Pronostic enregistré : <span className="text-white font-bold">{prediction.homeScorePred} – {prediction.awayScorePred}</span>
+        <div className="relative z-10 mt-2.5 text-[12.5px] text-slate-400">
+          Pronostic enregistré{' '}
+          <b className="font-display text-sm text-white">
+            {prediction.homeScorePred} – {prediction.awayScorePred}
+          </b>
         </div>
       )}
 
       {/* Pronostics des autres joueurs */}
-      <div className="mt-3 pt-3 border-t border-slate-800">
+      <div className="relative z-10 mt-3 pt-3 border-t border-slate-800">
         <button
           onClick={toggleOthers}
-          className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-amber-400 transition-colors"
+          className="flex items-center gap-2 text-xs text-slate-400 hover:text-amber-400 transition-colors"
         >
-          <span className={`transition-transform ${showOthers ? 'rotate-90' : ''}`}>▶</span>
+          <span className={`text-[9px] text-amber-500 transition-transform ${showOthers ? 'rotate-90' : ''}`}>▶</span>
           Pronos des joueurs
           {others && <span className="text-slate-600">({others.length})</span>}
         </button>
@@ -200,28 +215,33 @@ export default function MatchCard({ match, onPredictionSaved }) {
         {showOthers && (
           <div className="mt-2.5">
             {loadingOthers ? (
-              <p className="text-xs text-slate-600 animate-pulse">Chargement...</p>
+              <p className="text-xs text-slate-600 animate-pulse">Chargement…</p>
             ) : !others || others.length === 0 ? (
               <p className="text-xs text-slate-600">Aucun pronostic pour ce match.</p>
             ) : (
-              <ul className="space-y-1.5">
-                {others.map((p) => {
+              <ul className="flex flex-col gap-0.5">
+                {others.map((p, i) => {
                   const isMe = p.user.id === user?.id;
                   return (
                     <li
                       key={p.id}
-                      className={`flex items-center gap-2 text-sm rounded-lg px-2 py-1 ${
-                        isMe ? 'bg-amber-500/10' : ''
+                      className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-[13px] ${
+                        isMe
+                          ? 'bg-amber-500/10 shadow-[inset_2px_0_0_rgb(var(--a-500))]'
+                          : i % 2 === 0
+                          ? 'bg-amber-500/[.04]'
+                          : ''
                       }`}
                     >
                       <span
-                        className="w-2 h-2 rounded-full shrink-0"
+                        className="w-[7px] h-[7px] rounded-full shrink-0"
                         style={{ backgroundColor: p.user.avatarColor }}
                       />
-                      <span className={`truncate ${isMe ? 'text-amber-400 font-semibold' : 'text-slate-300'}`}>
-                        {p.user.username}{isMe && ' (toi)'}
+                      <span className={`truncate ${isMe ? 'text-amber-400 font-semibold' : 'text-slate-400'}`}>
+                        {p.user.username}
+                        {isMe && ' (toi)'}
                       </span>
-                      <span className="ml-auto font-bold text-white shrink-0 tabular-nums">
+                      <span className="ml-auto font-display font-bold text-[13.5px] tabular-nums shrink-0">
                         {p.homeScorePred} – {p.awayScorePred}
                       </span>
                       <PointsChip points={p.points} />

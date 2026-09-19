@@ -3,15 +3,14 @@ import { Link } from 'react-router-dom';
 import api from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 
-// Couleur de fond d'une case selon les points obtenus
 function cellClass(points) {
-  if (points === null || points === undefined) return 'bg-slate-800/50 text-slate-300';
+  if (points === null || points === undefined) return 'bg-slate-800/45 text-slate-400';
   return {
-    3: 'bg-green-500/25 text-green-300 font-bold',
-    2: 'bg-blue-500/25 text-blue-300 font-semibold',
-    1: 'bg-slate-500/25 text-slate-300',
-    0: 'bg-red-900/30 text-red-300/70',
-  }[points] || 'bg-red-900/30 text-red-300/70';
+    3: 'bg-green-500/25 text-green-400 font-extrabold',
+    2: 'bg-amber-500/20 text-amber-500',
+    1: 'bg-slate-700/30 text-slate-400',
+    0: 'bg-slate-800/60 text-slate-500',
+  }[points] || 'bg-slate-800/60 text-slate-500';
 }
 
 export default function RoundPredictionsPage() {
@@ -44,12 +43,9 @@ export default function RoundPredictionsPage() {
       .finally(() => setLoading(false));
   }, [currentRound]);
 
-  // Liste des joueurs ayant pronostiqué sur cette journée
   const playersById = {};
   for (const p of predictions) {
-    if (!playersById[p.user.id]) {
-      playersById[p.user.id] = { ...p.user, points: 0, count: 0 };
-    }
+    if (!playersById[p.user.id]) playersById[p.user.id] = { ...p.user, points: 0, count: 0 };
     playersById[p.user.id].count++;
     if (typeof p.points === 'number') playersById[p.user.id].points += p.points;
   }
@@ -57,30 +53,29 @@ export default function RoundPredictionsPage() {
     (a, b) => b.points - a.points || a.username.localeCompare(b.username)
   );
 
-  // Index (userId, matchId) -> pronostic
   const byUserMatch = {};
   for (const p of predictions) byUserMatch[`${p.user.id}-${p.matchId}`] = p;
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-6">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Pronos de tous les joueurs</h1>
-        <Link to="/" className="text-sm text-slate-400 hover:text-amber-400 transition-colors">
+      <div className="flex items-baseline justify-between gap-3 mb-1">
+        <h1 className="font-display text-[26px] font-extrabold leading-none">Tous les pronos</h1>
+        <Link to="/pronostics" className="text-sm text-slate-500 hover:text-amber-500 transition-colors whitespace-nowrap">
           ← Mes pronos
         </Link>
       </div>
+      <p className="text-xs italic text-slate-500 mb-5">Qui a vu juste cette journée</p>
 
-      {/* Sélecteur de journée */}
       {rounds.length > 0 && (
-        <div className="flex gap-1 overflow-x-auto pb-2 mb-6 scrollbar-none">
+        <div className="flex gap-1.5 overflow-x-auto pb-1.5 mb-5 scrollbar-none">
           {rounds.map((r) => (
             <button
               key={r}
               onClick={() => setCurrentRound(r)}
-              className={`shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              className={`shrink-0 font-display text-[13.5px] font-semibold px-3.5 py-1.5 rounded border transition-colors ${
                 currentRound === r
-                  ? 'bg-amber-500 text-black'
-                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                  ? 'chip-on'
+                  : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-amber-500 hover:text-white'
               }`}
             >
               J{r}
@@ -90,29 +85,29 @@ export default function RoundPredictionsPage() {
       )}
 
       {loading ? (
-        <div className="text-center py-16 text-slate-500 animate-pulse">Chargement...</div>
+        <div className="text-center py-16 text-slate-500 animate-pulse">Chargement…</div>
       ) : players.length === 0 ? (
         <div className="text-center py-16">
           <p className="text-slate-500 text-lg mb-2">Aucun pronostic pour la journée {currentRound}</p>
-          <p className="text-slate-600 text-sm">Les pronos s'afficheront ici dès que les joueurs auront misé</p>
+          <p className="text-slate-600 text-sm">Les pronos s'afficheront dès que les joueurs auront misé</p>
         </div>
       ) : (
         <>
-          <div className="overflow-x-auto -mx-4 px-4">
-            <table className="w-full border-separate border-spacing-0 text-sm">
+          <div className="card overflow-x-auto">
+            <table className="w-full border-separate border-spacing-0 text-xs">
               <thead>
                 <tr>
-                  <th className="sticky left-0 z-20 bg-slate-950 text-left font-semibold text-slate-400 px-2 py-2 min-w-[7rem]">
+                  <th className="sticky left-0 z-20 bg-slate-900 text-left font-display text-[10.5px] font-bold uppercase tracking-wider text-slate-500 px-2 pb-2.5 min-w-[7rem]">
                     Joueur
                   </th>
                   {matches.map((m) => (
-                    <th key={m.id} className="px-1.5 py-2 min-w-[4.5rem] align-bottom">
-                      <div className="text-[11px] leading-tight text-slate-400 font-semibold">
+                    <th key={m.id} className="px-1.5 pb-2.5 min-w-[4.6rem] align-bottom">
+                      <div className="font-display text-[10.5px] font-bold uppercase tracking-wide text-slate-500 leading-tight">
                         {m.homeTeam.shortName}
                         <span className="text-slate-600"> – </span>
                         {m.awayTeam.shortName}
                       </div>
-                      <div className="text-[11px] mt-0.5 font-bold">
+                      <div className="font-display text-[11.5px] font-bold mt-0.5">
                         {m.status === 'FINISHED' ? (
                           <span className="text-white">{m.homeScore}–{m.awayScore}</span>
                         ) : (
@@ -121,7 +116,9 @@ export default function RoundPredictionsPage() {
                       </div>
                     </th>
                   ))}
-                  <th className="px-2 py-2 text-right font-semibold text-slate-400 min-w-[3.5rem]">Pts</th>
+                  <th className="px-2 pb-2.5 text-right font-display text-[10.5px] font-bold uppercase tracking-wider text-slate-500 min-w-[3.5rem]">
+                    Pts
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -129,17 +126,13 @@ export default function RoundPredictionsPage() {
                   const isMe = pl.id === user?.id;
                   return (
                     <tr key={pl.id}>
-                      <td
-                        className={`sticky left-0 z-10 px-2 py-1.5 ${
-                          isMe ? 'bg-amber-500/10' : 'bg-slate-950'
-                        }`}
-                      >
-                        <div className="flex items-center gap-1.5">
+                      <td className={`sticky left-0 z-10 px-2 py-1.5 ${isMe ? 'bg-amber-500/10' : 'bg-slate-900'}`}>
+                        <div className="flex items-center gap-1.5 whitespace-nowrap">
                           <span
-                            className="w-2 h-2 rounded-full shrink-0"
+                            className="w-[7px] h-[7px] rounded-full shrink-0"
                             style={{ backgroundColor: pl.avatarColor }}
                           />
-                          <span className={`truncate ${isMe ? 'text-amber-400 font-semibold' : 'text-slate-200'}`}>
+                          <span className={`truncate ${isMe ? 'text-amber-500 font-semibold' : 'text-slate-400'}`}>
                             {pl.username}
                           </span>
                         </div>
@@ -150,8 +143,8 @@ export default function RoundPredictionsPage() {
                         return (
                           <td key={m.id} className="px-0.5 py-0.5">
                             <div
-                              className={`rounded-md py-1.5 text-center tabular-nums text-xs ${
-                                p ? cellClass(p.points) : 'bg-slate-900/60 text-slate-700'
+                              className={`rounded py-1.5 text-center font-display text-[12px] font-bold tabular-nums ${
+                                p ? cellClass(p.points) : 'bg-slate-800/25 text-slate-600'
                               }`}
                             >
                               {p ? `${p.homeScorePred}–${p.awayScorePred}` : '—'}
@@ -160,9 +153,7 @@ export default function RoundPredictionsPage() {
                         );
                       })}
 
-                      <td className={`px-2 py-1.5 text-right font-bold tabular-nums ${
-                        isMe ? 'text-amber-400' : 'text-white'
-                      }`}>
+                      <td className={`px-2 py-1.5 text-right font-display text-[15px] font-extrabold tabular-nums ${isMe ? 'text-amber-500' : ''}`}>
                         {pl.points}
                       </td>
                     </tr>
@@ -173,18 +164,18 @@ export default function RoundPredictionsPage() {
           </div>
 
           {/* Légende */}
-          <div className="mt-5 flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-500">
+          <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-xs text-slate-500">
             <span className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded bg-green-500/25 border border-green-500/40" /> Score exact (+3)
+              <span className="w-3 h-3 rounded-sm bg-green-500/25 border border-green-500/45" /> Score exact +3
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded bg-blue-500/25 border border-blue-500/40" /> Bon vainqueur, écart proche (+2)
+              <span className="w-3 h-3 rounded-sm bg-amber-500/20 border border-amber-500/45" /> Bon vainqueur, écart proche +2
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded bg-slate-500/25 border border-slate-500/40" /> Bon vainqueur (+1)
+              <span className="w-3 h-3 rounded-sm bg-slate-700/30 border border-slate-700" /> Bon vainqueur +1
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded bg-red-900/30 border border-red-900/50" /> Raté (0)
+              <span className="w-3 h-3 rounded-sm bg-slate-800/60 border border-slate-800" /> Raté 0
             </span>
           </div>
         </>
