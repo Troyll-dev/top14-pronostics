@@ -2,6 +2,7 @@ generator client {
   provider      = "prisma-client-js"
   binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
@@ -34,7 +35,7 @@ model Team {
 
 model Match {
   id           Int           @id @default(autoincrement())
-  externalId   String?       @unique   // ID depuis l'API Rugby externe
+  externalId   String?       @unique   // ID depuis l'API externe
   round        Int                     // Journée (1-26)
   season       String        @default("2026-2027")
   homeTeam     Team          @relation("HomeTeam", fields: [homeTeamId], references: [id])
@@ -73,4 +74,17 @@ model Prediction {
 
   @@unique([userId, matchId])
   @@map("predictions")
+}
+
+/// Instantané du classement Top 14, relu périodiquement sur une source externe.
+/// L'application lit toujours cette table, jamais le site : si la source change
+/// de structure, la page continue d'afficher le dernier classement connu.
+model LeagueTable {
+  id        Int      @id @default(autoincrement())
+  season    String   @unique @default("2026-2027")
+  data      Json                         // tableau des équipes, une entrée par club
+  source    String   @default("allrugby")
+  fetchedAt DateTime @default(now())
+
+  @@map("league_table")
 }

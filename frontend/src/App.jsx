@@ -5,6 +5,7 @@ import WelcomePage from './pages/WelcomePage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import HomePage from './pages/HomePage';
+import Top14Page from './pages/Top14Page';
 import MatchesPage from './pages/MatchesPage';
 import RoundPredictionsPage from './pages/RoundPredictionsPage';
 import LeaderboardPage from './pages/LeaderboardPage';
@@ -39,6 +40,7 @@ function AppRoutes() {
         <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
         <Route path="/" element={<PrivateRoute><HomePage /></PrivateRoute>} />
         <Route path="/pronostics" element={<PrivateRoute><MatchesPage /></PrivateRoute>} />
+        <Route path="/top14" element={<PrivateRoute><Top14Page /></PrivateRoute>} />
         <Route path="/pronos" element={<PrivateRoute><RoundPredictionsPage /></PrivateRoute>} />
         <Route path="/classement" element={<PrivateRoute><LeaderboardPage /></PrivateRoute>} />
         <Route path="/admin" element={<PrivateRoute><AdminPage /></PrivateRoute>} />

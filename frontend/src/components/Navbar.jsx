@@ -25,6 +25,7 @@ export default function Navbar() {
     { to: '/', icon: '🏠', label: 'Accueil' },
     { to: '/pronostics', icon: '📅', label: 'Mes pronos' },
     { to: '/pronos', icon: '👥', label: 'Tous les pronos' },
+    { to: '/top14', icon: '🏉', label: 'Championnat' },
     { to: '/classement', icon: '🏆', label: 'Classement' },
     { to: '/admin', icon: '⚙️', label: 'Admin' },
   ];
@@ -37,13 +38,13 @@ export default function Navbar() {
           <span className="hidden lg:inline">Top 14 Pronos</span>
         </Link>
 
-        <div className="flex items-center gap-0.5">
+        <div className="flex items-center">
           {links.map((l) => (
             <Link
               key={l.to}
               to={l.to}
               title={l.label}
-              className={`flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
+              className={`flex items-center gap-1.5 px-1.5 sm:px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
                 pathname === l.to
                   ? 'tab-on font-semibold shadow-[inset_0_-2px_0_rgba(0,0,0,.18)]'
                   : 'nav-dim hover:bg-white/10'

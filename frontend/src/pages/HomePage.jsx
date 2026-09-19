@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import api from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
+import TeamCrest from '../components/TeamCrest';
 
 function pointsTone(points) {
   return {
@@ -20,10 +21,16 @@ export default function HomePage() {
   const [matches, setMatches] = useState([]);
   const [previous, setPrevious] = useState([]);
   const [board, setBoard] = useState([]);
+  const [standings, setStandings] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let alive = true;
+
+    api.get('/standings')
+      .then((res) => alive && setStandings(res.data))
+      .catch(() => {});
+
     api.get('/matches/next-round')
       .then((res) => {
         if (!alive) return;
@@ -44,6 +51,7 @@ export default function HomePage() {
       })
       .catch(console.error)
       .finally(() => alive && setLoading(false));
+
     return () => { alive = false; };
   }, []);
 
@@ -57,10 +65,16 @@ export default function HomePage() {
   const me = myIndex >= 0 ? board[myIndex] : null;
   const leader = board[0];
 
-  const lastResults = previous
-    .filter((m) => m.status === 'FINISHED')
-    .slice(-3)
-    .reverse();
+  const lastResults = previous.filter((m) => m.status === 'FINISHED').slice(-3).reverse();
+
+  const table = standings?.table || [];
+  const topFive = table.slice(0, 5);
+  const hottest = table
+    .filter((r) => r.form?.weather?.streakType === 'V' && r.form.weather.streak >= 2)
+    .sort((a, b) => b.form.weather.streak - a.form.weather.streak)[0];
+  const coldest = table
+    .filter((r) => r.form?.weather?.streakType === 'D' && r.form.weather.streak >= 2)
+    .sort((a, b) => b.form.weather.streak - a.form.weather.streak)[0];
 
   if (loading) {
     return <div className="text-center py-20 text-slate-500 animate-pulse">Chargement…</div>;
@@ -79,7 +93,7 @@ export default function HomePage() {
           : 'Rien à pronostiquer pour le moment.'}
       </p>
 
-      {/* Appel à l'action principal */}
+      {/* Journée en cours */}
       <div className={`card stitched laced mb-4 ${todo.length > 0 ? 'border-l-4 border-l-amber-500' : ''}`}>
         <div className="relative z-10">
           <h2 className="rule-label mb-3">Journée {round}</h2>
@@ -104,16 +118,18 @@ export default function HomePage() {
 
           {nextMatch && (
             <div className="mt-4 pt-3 border-t border-slate-800">
-              <p className="text-[11px] uppercase tracking-wide text-slate-500 mb-1.5">
+              <p className="text-[11px] uppercase tracking-wide text-slate-500 mb-2">
                 Prochain coup d'envoi
               </p>
-              <div className="flex items-baseline justify-between gap-3">
-                <p className="font-display font-bold text-[15px] truncate">
+              <div className="flex items-center gap-2.5">
+                <TeamCrest team={nextMatch.homeTeam} size={22} />
+                <p className="font-display font-bold text-[14.5px] truncate">
                   {nextMatch.homeTeam.name}
-                  <span className="text-slate-500 font-normal"> contre </span>
+                  <span className="text-slate-500 font-normal"> — </span>
                   {nextMatch.awayTeam.name}
                 </p>
-                <p className="text-[12px] italic text-slate-500 shrink-0 first-letter:uppercase">
+                <TeamCrest team={nextMatch.awayTeam} size={22} />
+                <p className="ml-auto text-[12px] italic text-slate-500 shrink-0 first-letter:uppercase">
                   {format(new Date(nextMatch.kickoff), "EEE d MMM · HH'h'mm", { locale: fr })}
                 </p>
               </div>
@@ -122,21 +138,18 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Ton rang */}
+      {/* Mon rang */}
       {me && (
         <Link to="/classement" className="card block mb-4 hover:border-amber-500 transition-colors">
-          <h2 className="rule-label mb-3">Au classement</h2>
+          <h2 className="rule-label mb-3">Au classement des pronos</h2>
           <div className="flex items-center gap-4">
             <div className="text-center shrink-0 w-14">
               <p className="font-display text-[32px] font-extrabold leading-none text-amber-500">
                 {myIndex + 1}
-                <span className="text-sm align-top text-slate-500">
-                  {myIndex === 0 ? 'er' : 'e'}
-                </span>
+                <span className="text-sm align-top text-slate-500">{myIndex === 0 ? 'er' : 'e'}</span>
               </p>
               <p className="text-[10px] uppercase tracking-wide text-slate-500 mt-1">sur {board.length}</p>
             </div>
-
             <div className="flex-1 min-w-0 text-[13px] text-slate-400">
               <p>
                 <b className="font-display text-white">{me.totalPoints} points</b>
@@ -154,10 +167,50 @@ export default function HomePage() {
         </Link>
       )}
 
+      {/* Aperçu du championnat */}
+      {topFive.length > 0 && (
+        <div className="card mb-4">
+          <h2 className="rule-label mb-3">Le championnat</h2>
+
+          <div className="divide-y divide-slate-800">
+            {topFive.map((r) => (
+              <div key={r.shortName} className="flex items-center gap-2.5 py-1.5 text-[13px]">
+                <span className="font-display font-bold text-slate-500 w-4 shrink-0 tabular-nums">{r.rank}</span>
+                <TeamCrest team={r} size={20} />
+                <span className="font-display font-bold truncate">{r.name}</span>
+                <span className="ml-auto shrink-0 text-base leading-none" title={r.form?.weather?.label || ''}>
+                  {r.form?.weather?.icon || ''}
+                </span>
+                <span className="font-display font-extrabold tabular-nums w-7 text-right shrink-0">{r.points}</span>
+              </div>
+            ))}
+          </div>
+
+          {(hottest || coldest) && (
+            <div className="mt-3 pt-3 border-t border-slate-800 space-y-1 text-[12.5px]">
+              {hottest && (
+                <p className="text-slate-400">
+                  ☀️ <b className="font-display">{hottest.name}</b> reste sur {hottest.form.weather.streak} victoires
+                </p>
+              )}
+              {coldest && (
+                <p className="text-slate-400">
+                  🌧️ <b className="font-display">{coldest.name}</b> a perdu ses {coldest.form.weather.streak} derniers matchs
+                </p>
+              )}
+            </div>
+          )}
+
+          <Link to="/top14" className="inline-block mt-3 text-[13px] text-slate-500 hover:text-amber-500 transition-colors">
+            Classement complet et résultats →
+          </Link>
+        </div>
+      )}
+
       {/* Derniers résultats */}
       {lastResults.length > 0 && (
         <div className="card">
-          <h2 className="rule-label mb-3">Derniers résultats · journée {round - 1}</h2>
+          <h2 className="rule-label mb-3">Tes derniers pronos · journée {round - 1}</h2>
           <ul className="divide-y divide-slate-800">
             {lastResults.map((m) => {
               const p = m.predictions?.[0];
