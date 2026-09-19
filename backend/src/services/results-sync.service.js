@@ -184,7 +184,7 @@ async function syncResults({ dryRun = false, rounds = null } = {}) {
       // or c'est l'heure qui decide de « en cours » et de la cloture des pronos.
       const kickoff = apiKickoff(ev);
       const kickoffShift = kickoff && Math.abs(kickoff.getTime() - new Date(match.kickoff).getTime());
-      const fixKickoff = kickoff && kickoffShift > 10 * 60 * 1000 && match.status !== 'FINISHED';
+      const fixKickoff = kickoff && kickoffShift > 10 * 60 * 1000;
 
       if (!hasScore) {
         if (fixKickoff && !dryRun) {
@@ -199,6 +199,14 @@ async function syncResults({ dryRun = false, rounds = null } = {}) {
 
       const final = isFinal(ev, kickoff || new Date(match.kickoff), now);
       const status = final ? 'FINISHED' : 'LIVE';
+
+      // Un match deja termine n'est jamais rouvert par un score provisoire.
+      // TheSportsDB est alimente par des benevoles : il lui arrive de rester
+      // bloque sur un score de 60e minute pendant des heures. Sans cette regle,
+      // une correction saisie a la main serait ecrasee au passage suivant.
+      if (!final && match.status === 'FINISHED') {
+        report.skipped++; continue;
+      }
 
       // Rien de neuf : meme score, meme etat, meme horaire.
       if (match.homeScore === hs && match.awayScore === as && match.status === status && !fixKickoff) {
