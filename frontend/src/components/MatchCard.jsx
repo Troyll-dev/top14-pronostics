@@ -4,6 +4,7 @@ import { fr } from 'date-fns/locale';
 import api from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 import TeamCrest from './TeamCrest';
+import { matchState, STATE, STATE_CHIP } from '../utils/matchState';
 
 function ScoreInput({ value, onChange, disabled }) {
   return (
@@ -61,12 +62,12 @@ function PointsChip({ points }) {
  * qui les sauvegarde dans le navigateur et sait tout valider d'un coup.
  * La carte est donc pilotee par `draft` et remonte chaque frappe.
  */
-export default function MatchCard({ match, draft, onDraftChange, onPredictionSaved }) {
+export default function MatchCard({ match, draft, onDraftChange, onPredictionSaved, now = Date.now() }) {
   const { user } = useAuth();
   const prediction = match.predictions?.[0];
-  const isFinished = match.status === 'FINISHED';
-  const isPast = new Date() >= new Date(match.kickoff);
-  const locked = isPast || isFinished;
+  const state = matchState(match, now);
+  const isFinished = state === 'termine';
+  const locked = state !== 'avenir';
 
   // Un brouillon a la priorite sur ce qui est enregistre ; sinon on repart du
   // pronostic en base, sinon du vide.
@@ -131,17 +132,14 @@ export default function MatchCard({ match, draft, onDraftChange, onPredictionSav
       {/* En-tête */}
       <div className="relative z-10 flex items-center justify-between mb-3">
         <span className="text-[11.5px] italic text-slate-500 first-letter:uppercase">{dateStr}</span>
-        {isFinished ? (
-          <span className="font-display text-[10.5px] font-bold uppercase tracking-wider px-2.5 py-1 rounded bg-green-500/20 text-green-400 border border-green-500/40">
-            Terminé
-          </span>
-        ) : locked ? (
-          <span className="font-display text-[10.5px] font-bold uppercase tracking-wider px-2.5 py-1 rounded bg-slate-800/60 text-slate-500 border border-slate-800">
-            🔒 Clôturé
-          </span>
-        ) : (
+        {state === 'avenir' ? (
           <span className="font-display text-[10.5px] font-bold uppercase tracking-wider px-2.5 py-1 rounded chip-accent">
             Ouvert
+          </span>
+        ) : (
+          <span className={`font-display text-[10.5px] font-bold uppercase tracking-wider px-2.5 py-1 rounded flex items-center gap-1.5 ${STATE_CHIP[state]}`}>
+            {state === 'encours' && <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />}
+            {STATE[state].label}
           </span>
         )}
       </div>

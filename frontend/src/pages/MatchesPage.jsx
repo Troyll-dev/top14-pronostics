@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api/client';
 import MatchCard from '../components/MatchCard';
+import { matchState, useNow } from '../utils/matchState';
 
 const DRAFT_KEY = 't14-brouillons';
 const DRAFT_TTL = 30 * 24 * 3600 * 1000; // un mois
@@ -27,6 +28,9 @@ export default function MatchesPage() {
   const [currentRound, setCurrentRound] = useState(null);
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Horloge : fait basculer « ouvert » en « en cours » sans rechargement
+  const now = useNow(60000);
 
   const [drafts, setDrafts] = useState(loadDrafts);
   const [bulkSaving, setBulkSaving] = useState(false);
@@ -83,7 +87,7 @@ export default function MatchesPage() {
   }, []);
 
   const hasPrediction = (m) => m.predictions?.length > 0;
-  const isOpen = (m) => m.status === 'SCHEDULED' && new Date() < new Date(m.kickoff);
+  const isOpen = (m) => matchState(m, now) === 'avenir';
   const pending = matches.filter((m) => isOpen(m) && !hasPrediction(m));
 
   // Matchs ouverts dont le brouillon est complet et differe de ce qui est enregistre
@@ -176,6 +180,7 @@ export default function MatchesPage() {
               key={match.id}
               match={match}
               draft={drafts[match.id]}
+              now={now}
               onDraftChange={setDraft}
               onPredictionSaved={handleSaved}
             />

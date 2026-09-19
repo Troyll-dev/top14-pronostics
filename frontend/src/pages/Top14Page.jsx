@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import api from '../api/client';
 import TeamCrest from '../components/TeamCrest';
+import { matchState, STATE, STATE_CHIP, useNow } from '../utils/matchState';
 
 function ResultDot({ res }) {
   const cls = {
@@ -17,7 +18,25 @@ function ResultDot({ res }) {
   );
 }
 
+function StateChip({ state }) {
+  return (
+    <span className={`font-display text-[9.5px] font-bold uppercase tracking-wider px-2 py-0.5 rounded inline-flex items-center gap-1 whitespace-nowrap ${STATE_CHIP[state]}`}>
+      {state === 'encours' && <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />}
+      {STATE[state].short}
+    </span>
+  );
+}
+
+const FILTERS = [
+  { key: 'tous',    label: 'Tous'      },
+  { key: 'avenir',  label: 'À venir'   },
+  { key: 'encours', label: 'En cours'  },
+  { key: 'termine', label: 'Terminés'  },
+];
+
 export default function Top14Page() {
+  const now = useNow(60000);
+
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -25,6 +44,7 @@ export default function Top14Page() {
   const [round, setRound] = useState(null);
   const [matches, setMatches] = useState([]);
   const [loadingMatches, setLoadingMatches] = useState(false);
+  const [filter, setFilter] = useState('tous');
 
   useEffect(() => {
     api.get('/standings')
@@ -33,8 +53,11 @@ export default function Top14Page() {
       .finally(() => setLoading(false));
 
     api.get('/matches/rounds').then((res) => setRounds(res.data)).catch(console.error);
+
+    // On ouvre sur la journée en cours ou la dernière jouée, pas sur la précédente.
+    // Le backend renvoie currentRound ; on retombe sur round - 1 si l'API est ancienne.
     api.get('/matches/next-round')
-      .then((res) => setRound(Math.max(1, res.data.round - 1)))
+      .then((res) => setRound(res.data.currentRound ?? Math.max(1, res.data.round - 1)))
       .catch(() => setRound(1));
   }, []);
 
@@ -49,9 +72,22 @@ export default function Top14Page() {
 
   const table = data?.table || [];
   const played = table.filter((r) => r.form?.recent?.length);
-
   const hot = played.filter((r) => r.form.weather.streakType === 'V' && r.form.weather.streak >= 2);
   const cold = played.filter((r) => r.form.weather.streakType === 'D' && r.form.weather.streak >= 2);
+
+  // « En cours » regroupe aussi les matchs commencés dont le score n'est pas
+  // encore tombé : dans les deux cas la rencontre n'est pas finie.
+  const inFilter = (m, key) => {
+    const s = matchState(m, now);
+    if (key === 'tous') return true;
+    if (key === 'encours') return s === 'encours' || s === 'attente';
+    return s === key;
+  };
+
+  const counts = Object.fromEntries(
+    FILTERS.map((f) => [f.key, matches.filter((m) => inFilter(m, f.key)).length])
+  );
+  const visible = matches.filter((m) => inFilter(m, filter));
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
@@ -202,10 +238,11 @@ export default function Top14Page() {
         </>
       )}
 
-      {/* Résultats par journée */}
-      <h2 className="rule-label mt-8 mb-3">Résultats par journée</h2>
+      {/* Matchs par journée */}
+      <h2 className="rule-label mt-8 mb-3">Les matchs journée par journée</h2>
+
       {rounds.length > 0 && (
-        <div className="flex gap-1.5 overflow-x-auto pb-1.5 mb-4 scrollbar-none">
+        <div className="flex gap-1.5 overflow-x-auto pb-1.5 mb-3 scrollbar-none">
           {rounds.map((r) => (
             <button
               key={r}
@@ -222,45 +259,75 @@ export default function Top14Page() {
         </div>
       )}
 
+      {/* Filtre par état */}
+      <div className="flex gap-1.5 overflow-x-auto pb-1.5 mb-4 scrollbar-none">
+        {FILTERS.map((f) => (
+          <button
+            key={f.key}
+            onClick={() => setFilter(f.key)}
+            disabled={counts[f.key] === 0 && f.key !== 'tous'}
+            className={`shrink-0 font-display text-[12.5px] font-semibold px-3 py-1.5 rounded-full border transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+              filter === f.key
+                ? 'chip-accent border-transparent'
+                : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-amber-500 hover:text-white'
+            }`}
+          >
+            {f.label}
+            <span className="ml-1.5 opacity-70 tabular-nums">{counts[f.key] ?? 0}</span>
+          </button>
+        ))}
+      </div>
+
       <div className="card">
         {loadingMatches ? (
           <p className="text-center py-6 text-slate-500 animate-pulse">Chargement…</p>
         ) : matches.length === 0 ? (
           <p className="text-center py-6 text-slate-500">Aucun match pour cette journée.</p>
+        ) : visible.length === 0 ? (
+          <p className="text-center py-6 text-slate-500">
+            Aucun match {FILTERS.find((f) => f.key === filter)?.label.toLowerCase()} dans cette journée.
+          </p>
         ) : (
           <div className="divide-y divide-slate-800">
-            {matches.map((m) => {
-              const done = m.status === 'FINISHED';
+            {visible.map((m) => {
+              const state = matchState(m, now);
+              const done = state === 'termine';
               const homeWon = done && m.homeScore > m.awayScore;
               const awayWon = done && m.awayScore > m.homeScore;
               return (
-                <div key={m.id} className="flex items-center gap-2 py-2.5 text-[13px]">
-                  <div className="flex-1 min-w-0 flex items-center justify-end gap-2">
-                    <span className={`truncate font-display ${homeWon ? 'font-bold' : 'text-slate-400'}`}>
-                      {m.homeTeam.name}
-                    </span>
-                    <TeamCrest team={m.homeTeam} size={20} />
+                <div key={m.id} className="py-2.5">
+                  <div className="flex items-center gap-2 text-[13px]">
+                    <div className="flex-1 min-w-0 flex items-center justify-end gap-2">
+                      <span className={`truncate font-display ${homeWon ? 'font-bold' : 'text-slate-400'}`}>
+                        {m.homeTeam.name}
+                      </span>
+                      <TeamCrest team={m.homeTeam} size={20} />
+                    </div>
+
+                    <div className="shrink-0 w-[74px] text-center">
+                      {done ? (
+                        <span className="font-display font-extrabold text-[15px] tabular-nums">
+                          <span className={homeWon ? 'text-amber-500' : ''}>{m.homeScore}</span>
+                          <span className="text-slate-600 mx-1">–</span>
+                          <span className={awayWon ? 'text-amber-500' : ''}>{m.awayScore}</span>
+                        </span>
+                      ) : (
+                        <span className="text-[11px] italic text-slate-600">
+                          {format(new Date(m.kickoff), "d MMM · HH'h'mm", { locale: fr })}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex-1 min-w-0 flex items-center gap-2">
+                      <TeamCrest team={m.awayTeam} size={20} />
+                      <span className={`truncate font-display ${awayWon ? 'font-bold' : 'text-slate-400'}`}>
+                        {m.awayTeam.name}
+                      </span>
+                    </div>
                   </div>
 
-                  <div className="shrink-0 w-[74px] text-center">
-                    {done ? (
-                      <span className="font-display font-extrabold text-[15px] tabular-nums">
-                        <span className={homeWon ? 'text-amber-500' : ''}>{m.homeScore}</span>
-                        <span className="text-slate-600 mx-1">–</span>
-                        <span className={awayWon ? 'text-amber-500' : ''}>{m.awayScore}</span>
-                      </span>
-                    ) : (
-                      <span className="text-[11px] italic text-slate-600">
-                        {format(new Date(m.kickoff), 'd MMM', { locale: fr })}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="flex-1 min-w-0 flex items-center gap-2">
-                    <TeamCrest team={m.awayTeam} size={20} />
-                    <span className={`truncate font-display ${awayWon ? 'font-bold' : 'text-slate-400'}`}>
-                      {m.awayTeam.name}
-                    </span>
+                  <div className="flex justify-center mt-1.5">
+                    <StateChip state={state} />
                   </div>
                 </div>
               );
@@ -272,7 +339,8 @@ export default function Top14Page() {
       {data?.source && (
         <p className="text-[11px] italic text-slate-600 mt-5">
           Classement relevé sur {data.source}. Les résultats des matchs proviennent de notre propre
-          synchronisation, la forme des équipes en est calculée.
+          synchronisation, la forme des équipes en est calculée. Un match est dit « en cours »
+          pendant les 2 h 30 qui suivent son coup d'envoi, tant qu'aucun score n'est enregistré.
         </p>
       )}
     </div>

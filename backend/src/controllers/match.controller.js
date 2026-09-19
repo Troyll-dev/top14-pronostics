@@ -119,17 +119,37 @@ async function calculatePoints(match) {
   }
 }
 
-// GET /api/matches/next-round � prochaine journee avec matchs a venir
+/**
+ * GET /api/matches/next-round
+ *
+ * round        : prochaine journée à pronostiquer, utilisée par la page Pronostics.
+ * currentRound : journée en cours ou dernière jouée — celle du dernier match dont
+ *                le coup d'envoi est passé. C'est ce qu'il faut afficher par défaut
+ *                dans les résultats : le samedi soir on veut voir la journée du jour,
+ *                pas la précédente.
+ */
 exports.getNextRound = async (req, res) => {
   try {
     const now = new Date();
+
     const next = await prisma.match.findFirst({
       where: { kickoff: { gt: now }, status: 'SCHEDULED' },
       orderBy: { kickoff: 'asc' },
       select: { round: true },
     });
-    res.json({ round: next?.round ?? 1 });
+
+    const started = await prisma.match.findFirst({
+      where: { kickoff: { lte: now } },
+      orderBy: { kickoff: 'desc' },
+      select: { round: true },
+    });
+
+    res.json({
+      round: next?.round ?? started?.round ?? 1,
+      currentRound: started?.round ?? next?.round ?? 1,
+    });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Erreur serveur' });
   }
 };
