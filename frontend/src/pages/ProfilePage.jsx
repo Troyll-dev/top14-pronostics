@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import api from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
-import Avatar, { bumpAvatarVersion, inkOn } from '../components/Avatar';
+import Avatar, { bumpAvatarVersion, inkOn, initialsOf, ringShadow } from '../components/Avatar';
 
 const AVATAR_SIZE = 128;
 const MAX_UPLOAD = 8 * 1024 * 1024;   // garde-fou avant lecture, 8 Mo
@@ -47,6 +47,8 @@ export default function ProfilePage() {
 
   const [username, setUsername] = useState(user?.username || '');
   const [color, setColor] = useState(user?.avatarColor || '#3B82F6');
+  const [initials, setInitials] = useState(user?.initials || '');
+  const [ring, setRing] = useState(user?.avatarRing || '');   // '' = liseré du thème
   const [photo, setPhoto] = useState(undefined);   // undefined = inchangée, null = retirée
   const [preview, setPreview] = useState(null);
 
@@ -91,6 +93,8 @@ export default function ProfilePage() {
   const dirty =
     username.trim() !== (user?.username || '') ||
     color !== (user?.avatarColor || '') ||
+    initials.trim().toUpperCase() !== (user?.initials || '') ||
+    ring !== (user?.avatarRing || '') ||
     photo !== undefined;
 
   const save = async () => {
@@ -101,6 +105,10 @@ export default function ProfilePage() {
     const body = {};
     if (username.trim() !== user?.username) body.username = username.trim();
     if (color !== user?.avatarColor) body.avatarColor = color;
+    if (initials.trim().toUpperCase() !== (user?.initials || '')) {
+      body.initials = initials.trim() || null;
+    }
+    if (ring !== (user?.avatarRing || '')) body.avatarRing = ring || null;
     if (photo !== undefined) body.avatar = photo;
 
     try {
@@ -122,7 +130,13 @@ export default function ProfilePage() {
   };
 
   // Aperçu : la photo qu'on vient de choisir, sinon celle du serveur.
-  const shown = { ...user, avatarColor: color, username: username.trim() || user?.username };
+  const shown = {
+    ...user,
+    avatarColor: color,
+    initials: initials.trim(),
+    avatarRing: ring,
+    username: username.trim() || user?.username,
+  };
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6">
@@ -141,17 +155,18 @@ export default function ProfilePage() {
               width={56}
               height={56}
               className="rounded-full shrink-0 object-cover"
-              style={{ width: 56, height: 56, boxShadow: '0 0 0 2px rgb(var(--a-500))' }}
+              style={{ width: 56, height: 56, boxShadow: ringShadow({ avatarRing: ring }) }}
             />
           ) : photo === null ? (
             <span
               className="rounded-full shrink-0 flex items-center justify-center font-display font-bold"
               style={{
                 width: 56, height: 56, backgroundColor: color, color: inkOn(color),
-                fontSize: 24, boxShadow: '0 0 0 2px rgb(var(--a-500))',
+                fontSize: initials.trim().length >= 3 ? 17 : initials.trim().length === 2 ? 20 : 24,
+                boxShadow: ringShadow({ avatarRing: ring }),
               }}
             >
-              {(username.trim() || user?.username || '?')[0].toUpperCase()}
+              {initialsOf({ initials, username: username.trim() || user?.username })}
             </span>
           ) : (
             <Avatar user={shown} size={56} />
@@ -182,6 +197,31 @@ export default function ProfilePage() {
           De 2 à 20 caractères. Il apparaît dans le classement, les pronos et le vestiaire.
           Tes anciens messages et pronostics suivent automatiquement.
         </p>
+
+        <h2 className="rule-label mt-5 mb-3">Initiales de la pastille</h2>
+        <div className="flex items-center gap-3">
+          <input
+            value={initials}
+            onChange={(e) => { setInitials(e.target.value.slice(0, 3)); setDone(false); }}
+            maxLength={3}
+            placeholder={(username.trim() || user?.username || '?')[0]?.toUpperCase()}
+            className="w-24 text-center uppercase bg-slate-950 border-[1.5px] border-slate-800 rounded-md px-3 py-2
+                       font-display font-bold text-[16px] tracking-wide text-white placeholder:text-slate-600
+                       focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/25 transition-colors"
+          />
+          {initials.trim() && (
+            <button
+              onClick={() => { setInitials(''); setDone(false); }}
+              className="text-[13px] text-slate-500 hover:text-amber-500 transition-colors"
+            >
+              Revenir à l’initiale du pseudo
+            </button>
+          )}
+        </div>
+        <p className="text-[11.5px] text-slate-500 mt-2">
+          Une à trois lettres ou chiffres — « NBO » plutôt que « N ». Laisse vide pour reprendre
+          la première lettre de ton pseudo. Elles ne servent que si tu n’as pas de photo.
+        </p>
       </div>
 
       {/* Couleur */}
@@ -211,6 +251,43 @@ export default function ProfilePage() {
         </label>
         <p className="text-[11.5px] text-slate-500 mt-2">
           Elle sert de fond à ton initiale, et de repère pour retrouver tes pronos d’un coup d’œil.
+        </p>
+      </div>
+
+      {/* Liseré */}
+      <div className="card mb-4">
+        <h2 className="rule-label mb-3">Liseré autour de la pastille</h2>
+        <div className="flex flex-wrap items-center gap-2 mb-3">
+          <button
+            onClick={() => { setRing(''); setDone(false); }}
+            className={`font-display text-[12.5px] font-semibold px-3 py-1.5 rounded-full border transition-colors ${
+              ring === '' ? 'chip-accent border-transparent' : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-amber-500 hover:text-white'
+            }`}
+          >
+            Celui du thème
+          </button>
+          <button
+            onClick={() => { setRing('none'); setDone(false); }}
+            className={`font-display text-[12.5px] font-semibold px-3 py-1.5 rounded-full border transition-colors ${
+              ring === 'none' ? 'chip-accent border-transparent' : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-amber-500 hover:text-white'
+            }`}
+          >
+            Aucun
+          </button>
+          <label className={`flex items-center gap-2 font-display text-[12.5px] font-semibold px-3 py-1.5 rounded-full border cursor-pointer transition-colors ${
+            ring.startsWith('#') ? 'chip-accent border-transparent' : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-amber-500 hover:text-white'
+          }`}>
+            <input
+              type="color"
+              value={ring.startsWith('#') ? ring : '#ffffff'}
+              onChange={(e) => { setRing(e.target.value.toLowerCase()); setDone(false); }}
+              className="w-5 h-5 rounded bg-transparent border-0 cursor-pointer p-0"
+            />
+            Ma couleur
+          </label>
+        </div>
+        <p className="text-[11.5px] text-slate-500">
+          Par défaut c’est la brique du thème. Le liseré entoure aussi ta photo, si tu en as une.
         </p>
       </div>
 
@@ -267,6 +344,157 @@ export default function ProfilePage() {
           </button>
         </div>
       </div>
+
+      <SecuritySection currentEmail={user?.email} />
     </div>
+  );
+}
+
+const field =
+  'w-full bg-slate-950 border-[1.5px] border-slate-800 rounded-md px-3 py-2 ' +
+  'text-[14px] text-white placeholder:text-slate-600 ' +
+  'focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/25 transition-colors';
+
+/**
+ * Adresse et mot de passe.
+ *
+ * A part du reste de la page : ces deux changements passent par leurs propres
+ * routes, exigent le mot de passe actuel, et n'ont rien a faire dans le meme
+ * bouton « Enregistrer » que la couleur de la pastille.
+ *
+ * L'adresse n'est pas modifiee ici : le serveur envoie un lien a la nouvelle
+ * adresse, et le changement n'a lieu qu'au clic. Inutile donc de rafraichir
+ * l'utilisateur en sortant d'ici.
+ */
+function SecuritySection({ currentEmail }) {
+  const [email, setEmail] = useState('');
+  const [emailPwd, setEmailPwd] = useState('');
+  const [emailState, setEmailState] = useState({ busy: false, error: '', done: false });
+  const [pending, setPending] = useState('');
+
+  const [current, setCurrent] = useState('');
+  const [next, setNext] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [pwdState, setPwdState] = useState({ busy: false, error: '', done: false });
+
+  const submitEmail = async () => {
+    setEmailState({ busy: true, error: '', done: false });
+    try {
+      const res = await api.patch('/users/me/email', { email: email.trim(), currentPassword: emailPwd });
+      setPending(res.data?.email || email.trim());
+      setEmail(''); setEmailPwd('');
+      setEmailState({ busy: false, error: '', done: true });
+    } catch (err) {
+      setEmailState({ busy: false, error: err.response?.data?.error || 'Changement impossible', done: false });
+    }
+  };
+
+  const submitPassword = async () => {
+    if (next !== confirm) {
+      setPwdState({ busy: false, error: 'Les deux nouveaux mots de passe diffèrent', done: false });
+      return;
+    }
+    setPwdState({ busy: true, error: '', done: false });
+    try {
+      await api.patch('/users/me/password', { currentPassword: current, newPassword: next });
+      setCurrent(''); setNext(''); setConfirm('');
+      setPwdState({ busy: false, error: '', done: true });
+    } catch (err) {
+      setPwdState({ busy: false, error: err.response?.data?.error || 'Changement impossible', done: false });
+    }
+  };
+
+  return (
+    <>
+      <h2 className="rule-label mt-8 mb-3">Adresse et mot de passe</h2>
+
+      <div className="card mb-4">
+        <h3 className="font-display font-bold text-[15px] mb-1">Adresse e-mail</h3>
+        <p className="text-[12px] text-slate-500 mb-3">
+          Actuellement <b className="text-slate-400">{currentEmail}</b>. Elle sert à te connecter.
+        </p>
+
+        {pending && (
+          <p className="text-[12.5px] text-slate-400 bg-amber-500/10 border border-amber-500/40 rounded-md px-3 py-2 mb-3 leading-relaxed">
+            Un lien de confirmation est parti vers <b className="text-white">{pending}</b>. Ton
+            adresse actuelle reste active tant que tu n’as pas cliqué dessus. Le lien vaut une heure.
+          </p>
+        )}
+        <div className="space-y-2">
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Nouvelle adresse"
+            className={field}
+          />
+          <input
+            type="password"
+            value={emailPwd}
+            onChange={(e) => setEmailPwd(e.target.value)}
+            placeholder="Ton mot de passe actuel"
+            className={field}
+          />
+        </div>
+        <div className="flex items-center justify-between gap-3 mt-3">
+          <span className="text-[12.5px]">
+            {emailState.error && <span className="text-red-400">{emailState.error}</span>}
+            {emailState.done && <span className="text-green-400">📬 Lien envoyé</span>}
+          </span>
+          <button
+            onClick={submitEmail}
+            disabled={emailState.busy || !email.trim() || !emailPwd}
+            className="btn-primary text-[13px] py-2 shrink-0"
+          >
+            {emailState.busy ? '…' : 'Changer l’adresse'}
+          </button>
+        </div>
+      </div>
+
+      <div className="card">
+        <h3 className="font-display font-bold text-[15px] mb-1">Mot de passe</h3>
+        <p className="text-[12px] text-slate-500 mb-3">Huit caractères minimum.</p>
+        <div className="space-y-2">
+          <input
+            type="password"
+            value={current}
+            onChange={(e) => setCurrent(e.target.value)}
+            placeholder="Mot de passe actuel"
+            className={field}
+          />
+          <input
+            type="password"
+            value={next}
+            onChange={(e) => setNext(e.target.value)}
+            placeholder="Nouveau mot de passe"
+            className={field}
+          />
+          <input
+            type="password"
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            placeholder="Répète le nouveau"
+            className={field}
+          />
+        </div>
+        <div className="flex items-center justify-between gap-3 mt-3">
+          <span className="text-[12.5px]">
+            {pwdState.error && <span className="text-red-400">{pwdState.error}</span>}
+            {pwdState.done && <span className="text-green-400">✅ Mot de passe modifié</span>}
+          </span>
+          <button
+            onClick={submitPassword}
+            disabled={pwdState.busy || !current || next.length < 8 || !confirm}
+            className="btn-primary text-[13px] py-2 shrink-0"
+          >
+            {pwdState.busy ? '…' : 'Changer le mot de passe'}
+          </button>
+        </div>
+        <p className="text-[11px] italic text-slate-600 mt-3">
+          Tes autres appareils déjà connectés le restent : le jeton de session garde sa validité
+          jusqu’à son expiration.
+        </p>
+      </div>
+    </>
   );
 }

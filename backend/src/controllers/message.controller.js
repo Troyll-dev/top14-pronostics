@@ -2,7 +2,7 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 const MAX_LENGTH = 1000;
-const AUTHOR = { select: { id: true, username: true, avatarColor: true } };
+const AUTHOR = { select: { id: true, username: true, avatarColor: true, initials: true, avatarRing: true } };
 
 /**
  * GET /api/messages?limit=100

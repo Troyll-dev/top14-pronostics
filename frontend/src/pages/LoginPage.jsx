@@ -66,6 +66,14 @@ export default function LoginPage() {
             Pas encore de compte ?{' '}
             <Link to="/register" className="text-amber-400 hover:underline">S'inscrire</Link>
           </p>
+          <p className="text-center mt-2">
+            <Link
+              to="/mot-de-passe-oublie"
+              className="text-sm text-slate-500 hover:text-amber-500 transition-colors"
+            >
+              Mot de passe oublié ?
+            </Link>
+          </p>
         </div>
       </div>
     </div>

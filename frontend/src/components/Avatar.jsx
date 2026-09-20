@@ -57,6 +57,38 @@ export function inkOn(background) {
 }
 
 /**
+ * Ce qu'on ecrit dans la pastille : les initiales choisies par le joueur,
+ * sinon la premiere lettre de son pseudo.
+ */
+export function initialsOf(user) {
+  const chosen = (user?.initials || '').trim();
+  if (chosen) return chosen.toUpperCase().slice(0, 3);
+  return (user?.username || '?').trim().charAt(0).toUpperCase() || '?';
+}
+
+/** Trois lettres dans un rond de 28 px doivent retrecir pour tenir. */
+function fontSizeFor(text, size) {
+  const ratio = text.length >= 3 ? 0.30 : text.length === 2 ? 0.36 : 0.42;
+  return Math.max(9, Math.round(size * ratio));
+}
+
+/**
+ * Liseré autour de la pastille.
+ *
+ * Reglage du joueur : "none" pour aucun, une couleur, ou rien du tout — auquel
+ * cas on reprend l'accent du theme, qui est le comportement d'origine. La
+ * propriete `ring` ne sert plus que de valeur par defaut la ou l'on prefere une
+ * pastille nue, comme dans le salon : le choix du joueur, lui, s'applique
+ * partout.
+ */
+export function ringShadow(user, fallback = true) {
+  const choice = (user?.avatarRing || '').trim().toLowerCase();
+  if (choice === 'none') return undefined;
+  if (/^#[0-9a-f]{6}$/.test(choice)) return `0 0 0 2px ${choice}`;
+  return fallback ? '0 0 0 2px rgb(var(--a-500))' : undefined;
+}
+
+/**
  * Pastille de profil.
  *
  * On tente toujours l'image : le serveur repond 404 quand le joueur n'en a
@@ -77,13 +109,15 @@ export default function Avatar({ user, size = 32, ring = true, className = '' })
   useEffect(() => { setBroken(false); }, [user?.id]);
 
   const background = user?.avatarColor || '#3B82F6';
+  const text = initialsOf(user);
   const style = {
     width: size,
     height: size,
     backgroundColor: background,
     color: inkOn(background),
-    fontSize: Math.round(size * 0.42),
-    ...(ring ? { boxShadow: '0 0 0 2px rgb(var(--a-500))' } : null),
+    fontSize: fontSizeFor(text, size),
+    letterSpacing: text.length > 1 ? '-0.02em' : undefined,
+    boxShadow: ringShadow(user, ring),
   };
 
   const base = `rounded-full shrink-0 overflow-hidden flex items-center justify-center font-display font-bold ${className}`;
@@ -93,7 +127,7 @@ export default function Avatar({ user, size = 32, ring = true, className = '' })
   if (broken) {
     return (
       <span className={base} style={style} title={user.username}>
-        {user.username?.[0]?.toUpperCase()}
+        {text}
       </span>
     );
   }

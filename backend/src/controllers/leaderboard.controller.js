@@ -9,6 +9,8 @@ exports.getLeaderboard = async (req, res) => {
         id: true,
         username: true,
         avatarColor: true,
+        initials: true,
+        avatarRing: true,
         predictions: {
           select: { points: true, homeScorePred: true, awayScorePred: true, match: { select: { status: true } } },
         },
@@ -25,6 +27,8 @@ exports.getLeaderboard = async (req, res) => {
         id: u.id,
         username: u.username,
         avatarColor: u.avatarColor,
+        initials: u.initials,
+        avatarRing: u.avatarRing,
         totalPoints,
         played: played.length,
         exactScores,
@@ -48,7 +52,7 @@ exports.getRoundLeaderboard = async (req, res) => {
   try {
     const predictions = await prisma.prediction.findMany({
       where: { match: { round: parseInt(round), status: 'FINISHED' } },
-      include: { user: { select: { id: true, username: true, avatarColor: true } } },
+      include: { user: { select: { id: true, username: true, avatarColor: true, initials: true, avatarRing: true } } },
     });
 
     const byUser = {};

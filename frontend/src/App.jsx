@@ -11,6 +11,9 @@ import RoundPredictionsPage from './pages/RoundPredictionsPage';
 import LeaderboardPage from './pages/LeaderboardPage';
 import ChatPage from './pages/ChatPage';
 import ProfilePage from './pages/ProfilePage';
+import ConfirmEmailPage from './pages/ConfirmEmailPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 import AdminPage from './pages/AdminPage';
 
 function PrivateRoute({ children }) {
@@ -40,6 +43,12 @@ function AppRoutes() {
         <Route path="/bienvenue" element={<PublicRoute><WelcomePage /></PublicRoute>} />
         <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
         <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
+
+        {/* Liens recus par e-mail : accessibles connecte ou non, puisqu'on
+            arrive souvent depuis un autre appareil. */}
+        <Route path="/confirmer-email" element={<ConfirmEmailPage />} />
+        <Route path="/mot-de-passe-oublie" element={<ForgotPasswordPage />} />
+        <Route path="/reinitialiser" element={<ResetPasswordPage />} />
         <Route path="/" element={<PrivateRoute><HomePage /></PrivateRoute>} />
         <Route path="/pronostics" element={<PrivateRoute><MatchesPage /></PrivateRoute>} />
         <Route path="/top14" element={<PrivateRoute><Top14Page /></PrivateRoute>} />

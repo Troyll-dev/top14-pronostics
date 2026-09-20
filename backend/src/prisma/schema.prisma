@@ -14,10 +14,13 @@ model User {
   email        String        @unique
   password     String
   avatarColor  String        @default("#3B82F6")
+  initials     String?       @db.VarChar(3)   // pastille : "NBO" plutot que "N"
+  avatarRing   String?       @db.VarChar(7)   // null = liseré d'accent, "none" = aucun, sinon #RRGGBB
   createdAt    DateTime      @default(now())
   predictions  Prediction[]
   messages     Message[]
   avatar       UserAvatar?
+  authTokens   AuthToken[]
 
   @@map("users")
 }
@@ -108,6 +111,32 @@ model Message {
 
   @@index([createdAt])
   @@map("messages")
+}
+
+/// Jetons a usage unique envoyes par e-mail : confirmation d'adresse et
+/// reinitialisation de mot de passe.
+///
+/// On ne garde que l'empreinte SHA-256 du jeton, jamais le jeton lui-meme.
+/// Ainsi une fuite de la base ne permet pas de prendre la main sur un compte,
+/// puisque le lien envoye reste introuvable a partir de ce qui est stocke.
+model AuthToken {
+  id        Int       @id @default(autoincrement())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int
+  kind      TokenKind
+  tokenHash String    @unique
+  payload   String?              // la nouvelle adresse, pour un changement d'e-mail
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, kind])
+  @@map("auth_tokens")
+}
+
+enum TokenKind {
+  EMAIL_CHANGE
+  PASSWORD_RESET
 }
 
 /// Instantané du classement Top 14, relu périodiquement sur une source externe.
