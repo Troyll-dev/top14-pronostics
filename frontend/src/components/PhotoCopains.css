@@ -1,27 +1,46 @@
 /* ---------------------------------------------------------------------------
-   La bande de copains, en haut a droite du contenu.
+   La bande de copains, a cote du titre de la page.
 
-   Positionnement absolu et non fixe : elle appartient au flux de la page et
-   defile donc avec elle. Sans cela, elle resterait collee a l'ecran et
-   passerait par-dessus les cartes des qu'on descend — insupportable sur un
-   telephone, ou la colonne occupe toute la largeur.
+   Le point delicat est le repere. Un conteneur pleine largeur donnerait a
+   `right` le bord de la FENETRE : sur un grand ecran la vignette part alors
+   se coller tout a droite, loin du titre. Le repere doit donc etre la colonne
+   de contenu, pas la fenetre.
 
-   Le parent qui lui sert de repere est le conteneur relatif place autour des
-   routes dans App.jsx. Il fait toute la largeur de la fenetre, ce qui permet
-   au meme `right` de donner deux resultats voulus : sur telephone la vignette
-   se loge a cote du titre, sur grand ecran elle part dans la marge, loin de
-   la colonne centrale.
+   D'ou l'ancre ci-dessous : une boite centree de la meme largeur que les
+   pages (max-w-2xl = 672 px, plus les 16 px de padding de chaque cote). La
+   vignette se pose a son bord droit, donc juste a cote du titre, a toutes les
+   largeurs d'ecran. Sur telephone la colonne occupe tout l'espace et le
+   resultat est inchange ; sur ordinateur la vignette suit desormais la
+   colonne au lieu de filer dans la marge.
 
-   Le cadre reprend le papier des cartes : l'ensemble suit donc creme et nuit
-   sans qu'on ait rien a dupliquer. Purement decoratif, sans interaction.
+   Les deux pages plus larges (Top 14, pronos de la journee) gardent le meme
+   reperage : la vignette y est simplement un peu a l'interieur de la colonne,
+   toujours a hauteur du titre.
+
+   Positionnement absolu et non fixe : elle appartient au flux et defile avec
+   la page. Le cadre reprend le papier des cartes, donc creme et nuit sont
+   gerees sans duplication. Purement decoratif, sans interaction.
    --------------------------------------------------------------------------- */
+
+/* L'ancre ne se voit pas et ne prend aucune hauteur : elle ne fait que
+   reproduire la geometrie de la colonne pour donner un bord droit utile. */
+.photo-copains-ancre {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 0;
+  max-width: 704px;          /* 672 px de colonne + 2 x 16 px de padding */
+  margin: 0 auto;
+  z-index: 5;
+  pointer-events: none;      /* elle ne doit jamais voler un clic au contenu */
+}
 
 .photo-copains {
   position: absolute;
   top: 14px;
   right: 12px;
-  z-index: 5;
-  width: 96px;               /* hauteur totale ~76 px : la hauteur du bloc titre */
+  width: 96px;               /* tient a droite de « Salut Nico » des 390 px */
   padding: 5px 5px 17px;     /* la marge basse fait la legende, comme un polaroid */
   background: rgb(var(--card-bg, 251 248 236));
   border-radius: 9px;
@@ -29,7 +48,6 @@
     0 1px 2px rgb(0 0 0 / .12),
     0 10px 22px -14px rgb(0 0 0 / .5);
   transform: rotate(1.6deg);
-  pointer-events: none;      /* elle ne doit jamais voler un clic au contenu */
 }
 
 .photo-copains-legende {
@@ -42,23 +60,19 @@
   font-weight: 600;
   letter-spacing: .08em;
   text-transform: uppercase;
+  text-align: center;
   color: rgb(var(--s-500));
 }
 
 /* A partir de 640 px le titre respire : on peut agrandir sans le serrer. */
 @media (min-width: 640px) {
-  .photo-copains { width: 132px; top: 16px; right: 16px; padding: 6px 6px 19px; }
+  .photo-copains { width: 124px; top: 16px; right: 16px; padding: 6px 6px 19px; }
   .photo-copains-legende { font-size: 9px; bottom: 5px; }
 }
 
-/* Au-dela de 1100 px, la marge droite depasse 230 px une fois retires les
-   672 px de la colonne centrale : la vignette quitte le titre et s'installe
-   dans la marge, ou elle peut etre plus grande. */
+/* Au-dela de 1100 px la colonne est centree et stable : c'est la taille
+   maximale qu'on peut donner a la vignette sans qu'elle morde sur le titre. */
 @media (min-width: 1100px) {
-  .photo-copains { width: 196px; top: 18px; right: 18px; padding: 7px 7px 22px; }
-  .photo-copains-legende { font-size: 10.5px; bottom: 5px; }
-}
-
-@media (min-width: 1440px) {
-  .photo-copains { width: 232px; right: 26px; }
+  .photo-copains { width: 150px; top: 14px; right: 16px; padding: 7px 7px 21px; }
+  .photo-copains-legende { font-size: 10px; bottom: 5px; }
 }
