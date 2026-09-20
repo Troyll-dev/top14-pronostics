@@ -32,11 +32,7 @@
   height: 0;
   max-width: 704px;          /* 672 px de colonne + 2 x 16 px de padding */
   margin: 0 auto;
-  /* Au-dessus du contenu des pages, qui s'eleve a z-10 pour passer devant le
-     fond de terrain, et en dessous de la barre de navigation, qui est a z-50.
-     Sans cela la vignette disparait des qu'elle chevauche la colonne, donc sur
-     telephone uniquement : sur grand ecran elle est dans la marge et rien ne
-     la recouvre, ce qui masquait le probleme. */
+  /* Au-dessus du contenu, en dessous de la barre de navigation (z-50). */
   z-index: 40;
   pointer-events: none;      /* elle ne doit jamais voler un clic au contenu */
 }
@@ -80,4 +76,35 @@
 @media (min-width: 1100px) {
   .photo-copains { width: 150px; top: 14px; right: 16px; padding: 7px 7px 21px; }
   .photo-copains-legende { font-size: 10px; bottom: 5px; }
+}
+
+/* ---------------------------------------------------------------------------
+   Reserver la place du texte.
+
+   La vignette est en position absolue : elle ne pousse donc rien et le texte
+   passe dessous. Sur telephone, ou la colonne fait toute la largeur, le
+   sous-titre sous le titre finissait par courir derriere l'image.
+
+   Plutot que de rapetisser la vignette jusqu'a ce que le probleme disparaisse,
+   on borne le texte : le titre de page et le paragraphe qui le suit s'arretent
+   avant elle. `~ *` designe ce que les routes rendent a cote de l'ancre,
+   c'est-a-dire la colonne de la page courante, quelle qu'elle soit — inutile
+   de repeter la regle dans chaque page.
+
+   Les valeurs sont la largeur occupee par la vignette : sa largeur, plus ses
+   10 px de cadre, plus son decalage droit.
+   --------------------------------------------------------------------------- */
+.photo-copains-ancre ~ * > h1,
+.photo-copains-ancre ~ * > h1 + p {
+  padding-right: 118px;      /* 96 + 10 + 12 */
+}
+
+@media (min-width: 640px) {
+  .photo-copains-ancre ~ * > h1,
+  .photo-copains-ancre ~ * > h1 + p { padding-right: 150px; }   /* 124 + 10 + 16 */
+}
+
+@media (min-width: 1100px) {
+  .photo-copains-ancre ~ * > h1,
+  .photo-copains-ancre ~ * > h1 + p { padding-right: 176px; }   /* 150 + 10 + 16 */
 }
