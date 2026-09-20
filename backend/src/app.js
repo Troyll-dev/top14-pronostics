@@ -8,6 +8,7 @@ const predictionRoutes = require('./routes/prediction.routes');
 const leaderboardRoutes = require('./routes/leaderboard.routes');
 const syncRoutes = require('./routes/sync.routes');
 const standingsRoutes = require('./routes/standings.routes');
+const messageRoutes = require('./routes/message.routes');
 const { startResultsCron } = require('./cron/results.cron');
 
 const app = express();
@@ -26,6 +27,7 @@ app.use('/api/predictions', predictionRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/sync', syncRoutes);
 app.use('/api/standings', standingsRoutes);
+app.use('/api/messages', messageRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

@@ -16,6 +16,7 @@ model User {
   avatarColor  String        @default("#3B82F6")
   createdAt    DateTime      @default(now())
   predictions  Prediction[]
+  messages     Message[]
 
   @@map("users")
 }
@@ -74,6 +75,19 @@ model Prediction {
 
   @@unique([userId, matchId])
   @@map("predictions")
+}
+
+/// Salon de discussion du groupe — une seule conversation, tous joueurs confondus.
+/// Les messages disparaissent avec le compte de leur auteur, comme ses pronostics.
+model Message {
+  id        Int      @id @default(autoincrement())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int
+  body      String   @db.VarChar(1000)
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("messages")
 }
 
 /// Instantané du classement Top 14, relu périodiquement sur une source externe.

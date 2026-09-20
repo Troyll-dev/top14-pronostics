@@ -1,6 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import api from '../api/client';
+
+const SEEN_KEY = 't14-chat-vu';
+const UNREAD_MS = 20000;
 
 export default function Navbar() {
   const { user, logout } = useAuth();
@@ -9,6 +13,8 @@ export default function Navbar() {
   const [theme, setTheme] = useState(
     () => document.documentElement.dataset.theme || 'creme'
   );
+
+  const [unread, setUnread] = useState(0);
 
   const toggleTheme = () => {
     const next = theme === 'nuit' ? 'creme' : 'nuit';
@@ -21,12 +27,57 @@ export default function Navbar() {
     setTheme(next);
   };
 
+  /**
+   * Messages non lus depuis la derniere visite du salon.
+   *
+   * Le repere est garde dans le navigateur ; a la premiere ouverture on le
+   * pose a maintenant, pour ne pas accueillir un nouvel arrivant avec une
+   * pastille a trois chiffres.
+   */
+  const refreshUnread = useCallback(async () => {
+    if (!user) return;
+    let since;
+    try {
+      since = localStorage.getItem(SEEN_KEY);
+      if (!since) {
+        since = new Date().toISOString();
+        localStorage.setItem(SEEN_KEY, since);
+      }
+    } catch {
+      since = new Date().toISOString();
+    }
+
+    try {
+      const res = await api.get(`/messages/unread?since=${encodeURIComponent(since)}`);
+      setUnread(res.data.count || 0);
+    } catch {
+      /* salon indisponible : la barre reste utilisable, sans pastille */
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    refreshUnread();
+    const id = setInterval(() => { if (!document.hidden) refreshUnread(); }, UNREAD_MS);
+
+    // La page du salon previent qu'elle a tout lu ; inutile d'attendre le
+    // prochain relevé pour éteindre la pastille.
+    const onRead = () => setUnread(0);
+    window.addEventListener('t14-chat-lu', onRead);
+
+    return () => { clearInterval(id); window.removeEventListener('t14-chat-lu', onRead); };
+  }, [user, refreshUnread]);
+
+  // On sort du salon : on repart d'un compteur propre.
+  useEffect(() => { if (pathname === '/chat') setUnread(0); }, [pathname]);
+
   const links = [
     { to: '/', icon: '🏠', label: 'Accueil' },
     { to: '/pronostics', icon: '📅', label: 'Mes pronos' },
     { to: '/pronos', icon: '👥', label: 'Tous les pronos' },
     { to: '/top14', icon: '🏉', label: 'Championnat' },
     { to: '/classement', icon: '🏆', label: 'Classement' },
+    { to: '/chat', icon: '💬', label: 'Vestiaire', badge: unread },
     { to: '/admin', icon: '⚙️', label: 'Admin' },
   ];
 
@@ -38,13 +89,13 @@ export default function Navbar() {
           <span className="hidden lg:inline">Top 14 Pronos</span>
         </Link>
 
-        <div className="flex items-center">
+        <div className="flex items-center gap-0.5">
           {links.map((l) => (
             <Link
               key={l.to}
               to={l.to}
               title={l.label}
-              className={`flex items-center gap-1.5 px-1.5 sm:px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
+              className={`relative flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
                 pathname === l.to
                   ? 'tab-on font-semibold shadow-[inset_0_-2px_0_rgba(0,0,0,.18)]'
                   : 'nav-dim hover:bg-white/10'
@@ -52,6 +103,14 @@ export default function Navbar() {
             >
               <span>{l.icon}</span>
               <span className="hidden lg:inline">{l.label}</span>
+
+              {l.badge > 0 && pathname !== l.to && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-[17px] h-[17px] px-1 rounded-full
+                                 bg-red-500 text-white font-display text-[10px] font-bold leading-[17px]
+                                 text-center tabular-nums">
+                  {l.badge > 99 ? '99' : l.badge}
+                </span>
+              )}
             </Link>
           ))}
         </div>
