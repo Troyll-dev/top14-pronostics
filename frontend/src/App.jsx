@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Navbar from './components/Navbar';
+import PhotoCopains from './components/PhotoCopains';
 import WelcomePage from './pages/WelcomePage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -38,6 +39,7 @@ function AppRoutes() {
   return (
     <div className="min-h-screen">
       {user && <Navbar />}
+      {user && <PhotoCopains />}
       <Routes>
         <Route path="/bienvenue" element={<PublicRoute><WelcomePage /></PublicRoute>} />
         <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
