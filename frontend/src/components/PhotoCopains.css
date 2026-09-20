@@ -1,49 +1,62 @@
 /* ---------------------------------------------------------------------------
-   La bande de copains, epinglee dans la marge droite.
+   La bande de copains, en haut a droite du contenu.
 
-   Le seuil est a 1100 px et non a l'un des points de rupture habituels de
-   Tailwind : c'est la largeur a partir de laquelle la marge droite depasse
-   230 px, une fois retires les 672 px de la colonne centrale. En dessous, la
-   vignette chevaucherait les cartes, donc elle disparait.
+   Positionnement absolu et non fixe : elle appartient au flux de la page et
+   defile donc avec elle. Sans cela, elle resterait collee a l'ecran et
+   passerait par-dessus les cartes des qu'on descend — insupportable sur un
+   telephone, ou la colonne occupe toute la largeur.
+
+   Le parent qui lui sert de repere est le conteneur relatif place autour des
+   routes dans App.jsx. Il fait toute la largeur de la fenetre, ce qui permet
+   au meme `right` de donner deux resultats voulus : sur telephone la vignette
+   se loge a cote du titre, sur grand ecran elle part dans la marge, loin de
+   la colonne centrale.
 
    Le cadre reprend le papier des cartes : l'ensemble suit donc creme et nuit
    sans qu'on ait rien a dupliquer. Purement decoratif, sans interaction.
    --------------------------------------------------------------------------- */
 
 .photo-copains {
-  display: none;
+  position: absolute;
+  top: 14px;
+  right: 12px;
+  z-index: 5;
+  width: 96px;               /* hauteur totale ~76 px : la hauteur du bloc titre */
+  padding: 5px 5px 17px;     /* la marge basse fait la legende, comme un polaroid */
+  background: rgb(var(--card-bg, 251 248 236));
+  border-radius: 9px;
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / .12),
+    0 10px 22px -14px rgb(0 0 0 / .5);
+  transform: rotate(1.6deg);
+  pointer-events: none;      /* elle ne doit jamais voler un clic au contenu */
 }
 
-@media (min-width: 1100px) {
-  .photo-copains {
-    position: fixed;
-    top: 72px;                 /* la barre fait 56 px, plus une respiration */
-    right: 18px;
-    z-index: 20;
-    display: block;
-    width: 196px;
-    padding: 7px 7px 22px;     /* la marge basse fait la legende, comme un polaroid */
-    border: 0;
-    background: rgb(var(--card-bg, 251 248 236));
-    border-radius: 10px;
-    box-shadow:
-      0 1px 2px rgb(0 0 0 / .12),
-      0 14px 30px -16px rgb(0 0 0 / .55);
-    transform: rotate(1.6deg);
-  }
+.photo-copains-legende {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 4px;
+  font-family: 'Bitter', Georgia, serif;
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: rgb(var(--s-500));
+}
 
-  .photo-copains-legende {
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 5px;
-    font-family: 'Bitter', Georgia, serif;
-    font-size: 10.5px;
-    font-weight: 600;
-    letter-spacing: .09em;
-    text-transform: uppercase;
-    color: rgb(var(--s-500));
-  }
+/* A partir de 640 px le titre respire : on peut agrandir sans le serrer. */
+@media (min-width: 640px) {
+  .photo-copains { width: 132px; top: 16px; right: 16px; padding: 6px 6px 19px; }
+  .photo-copains-legende { font-size: 9px; bottom: 5px; }
+}
+
+/* Au-dela de 1100 px, la marge droite depasse 230 px une fois retires les
+   672 px de la colonne centrale : la vignette quitte le titre et s'installe
+   dans la marge, ou elle peut etre plus grande. */
+@media (min-width: 1100px) {
+  .photo-copains { width: 196px; top: 18px; right: 18px; padding: 7px 7px 22px; }
+  .photo-copains-legende { font-size: 10.5px; bottom: 5px; }
 }
 
 @media (min-width: 1440px) {

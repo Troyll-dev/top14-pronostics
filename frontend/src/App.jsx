@@ -39,26 +39,32 @@ function AppRoutes() {
   return (
     <div className="min-h-screen">
       {user && <Navbar />}
-      {user && <PhotoCopains />}
-      <Routes>
-        <Route path="/bienvenue" element={<PublicRoute><WelcomePage /></PublicRoute>} />
-        <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
-        <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
 
-        {/* Liens recus par e-mail : accessibles connecte ou non, puisqu'on
-            arrive souvent depuis un autre appareil. */}
-        <Route path="/mot-de-passe-oublie" element={<ForgotPasswordPage />} />
-        <Route path="/reinitialiser" element={<ResetPasswordPage />} />
-        <Route path="/" element={<PrivateRoute><HomePage /></PrivateRoute>} />
-        <Route path="/pronostics" element={<PrivateRoute><MatchesPage /></PrivateRoute>} />
-        <Route path="/top14" element={<PrivateRoute><Top14Page /></PrivateRoute>} />
-        <Route path="/pronos" element={<PrivateRoute><RoundPredictionsPage /></PrivateRoute>} />
-        <Route path="/classement" element={<PrivateRoute><LeaderboardPage /></PrivateRoute>} />
-        <Route path="/chat" element={<PrivateRoute><ChatPage /></PrivateRoute>} />
-        <Route path="/profil" element={<PrivateRoute><ProfilePage /></PrivateRoute>} />
-        <Route path="/admin" element={<PrivateRoute><AdminPage /></PrivateRoute>} />
-        <Route path="*" element={<Navigate to="/" />} />
-      </Routes>
+      {/* Conteneur relatif : il sert de repere a la vignette, qui est en
+          position absolue et defile donc avec la page au lieu de rester
+          collee a l'ecran. */}
+      <div className="relative">
+        {user && <PhotoCopains />}
+        <Routes>
+          <Route path="/bienvenue" element={<PublicRoute><WelcomePage /></PublicRoute>} />
+          <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
+          <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
+
+          {/* Liens recus par e-mail : accessibles connecte ou non, puisqu'on
+              arrive souvent depuis un autre appareil. */}
+          <Route path="/mot-de-passe-oublie" element={<ForgotPasswordPage />} />
+          <Route path="/reinitialiser" element={<ResetPasswordPage />} />
+          <Route path="/" element={<PrivateRoute><HomePage /></PrivateRoute>} />
+          <Route path="/pronostics" element={<PrivateRoute><MatchesPage /></PrivateRoute>} />
+          <Route path="/top14" element={<PrivateRoute><Top14Page /></PrivateRoute>} />
+          <Route path="/pronos" element={<PrivateRoute><RoundPredictionsPage /></PrivateRoute>} />
+          <Route path="/classement" element={<PrivateRoute><LeaderboardPage /></PrivateRoute>} />
+          <Route path="/chat" element={<PrivateRoute><ChatPage /></PrivateRoute>} />
+          <Route path="/profil" element={<PrivateRoute><ProfilePage /></PrivateRoute>} />
+          <Route path="/admin" element={<PrivateRoute><AdminPage /></PrivateRoute>} />
+          <Route path="*" element={<Navigate to="/" />} />
+        </Routes>
+      </div>
     </div>
   );
 }
