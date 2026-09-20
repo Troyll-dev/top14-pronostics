@@ -3,6 +3,7 @@ import { format, isToday, isYesterday, isSameDay } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import api from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
+import Avatar from '../components/Avatar';
 
 const SEEN_KEY = 't14-chat-vu';
 const POLL_MS = 6000;
@@ -175,14 +176,7 @@ export default function ChatPage() {
 
                   <div className={`flex gap-2.5 ${grouped ? 'mt-0.5' : 'mt-3'} ${isMe ? 'flex-row-reverse' : ''}`}>
                     <div className="w-7 shrink-0">
-                      {!grouped && (
-                        <div
-                          className="w-7 h-7 rounded-full flex items-center justify-center font-display font-bold text-[12px]"
-                          style={{ backgroundColor: m.user.avatarColor, color: '#fff' }}
-                        >
-                          {m.user.username[0].toUpperCase()}
-                        </div>
-                      )}
+                      {!grouped && <Avatar user={m.user} size={28} ring={false} />}
                     </div>
 
                     <div className={`min-w-0 max-w-[78%] ${isMe ? 'text-right' : ''}`}>

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../api/client';
+import Avatar from './Avatar';
 
 const SEEN_KEY = 't14-chat-vu';
 const UNREAD_MS = 20000;
@@ -60,15 +61,12 @@ export default function Navbar() {
     refreshUnread();
     const id = setInterval(() => { if (!document.hidden) refreshUnread(); }, UNREAD_MS);
 
-    // La page du salon previent qu'elle a tout lu ; inutile d'attendre le
-    // prochain relevé pour éteindre la pastille.
     const onRead = () => setUnread(0);
     window.addEventListener('t14-chat-lu', onRead);
 
     return () => { clearInterval(id); window.removeEventListener('t14-chat-lu', onRead); };
   }, [user, refreshUnread]);
 
-  // On sort du salon : on repart d'un compteur propre.
   useEffect(() => { if (pathname === '/chat') setUnread(0); }, [pathname]);
 
   const links = [
@@ -124,17 +122,16 @@ export default function Navbar() {
             {theme === 'nuit' ? '☀️' : '🌙'}
           </button>
 
-          <div
-            className="w-8 h-8 rounded-full flex items-center justify-center font-display font-bold text-sm shrink-0"
-            style={{
-              backgroundColor: user?.avatarColor,
-              color: '#fff',
-              boxShadow: '0 0 0 2px rgb(var(--a-500))',
-            }}
+          {/* La pastille mène au profil : c'est l'endroit où on la cherche. */}
+          <Link
+            to="/profil"
+            title="Mon profil"
+            className="flex items-center gap-2 rounded-md px-1 py-1 hover:bg-white/10 transition-colors"
           >
-            {user?.username?.[0]?.toUpperCase()}
-          </div>
-          <span className="nav-tx text-sm hidden lg:block">{user?.username}</span>
+            <Avatar user={user} size={32} />
+            <span className="nav-tx text-sm hidden lg:block">{user?.username}</span>
+          </Link>
+
           <button
             onClick={logout}
             title="Se déconnecter"

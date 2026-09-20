@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
+import Avatar from '../components/Avatar';
 
 function MedalIcon({ rank }) {
   if (rank === 1) return <span className="text-2xl">🥇</span>;
@@ -25,16 +26,7 @@ function PlayerRow({ rank, player, points, stats, isMe }) {
         <MedalIcon rank={rank} />
       </div>
 
-      <div
-        className="w-10 h-10 rounded-full flex items-center justify-center font-display font-bold text-lg shrink-0"
-        style={{
-          backgroundColor: player.avatarColor,
-          color: '#fff',
-          boxShadow: '0 0 0 2px rgb(var(--a-500) / .45)',
-        }}
-      >
-        {player.username[0].toUpperCase()}
-      </div>
+      <Avatar user={player} size={40} />
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">

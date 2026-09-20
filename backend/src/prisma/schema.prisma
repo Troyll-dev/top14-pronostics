@@ -17,8 +17,28 @@ model User {
   createdAt    DateTime      @default(now())
   predictions  Prediction[]
   messages     Message[]
+  avatar       UserAvatar?
 
   @@map("users")
+}
+
+/// Photo de profil, volontairement dans sa propre table.
+///
+/// Si l'image vivait dans `users`, elle partirait dans chaque reponse qui
+/// renvoie un utilisateur — /auth/me, le classement, chaque message du salon —
+/// puisque le middleware d'authentification relit l'utilisateur entier. Isolee
+/// ici, elle n'est lue que par la route qui la sert.
+///
+/// Le navigateur redimensionne en 128x128 avant l'envoi : quelques kilo-octets
+/// par joueur, rien qui justifie un hebergement d'images.
+model UserAvatar {
+  userId    Int      @id
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  data      Bytes
+  mimeType  String   @default("image/webp")
+  updatedAt DateTime @updatedAt
+
+  @@map("user_avatars")
 }
 
 model Team {

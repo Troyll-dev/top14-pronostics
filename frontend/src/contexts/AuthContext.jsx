@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import api from '../api/client';
 
 const AuthContext = createContext(null);
@@ -38,8 +38,23 @@ export function AuthProvider({ children }) {
     setUser(null);
   };
 
+  /**
+   * Relit l'utilisateur apres modification du profil.
+   * Le jeton porte l'identifiant, pas le pseudo : changer de pseudo ne
+   * deconnecte donc personne, il suffit de rafraichir ce qui est affiche.
+   */
+  const refreshUser = useCallback(async () => {
+    try {
+      const { data } = await api.get('/auth/me');
+      setUser(data);
+      return data;
+    } catch {
+      return null;
+    }
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

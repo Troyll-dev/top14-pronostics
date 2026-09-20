@@ -10,6 +10,7 @@ import MatchesPage from './pages/MatchesPage';
 import RoundPredictionsPage from './pages/RoundPredictionsPage';
 import LeaderboardPage from './pages/LeaderboardPage';
 import ChatPage from './pages/ChatPage';
+import ProfilePage from './pages/ProfilePage';
 import AdminPage from './pages/AdminPage';
 
 function PrivateRoute({ children }) {
@@ -45,6 +46,7 @@ function AppRoutes() {
         <Route path="/pronos" element={<PrivateRoute><RoundPredictionsPage /></PrivateRoute>} />
         <Route path="/classement" element={<PrivateRoute><LeaderboardPage /></PrivateRoute>} />
         <Route path="/chat" element={<PrivateRoute><ChatPage /></PrivateRoute>} />
+        <Route path="/profil" element={<PrivateRoute><ProfilePage /></PrivateRoute>} />
         <Route path="/admin" element={<PrivateRoute><AdminPage /></PrivateRoute>} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
