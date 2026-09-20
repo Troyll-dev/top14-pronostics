@@ -123,23 +123,6 @@ async function send(message) {
   console.log(`[mail] ${message.subject} -> ${message.to} (${how})`);
 }
 
-/** Confirmation d'une nouvelle adresse — le lien part vers la NOUVELLE adresse. */
-async function sendEmailChange(to, username, token) {
-  const link = `${config().appUrl}/confirmer-email?token=${encodeURIComponent(token)}`;
-  await send({
-    to,
-    subject: 'Confirme ta nouvelle adresse',
-    html: wrap(
-      'Confirme ta nouvelle adresse',
-      `Salut ${username}, tu as demandé à utiliser cette adresse pour te connecter à Top 14 Pronos. Clique pour valider le changement.`,
-      'Confirmer mon adresse',
-      link,
-      'Ce lien est valable une heure et ne sert qu\'une fois. Si tu n\'as rien demandé, ignore ce message : ton adresse actuelle reste inchangée.'
-    ),
-    text: `Salut ${username}, confirme ta nouvelle adresse : ${link}\nCe lien est valable une heure.`,
-  });
-}
-
 /** Reinitialisation de mot de passe. */
 async function sendPasswordReset(to, username, token) {
   const link = `${config().appUrl}/reinitialiser?token=${encodeURIComponent(token)}`;
@@ -157,4 +140,4 @@ async function sendPasswordReset(to, username, token) {
   });
 }
 
-module.exports = { isConfigured, provider, sendEmailChange, sendPasswordReset };
+module.exports = { isConfigured, provider, sendPasswordReset };

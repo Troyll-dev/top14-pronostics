@@ -113,8 +113,8 @@ model Message {
   @@map("messages")
 }
 
-/// Jetons a usage unique envoyes par e-mail : confirmation d'adresse et
-/// reinitialisation de mot de passe.
+/// Jetons a usage unique envoyes par e-mail, pour la reinitialisation de mot
+/// de passe.
 ///
 /// On ne garde que l'empreinte SHA-256 du jeton, jamais le jeton lui-meme.
 /// Ainsi une fuite de la base ne permet pas de prendre la main sur un compte,
@@ -125,7 +125,6 @@ model AuthToken {
   userId    Int
   kind      TokenKind
   tokenHash String    @unique
-  payload   String?              // la nouvelle adresse, pour un changement d'e-mail
   expiresAt DateTime
   usedAt    DateTime?
   createdAt DateTime  @default(now())
@@ -135,7 +134,6 @@ model AuthToken {
 }
 
 enum TokenKind {
-  EMAIL_CHANGE
   PASSWORD_RESET
 }
 

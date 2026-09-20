@@ -11,7 +11,6 @@ import RoundPredictionsPage from './pages/RoundPredictionsPage';
 import LeaderboardPage from './pages/LeaderboardPage';
 import ChatPage from './pages/ChatPage';
 import ProfilePage from './pages/ProfilePage';
-import ConfirmEmailPage from './pages/ConfirmEmailPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import AdminPage from './pages/AdminPage';
@@ -46,7 +45,6 @@ function AppRoutes() {
 
         {/* Liens recus par e-mail : accessibles connecte ou non, puisqu'on
             arrive souvent depuis un autre appareil. */}
-        <Route path="/confirmer-email" element={<ConfirmEmailPage />} />
         <Route path="/mot-de-passe-oublie" element={<ForgotPasswordPage />} />
         <Route path="/reinitialiser" element={<ResetPasswordPage />} />
         <Route path="/" element={<PrivateRoute><HomePage /></PrivateRoute>} />

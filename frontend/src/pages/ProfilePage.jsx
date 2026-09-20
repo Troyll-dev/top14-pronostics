@@ -345,7 +345,7 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      <SecuritySection currentEmail={user?.email} />
+      <SecuritySection />
     </div>
   );
 }
@@ -356,38 +356,21 @@ const field =
   'focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/25 transition-colors';
 
 /**
- * Adresse et mot de passe.
+ * Mot de passe.
  *
- * A part du reste de la page : ces deux changements passent par leurs propres
- * routes, exigent le mot de passe actuel, et n'ont rien a faire dans le meme
- * bouton « Enregistrer » que la couleur de la pastille.
+ * A part du reste de la page : le changement passe par sa propre route, exige
+ * le mot de passe actuel, et n'a rien a faire dans le meme bouton
+ * « Enregistrer » que la couleur de la pastille.
  *
- * L'adresse n'est pas modifiee ici : le serveur envoie un lien a la nouvelle
- * adresse, et le changement n'a lieu qu'au clic. Inutile donc de rafraichir
- * l'utilisateur en sortant d'ici.
+ * L'adresse e-mail n'est pas modifiable : elle sert d'identifiant de connexion
+ * et de point de chute pour la reinitialisation. Entre amis, une adresse se
+ * change directement en base le jour ou c'est necessaire.
  */
-function SecuritySection({ currentEmail }) {
-  const [email, setEmail] = useState('');
-  const [emailPwd, setEmailPwd] = useState('');
-  const [emailState, setEmailState] = useState({ busy: false, error: '', done: false });
-  const [pending, setPending] = useState('');
-
+function SecuritySection() {
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
   const [pwdState, setPwdState] = useState({ busy: false, error: '', done: false });
-
-  const submitEmail = async () => {
-    setEmailState({ busy: true, error: '', done: false });
-    try {
-      const res = await api.patch('/users/me/email', { email: email.trim(), currentPassword: emailPwd });
-      setPending(res.data?.email || email.trim());
-      setEmail(''); setEmailPwd('');
-      setEmailState({ busy: false, error: '', done: true });
-    } catch (err) {
-      setEmailState({ busy: false, error: err.response?.data?.error || 'Changement impossible', done: false });
-    }
-  };
 
   const submitPassword = async () => {
     if (next !== confirm) {
@@ -406,54 +389,13 @@ function SecuritySection({ currentEmail }) {
 
   return (
     <>
-      <h2 className="rule-label mt-8 mb-3">Adresse et mot de passe</h2>
-
-      <div className="card mb-4">
-        <h3 className="font-display font-bold text-[15px] mb-1">Adresse e-mail</h3>
-        <p className="text-[12px] text-slate-500 mb-3">
-          Actuellement <b className="text-slate-400">{currentEmail}</b>. Elle sert à te connecter.
-        </p>
-
-        {pending && (
-          <p className="text-[12.5px] text-slate-400 bg-amber-500/10 border border-amber-500/40 rounded-md px-3 py-2 mb-3 leading-relaxed">
-            Un lien de confirmation est parti vers <b className="text-white">{pending}</b>. Ton
-            adresse actuelle reste active tant que tu n’as pas cliqué dessus. Le lien vaut une heure.
-          </p>
-        )}
-        <div className="space-y-2">
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="Nouvelle adresse"
-            className={field}
-          />
-          <input
-            type="password"
-            value={emailPwd}
-            onChange={(e) => setEmailPwd(e.target.value)}
-            placeholder="Ton mot de passe actuel"
-            className={field}
-          />
-        </div>
-        <div className="flex items-center justify-between gap-3 mt-3">
-          <span className="text-[12.5px]">
-            {emailState.error && <span className="text-red-400">{emailState.error}</span>}
-            {emailState.done && <span className="text-green-400">📬 Lien envoyé</span>}
-          </span>
-          <button
-            onClick={submitEmail}
-            disabled={emailState.busy || !email.trim() || !emailPwd}
-            className="btn-primary text-[13px] py-2 shrink-0"
-          >
-            {emailState.busy ? '…' : 'Changer l’adresse'}
-          </button>
-        </div>
-      </div>
+      <h2 className="rule-label mt-8 mb-3">Mot de passe</h2>
 
       <div className="card">
-        <h3 className="font-display font-bold text-[15px] mb-1">Mot de passe</h3>
-        <p className="text-[12px] text-slate-500 mb-3">Huit caractères minimum.</p>
+        <p className="text-[12.5px] text-slate-500 mb-3">
+          Huit caractères minimum. Si tu l’as oublié, la page de connexion propose
+          « Mot de passe oublié ? » : un lien te sera envoyé par e-mail.
+        </p>
         <div className="space-y-2">
           <input
             type="password"
