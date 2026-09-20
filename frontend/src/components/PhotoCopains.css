@@ -86,25 +86,42 @@
    sous-titre sous le titre finissait par courir derriere l'image.
 
    Plutot que de rapetisser la vignette jusqu'a ce que le probleme disparaisse,
-   on borne le texte : le titre de page et le paragraphe qui le suit s'arretent
-   avant elle. `~ *` designe ce que les routes rendent a cote de l'ancre,
-   c'est-a-dire la colonne de la page courante, quelle qu'elle soit — inutile
-   de repeter la regle dans chaque page.
+   on borne l'en-tete : le premier element de la colonne, et le paragraphe de
+   sous-titre qui suit le titre, s'arretent avant elle. `~ *` designe ce que les
+   routes rendent a cote de l'ancre, c'est-a-dire la colonne de la page
+   courante, quelle qu'elle soit — inutile de repeter la regle dans chaque page.
+
+   On vise `:first-child` et pas seulement `h1` parce que toutes les pages ne
+   posent pas leur titre de la meme facon : « Mes pronos » l'enveloppe dans une
+   ligne en `justify-between` qui porte aussi le lien « Tous les pronos », lequel
+   se retrouvait donc sous la vignette. Verifie : les six pages commencent par un
+   bandeau de titre, jamais par une carte, donc ce padding ne decale aucun
+   contenu.
+
+   Le `flex-wrap` va avec le padding et ne s'y substitue pas. Un padding ne
+   coupe rien : les elements d'une ligne flex en `nowrap` debordent simplement
+   du cadre, et le lien restait sous la vignette. Avec le retour a la ligne
+   autorise, le groupe de droite descend d'une ligne et s'aligne a gauche,
+   loin de l'image. Sur une page dont le premier element n'est pas une boite
+   flex — c'est le cas des cinq autres, qui commencent par un `h1` — la
+   propriete n'a aucun effet.
 
    Les valeurs sont la largeur occupee par la vignette : sa largeur, plus ses
    10 px de cadre, plus son decalage droit.
    --------------------------------------------------------------------------- */
-.photo-copains-ancre ~ * > h1,
+.photo-copains-ancre ~ * > :first-child,
 .photo-copains-ancre ~ * > h1 + p {
   padding-right: 118px;      /* 96 + 10 + 12 */
+  flex-wrap: wrap;
+  row-gap: 6px;
 }
 
 @media (min-width: 640px) {
-  .photo-copains-ancre ~ * > h1,
+  .photo-copains-ancre ~ * > :first-child,
   .photo-copains-ancre ~ * > h1 + p { padding-right: 150px; }   /* 124 + 10 + 16 */
 }
 
 @media (min-width: 1100px) {
-  .photo-copains-ancre ~ * > h1,
+  .photo-copains-ancre ~ * > :first-child,
   .photo-copains-ancre ~ * > h1 + p { padding-right: 176px; }   /* 150 + 10 + 16 */
 }
