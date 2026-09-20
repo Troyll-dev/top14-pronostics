@@ -32,7 +32,12 @@
   height: 0;
   max-width: 704px;          /* 672 px de colonne + 2 x 16 px de padding */
   margin: 0 auto;
-  z-index: 5;
+  /* Au-dessus du contenu des pages, qui s'eleve a z-10 pour passer devant le
+     fond de terrain, et en dessous de la barre de navigation, qui est a z-50.
+     Sans cela la vignette disparait des qu'elle chevauche la colonne, donc sur
+     telephone uniquement : sur grand ecran elle est dans la marge et rien ne
+     la recouvre, ce qui masquait le probleme. */
+  z-index: 40;
   pointer-events: none;      /* elle ne doit jamais voler un clic au contenu */
 }
 
