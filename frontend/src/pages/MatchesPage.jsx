@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
 import api from '../api/client';
 import MatchCard from '../components/MatchCard';
 import { matchState, useNow } from '../utils/matchState';
@@ -133,16 +132,11 @@ export default function MatchesPage() {
         <h1 className="font-display text-[26px] font-extrabold leading-none">
           Journée <span className="text-amber-500">{currentRound ?? '—'}</span>
         </h1>
-        <div className="flex items-center gap-3">
-          {pending.length > 0 && (
-            <span className="font-display text-xs font-bold chip-accent px-2.5 py-1 rounded whitespace-nowrap">
-              {pending.length} à faire
-            </span>
-          )}
-          <Link to="/pronos" className="text-sm text-slate-500 hover:text-amber-500 transition-colors whitespace-nowrap">
-            Tous les pronos →
-          </Link>
-        </div>
+        {pending.length > 0 && (
+          <span className="font-display text-xs font-bold chip-accent px-2.5 py-1 rounded whitespace-nowrap">
+            {pending.length} à faire
+          </span>
+        )}
       </div>
       <p className="text-xs italic text-slate-500 mb-5">Saison 2026-2027 · Championnat de France</p>
 
@@ -162,6 +156,35 @@ export default function MatchesPage() {
               J{r}
             </button>
           ))}
+        </div>
+      )}
+
+      {/* Récapitulatif */}
+      {!loading && matches.length > 0 && (
+        <div className="card mb-5">
+          <h3 className="rule-label mb-4">Récapitulatif</h3>
+          <div className="grid grid-cols-3 gap-4 text-center">
+            <div>
+              <p className="font-display text-[27px] font-extrabold leading-none tabular-nums text-amber-500">
+                {matches.filter(hasPrediction).length}/{matches.length}
+              </p>
+              <p className="text-[10.5px] uppercase tracking-wide text-slate-500 mt-1.5">Pronostics</p>
+            </div>
+            <div>
+              <p className="font-display text-[27px] font-extrabold leading-none tabular-nums text-green-400">
+                {matches
+                  .filter((m) => m.status === 'FINISHED')
+                  .reduce((sum, m) => sum + (m.predictions?.[0]?.points || 0), 0)}
+              </p>
+              <p className="text-[10.5px] uppercase tracking-wide text-slate-500 mt-1.5">Points</p>
+            </div>
+            <div>
+              <p className="font-display text-[27px] font-extrabold leading-none tabular-nums text-blue-400">
+                {matches.filter((m) => m.status === 'FINISHED' && m.predictions?.[0]?.points === 3).length}
+              </p>
+              <p className="text-[10.5px] uppercase tracking-wide text-slate-500 mt-1.5">Scores exacts</p>
+            </div>
+          </div>
         </div>
       )}
 
@@ -228,35 +251,6 @@ export default function MatchesPage() {
               )}
             </div>
           )}
-        </div>
-      )}
-
-      {/* Récapitulatif */}
-      {!loading && matches.length > 0 && (
-        <div className="card mt-5">
-          <h3 className="rule-label mb-4">Récapitulatif</h3>
-          <div className="grid grid-cols-3 gap-4 text-center">
-            <div>
-              <p className="font-display text-[27px] font-extrabold leading-none tabular-nums text-amber-500">
-                {matches.filter(hasPrediction).length}/{matches.length}
-              </p>
-              <p className="text-[10.5px] uppercase tracking-wide text-slate-500 mt-1.5">Pronostics</p>
-            </div>
-            <div>
-              <p className="font-display text-[27px] font-extrabold leading-none tabular-nums text-green-400">
-                {matches
-                  .filter((m) => m.status === 'FINISHED')
-                  .reduce((sum, m) => sum + (m.predictions?.[0]?.points || 0), 0)}
-              </p>
-              <p className="text-[10.5px] uppercase tracking-wide text-slate-500 mt-1.5">Points</p>
-            </div>
-            <div>
-              <p className="font-display text-[27px] font-extrabold leading-none tabular-nums text-blue-400">
-                {matches.filter((m) => m.status === 'FINISHED' && m.predictions?.[0]?.points === 3).length}
-              </p>
-              <p className="text-[10.5px] uppercase tracking-wide text-slate-500 mt-1.5">Scores exacts</p>
-            </div>
-          </div>
         </div>
       )}
     </div>
