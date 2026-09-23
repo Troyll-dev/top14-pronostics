@@ -309,8 +309,8 @@ export default function Top14Page() {
                       <td className={`py-2 px-1.5 text-center tabular-nums font-medium ${r.diff > 0 ? 'text-green-400' : r.diff < 0 ? 'text-slate-500' : 'text-slate-400'}`}>
                         {r.diff > 0 ? '+' : ''}{r.diff}
                       </td>
-                      <td className="py-2 px-1.5 text-center tabular-nums text-slate-400 hidden md:table-cell">{r.triesFor}</td>
-                      <td className="py-2 px-1.5 text-center tabular-nums text-slate-500 hidden md:table-cell">{r.triesAgainst}</td>
+                      <td className="py-2 px-1.5 text-center tabular-nums text-slate-400 hidden md:table-cell">{r.triesFor ?? '—'}</td>
+                      <td className="py-2 px-1.5 text-center tabular-nums text-slate-500 hidden md:table-cell">{r.triesAgainst ?? '—'}</td>
                       <td className="py-2 px-1.5 text-center tabular-nums text-amber-500 hidden lg:table-cell">{r.bonusOff}</td>
                       <td className="py-2 px-1.5 text-center tabular-nums text-blue-400 hidden lg:table-cell">{r.bonusDef}</td>
                       <td className="py-2 px-1.5 text-center" title={r.form?.weather?.label || ''}>
