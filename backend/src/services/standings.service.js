@@ -1,4 +1,6 @@
 const axios = require('axios');
+const lnr = require('./sources/lnr');
+const { computeTable } = require('./standings-compute');
 const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
@@ -234,75 +236,84 @@ async function computeForm() {
 // --- Synchronisation ----------------------------------------------------------
 
 /**
- * Lit le classement sur allrugby et l'enregistre en base.
- * @param {{ dryRun?: boolean, debug?: boolean }} options
+ * Classement Top 14 — calcule, plus scrape.
+ *
+ * L'ancienne version lisait un tableau tout fait sur allrugby. Elle a cesse de
+ * fonctionner le 19 septembre et personne ne l'a su : quand la page changeait,
+ * l'analyseur ne reconnaissait plus rien, n'ecrivait rien, et l'application
+ * continuait de servir un instantane perime sans le signaler. Quatre jours.
+ *
+ * Desormais on lit les resultats sur le site de la LNR, qui homologue, et on
+ * calcule le tableau. Le bareme est arithmetique, donc il ne peut pas deriver ;
+ * la seule chose qui puisse casser est la lecture des pages, et celle-ci
+ * echoue bruyamment plutot qu'en silence.
  */
-async function syncStandings({ dryRun = false, debug = false } = {}) {
-  let html;
-  try {
-    const res = await axios.get(URL, {
-      timeout: 20000,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; Top14PronosBot/1.0)',
-        'Accept-Language': 'fr-FR,fr;q=0.9',
-      },
-    });
-    html = res.data;
-  } catch (err) {
-    return { ok: false, reason: `Page inaccessible : ${err.message}` };
+async function attachTeamsBySlug(rows) {
+  const teams = await prisma.team.findMany();
+  const parNom = new Map(teams.map((x) => [x.name, x]));
+  const parCourt = new Map(teams.map((x) => [x.shortName, x]));
+
+  const inconnus = [];
+  for (const r of rows) {
+    const nom = lnr.SLUG_TO_NAME[r.slug];
+    const team = (nom && parNom.get(nom)) || parCourt.get(r.slug.toUpperCase());
+    if (team) {
+      r.teamId = team.id;
+      r.name = team.name;
+      r.shortName = team.shortName;
+    } else {
+      r.name = nom || r.slug;
+      inconnus.push(r.slug);
+    }
   }
+  return inconnus;
+}
 
-  const { rows, misses } = parseTable(String(html));
+async function syncStandings({ dryRun = false } = {}) {
+  const report = { source: 'lnr', season: SEASON, rounds: [], table: [], unmatched: [] };
 
-  const report = {
-    ok: rows.length > 0,
-    dryRun,
-    source: URL,
-    found: rows.length,
-    misses,
-  };
-
-  // Diagnostic : on renvoie le texte reel des lignes, seul moyen de caler
-  // l'analyseur sans pouvoir inspecter la page depuis l'exterieur.
-  if (debug) {
-    const lines = toLines(String(html));
-    const grab = (re, max) => lines.filter((l) => re.test(l)).slice(0, max).map((l) => l.slice(0, 600));
-    report.diag = {
-      totalLignes: lines.length,
-      longueurHtml: String(html).length,
-      bordeaux: grab(/Bordeaux/i, 6),
-      racing: grab(/Racing/i, 6),
-      vannes: grab(/Vannes/i, 6),
-      // les lignes les plus chargees en chiffres : c'est la que vit le tableau
-      plusDeChiffres: lines
-        .map((l) => ({ l, n: (l.match(/\d+/g) || []).length }))
-        .sort((a, b) => b.n - a.n)
-        .slice(0, 8)
-        .map((x) => `[${x.n} nombres] ${x.l.slice(0, 600)}`),
-    };
-  }
-
-  if (!rows.length) {
-    report.reason = "Aucune ligne reconnue — la structure de la page a probablement change";
+  // Jusqu'ou lire : la derniere journee dont au moins un match est termine chez
+  // nous. Inutile d'aller chercher des journees a venir, et cela evite de
+  // marteler le site de la LNR avec vingt-six requetes a chaque passage.
+  const joues = await prisma.match.findMany({
+    where: { season: SEASON, status: 'FINISHED' },
+    select: { round: true },
+  });
+  const derniere = joues.reduce((m, x) => Math.max(m, x.round || 0), 0);
+  if (!derniere) {
+    report.reason = 'aucun match termine en base : rien a classer';
     return report;
   }
 
-  report.unmatched = await attachTeams(rows);
-  report.table = rows.map(({ raw, ...r }) => (debug ? { ...r, raw } : r));
+  const matchs = [];
+  for (let r = 1; r <= derniere; r += 1) {
+    // fetchRound leve si la page ne rend pas ses sept rencontres. On laisse
+    // remonter : mieux vaut une erreur visible qu'un classement ampute d'une
+    // journee, qui aurait l'air juste et serait faux.
+    matchs.push(...(await lnr.fetchRound(r)));
+    report.rounds.push(r);
+  }
+
+  const lignes = computeTable(matchs);
+  if (lignes.length !== 14) {
+    throw new Error(`classement : ${lignes.length} clubs au lieu de 14 — rien n'a ete ecrit`);
+  }
+
+  report.unmatched = await attachTeamsBySlug(lignes);
+  report.table = lignes;
 
   if (dryRun) return report;
 
   await prisma.leagueTable.upsert({
     where: { season: SEASON },
-    update: { data: report.table, source: 'allrugby', fetchedAt: new Date() },
-    create: { season: SEASON, data: report.table, source: 'allrugby' },
+    update: { data: report.table, source: 'lnr', fetchedAt: new Date() },
+    create: { season: SEASON, data: report.table, source: 'lnr' },
   });
 
-  console.log(`[classement] ${rows.length} equipes enregistrees`);
+  console.log(`[classement] calcule sur J1-J${derniere}, 14 clubs enregistres`);
   return report;
 }
 
-/** Ce que l'application affiche : instantane en base + forme calculee. */
 async function getStandings() {
   const snap = await prisma.leagueTable.findUnique({ where: { season: SEASON } });
   const form = await computeForm();
