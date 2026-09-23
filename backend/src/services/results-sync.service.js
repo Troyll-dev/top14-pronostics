@@ -2,6 +2,7 @@ const { PrismaClient } = require('@prisma/client');
 const { calculatePoints } = require('../controllers/match.controller');
 const sportsdb = require('./sources/thesportsdb');
 const espn = require('./sources/espn');
+const lnr = require('./sources/lnr');
 
 const prisma = new PrismaClient();
 
@@ -199,9 +200,35 @@ async function syncResults({ dryRun = false, rounds = null } = {}) {
   }
 
   for (const round of targets) {
-    const events = await sportsdb.fetchRound(round, SEASON);
-    if (events === null) { report.sources[`thesportsdb J${round}`] = 'injoignable'; continue; }
-    report.sources[`thesportsdb J${round}`] = `${events.length} rencontres`;
+    // La LNR homologue les resultats : quand elle repond, c'est elle qui mene
+    // la boucle. Les deux autres sources restent en recoupement, ce qui garde
+    // l'arbitrage utile en cas de desaccord. Et si la LNR est injoignable, on
+    // retombe sur TheSportsDB plutot que de sauter la journee : c'est ce
+    // saut-la qui rendait la synchronisation otage de sa source la plus fragile.
+    let lnrEvents = null;
+    try {
+      lnrEvents = (await lnr.fetchRound(round)).map(lnr.normalize);
+      report.sources[`lnr J${round}`] = `${lnrEvents.length} rencontres`;
+    } catch (err) {
+      // Le garde-fou de la source a parle : on journalise fort et on continue
+      // avec les autres, mais on ne fait surtout pas semblant que tout va bien.
+      report.sources[`lnr J${round}`] = `ECHEC — ${err.message}`;
+      console.error(`[sync] LNR J${round} : ${err.message}`);
+    }
+
+    const sdbEvents = await sportsdb.fetchRound(round, SEASON);
+    report.sources[`thesportsdb J${round}`] =
+      sdbEvents === null ? 'injoignable' : `${sdbEvents.length} rencontres`;
+
+    const sdbIndex = new Map();
+    for (const ev of sdbEvents || []) {
+      const h = resolveTeam(ev.home, teams);
+      const a = resolveTeam(ev.away, teams);
+      if (h && a) sdbIndex.set(`${h.id}-${a.id}`, ev);
+    }
+
+    const events = lnrEvents && lnrEvents.length ? lnrEvents : sdbEvents;
+    if (!events) continue;
 
     for (const ev of events) {
       let match = await prisma.match.findFirst({ where: { externalId: ev.externalId } });
@@ -223,15 +250,21 @@ async function syncResults({ dryRun = false, rounds = null } = {}) {
         }
       }
 
-      const second = espnIndex.get(`${match.homeTeamId}-${match.awayTeamId}`) || null;
-      const kickoff = ev.kickoff || (second && second.kickoff) || new Date(match.kickoff);
+      const cle = `${match.homeTeamId}-${match.awayTeamId}`;
+      const autres = [espnIndex.get(cle), sdbIndex.get(cle)].filter(Boolean).filter((x) => x !== ev);
+      const second = autres[0] || null;
+
+      // La LNR ne publie que le jour, pas l'heure : son kickoff est nul a
+      // dessein, pour ne pas ecraser un horaire correct par une date a minuit.
+      const kickoff =
+        ev.kickoff || autres.map((x) => x.kickoff).find(Boolean) || new Date(match.kickoff);
 
       // Heure officielle : la base a ete semee avec des horaires approximatifs,
       // or c'est l'heure qui decide de « en cours » et de la cloture des pronos.
       const shift = Math.abs(new Date(kickoff).getTime() - new Date(match.kickoff).getTime());
       const fixKickoff = shift > 10 * 60 * 1000;
 
-      const verdict = decide([ev, second].filter(Boolean), kickoff, now);
+      const verdict = decide([ev, ...autres].filter(Boolean), kickoff, now);
 
       if (!verdict) {
         if (fixKickoff && !dryRun) {
