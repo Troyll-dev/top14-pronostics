@@ -34,7 +34,7 @@
   object-fit: cover;
   /* 8 % et pas davantage : le joueur du fond a la tete au ras du bord
      superieur de l'image, et tout decalage plus grand la decapite. */
-  object-position: center 8%;
+  object-position: center 10%;
   -webkit-mask-image: linear-gradient(#000 70%, transparent 100%);
           mask-image: linear-gradient(#000 70%, transparent 100%);
 }

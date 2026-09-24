@@ -21,8 +21,9 @@ const PAGES_BANDEAU = ['/', '/classement'];
 const SRCSET =
   '/equipe-400.webp 400w, /equipe-600.webp 600w, /equipe-900.webp 900w';
 
-// Deuxieme groupe, pour le coin gauche : des maillots differents, sans quoi le
-// meme dessin repete de part et d'autre se remarquerait immediatement.
+// Deuxieme groupe : le bandeau et le filigrane de gauche. Le coin droit garde
+// l'autre image, sans quoi le meme dessin repete de part et d'autre se
+// remarquerait immediatement.
 const SRCSET_G =
   '/equipe-g-400.webp 400w, /equipe-g-600.webp 600w, /equipe-g-900.webp 900w';
 
@@ -60,12 +61,12 @@ export default function JoueursDecor() {
       {avecBandeau && (
         <div className="joueurs-bandeau" aria-hidden="true">
           <img
-            src="/equipe-600.webp"
-            srcSet={SRCSET}
+            src="/equipe-g-600.webp"
+            srcSet={SRCSET_G}
             sizes="(min-width: 704px) 672px, 100vw"
             alt=""
             width={600}
-            height={552}
+            height={556}
             decoding="async"
           />
         </div>
