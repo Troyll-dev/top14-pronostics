@@ -45,9 +45,9 @@
    differe selon le theme : sur le fond creme il faut l'attenuer davantage, une
    image sombre y ressortant beaucoup plus que sur le fond nuit.
    --------------------------------------------------------------------------- */
-.joueurs-filigrane {
+.joueurs-filigrane,
+.joueurs-filigrane-gauche {
   position: fixed;
-  right: -40px;
   bottom: -30px;
   width: min(52vw, 520px);
   z-index: 0;
@@ -55,10 +55,23 @@
   opacity: var(--joueurs-o, .2);
 }
 
-.joueurs-filigrane img { display: block; width: 100%; height: auto; }
+.joueurs-filigrane        { right: -40px; }
+.joueurs-filigrane-gauche { left: -40px; }
 
-html[data-theme='creme'] .joueurs-filigrane { --joueurs-o: .22; }
-html[data-theme='nuit']  .joueurs-filigrane { --joueurs-o: .16; }
+.joueurs-filigrane img,
+.joueurs-filigrane-gauche img { display: block; width: 100%; height: auto; }
+
+html[data-theme='creme'] .joueurs-filigrane,
+html[data-theme='creme'] .joueurs-filigrane-gauche { --joueurs-o: .22; }
+html[data-theme='nuit']  .joueurs-filigrane,
+html[data-theme='nuit']  .joueurs-filigrane-gauche { --joueurs-o: .16; }
+
+/* Deux filigranes ne tiennent qu'au-dela d'une certaine largeur : sous
+   900 px ils se rejoindraient au centre et se disputeraient les cartes. On ne
+   garde alors que celui de droite. */
+@media (max-width: 900px) {
+  .joueurs-filigrane-gauche { display: none; }
+}
 
 /* Sur un petit ecran le filigrane occupe proportionnellement beaucoup plus de
    place : on le reduit, sans quoi il concurrence les cartes. */
@@ -69,5 +82,6 @@ html[data-theme='nuit']  .joueurs-filigrane { --joueurs-o: .16; }
 /* Respect du reglage systeme : certains utilisateurs demandent moins d'images
    decoratives. On garde le bandeau, qui porte du sens, et on retire le fond. */
 @media (prefers-reduced-motion: reduce) {
-  .joueurs-filigrane { opacity: calc(var(--joueurs-o) * .5); }
+  .joueurs-filigrane,
+  .joueurs-filigrane-gauche { opacity: calc(var(--joueurs-o) * .5); }
 }
