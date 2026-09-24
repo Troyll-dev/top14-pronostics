@@ -24,18 +24,19 @@
 .joueurs-bandeau img {
   display: block;
   width: 100%;
-  height: 168px;
+  /* Une hauteur en proportion, et non en pixels : le cadrage reste alors
+     identique du telephone au grand ecran. Le rapport 1,86 correspond aux
+     56 % superieurs de l'image — mesure comme la plus petite bande qui
+     contienne a la fois les quatre visages et le ballon. En dessous, le ballon
+     sortait du champ. */
+  aspect-ratio: 1.86;
+  height: auto;
   object-fit: cover;
   /* 8 % et pas davantage : le joueur du fond a la tete au ras du bord
-     superieur de l'image, et tout decalage plus grand la decapite. Valeur
-     mesuree sur les quatre cadrages possibles, aux deux hauteurs de bandeau. */
+     superieur de l'image, et tout decalage plus grand la decapite. */
   object-position: center 8%;
   -webkit-mask-image: linear-gradient(#000 70%, transparent 100%);
           mask-image: linear-gradient(#000 70%, transparent 100%);
-}
-
-@media (min-width: 640px) {
-  .joueurs-bandeau img { height: 220px; }
 }
 
 /* --- Le filigrane ----------------------------------------------------------
