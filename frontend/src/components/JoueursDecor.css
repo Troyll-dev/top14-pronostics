@@ -9,8 +9,8 @@
 /* --- Le bandeau ------------------------------------------------------------
    Il appartient au flux, au-dessus du titre, et a la meme largeur que la
    colonne de contenu. En plein format l'image repoussait toutes les cartes
-   sous la ligne de flottaison : on la plafonne en hauteur et on recadre sur le
-   tiers superieur, ou sont les visages. Le bas se fond dans la page par un
+   sous la ligne de flottaison : on la plafonne en hauteur et on recadre tout
+   en haut, ou sont les quatre visages. Le bas se fond dans la page par un
    masque en degrade, pour eviter le bord net d'une image collee.
    --------------------------------------------------------------------------- */
 .joueurs-bandeau {
@@ -26,7 +26,10 @@
   width: 100%;
   height: 168px;
   object-fit: cover;
-  object-position: center 26%;
+  /* 8 % et pas davantage : le joueur du fond a la tete au ras du bord
+     superieur de l'image, et tout decalage plus grand la decapite. Valeur
+     mesuree sur les quatre cadrages possibles, aux deux hauteurs de bandeau. */
+  object-position: center 8%;
   -webkit-mask-image: linear-gradient(#000 70%, transparent 100%);
           mask-image: linear-gradient(#000 70%, transparent 100%);
 }
