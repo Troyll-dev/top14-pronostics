@@ -3,7 +3,6 @@ import { format, isToday, isYesterday, isSameDay } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import api from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
-import Avatar from '../components/Avatar';
 
 const SEEN_KEY = 't14-chat-vu';
 const POLL_MS = 6000;
@@ -37,7 +36,6 @@ export default function ChatPage() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
 
-  const bottomRef = useRef(null);
   const scrollerRef = useRef(null);
   // On ne recolle en bas que si l'on y etait deja : sinon relire un vieux
   // message serait impossible, la liste sauterait a chaque interrogation.
@@ -85,8 +83,22 @@ export default function ChatPage() {
     markChatSeen(messages[messages.length - 1].createdAt);
   }, [messages]);
 
+  /**
+   * Recoller en bas — de la liste, et d'elle seule.
+   *
+   * L'ancienne version appelait scrollIntoView sur une ancre placee en fin de
+   * liste. Or scrollIntoView fait defiler TOUS les conteneurs defilants qui
+   * englobent la cible, la fenetre comprise : toutes les trois secondes, le
+   * rafraichissement ramenait donc la page entiere vers le bas, et il devenait
+   * impossible de lire tranquillement. Le defaut ne se voyait pas tant que la
+   * page tenait dans l'ecran ; il est apparu des qu'elle est devenue plus
+   * haute.
+   *
+   * Agir directement sur scrollTop ne touche que la boite des messages.
+   */
   useEffect(() => {
-    if (stick.current) bottomRef.current?.scrollIntoView({ block: 'end' });
+    const el = scrollerRef.current;
+    if (el && stick.current) el.scrollTop = el.scrollHeight;
   }, [messages]);
 
   const send = async () => {
@@ -176,7 +188,14 @@ export default function ChatPage() {
 
                   <div className={`flex gap-2.5 ${grouped ? 'mt-0.5' : 'mt-3'} ${isMe ? 'flex-row-reverse' : ''}`}>
                     <div className="w-7 shrink-0">
-                      {!grouped && <Avatar user={m.user} size={28} ring={false} />}
+                      {!grouped && (
+                        <div
+                          className="w-7 h-7 rounded-full flex items-center justify-center font-display font-bold text-[12px]"
+                          style={{ backgroundColor: m.user.avatarColor, color: '#fff' }}
+                        >
+                          {m.user.username[0].toUpperCase()}
+                        </div>
+                      )}
                     </div>
 
                     <div className={`min-w-0 max-w-[78%] ${isMe ? 'text-right' : ''}`}>
@@ -218,7 +237,6 @@ export default function ChatPage() {
               );
             })
           )}
-          <div ref={bottomRef} />
         </div>
 
         {/* Saisie */}
