@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Navbar from './components/Navbar';
 import PhotoCopains from './components/PhotoCopains';
+import JoueursDecor from './components/JoueursDecor';
 import WelcomePage from './pages/WelcomePage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -40,10 +41,14 @@ function AppRoutes() {
     <div className="min-h-screen">
       {user && <Navbar />}
 
+      {/* Le filigrane est fixe en z-0 : le contenu doit donc etre eleve
+          au-dessus, sans quoi il passerait derriere les joueurs. */}
+      {user && <JoueursDecor />}
+
       {/* Conteneur relatif : il sert de repere a la vignette, qui est en
           position absolue et defile donc avec la page au lieu de rester
-          collee a l'ecran. */}
-      <div className="relative">
+          collee a l'ecran. Le z-10 le place devant le filigrane. */}
+      <div className="relative z-10">
         {user && <PhotoCopains />}
         <Routes>
           <Route path="/bienvenue" element={<PublicRoute><WelcomePage /></PublicRoute>} />

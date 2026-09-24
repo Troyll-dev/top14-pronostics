@@ -1,0 +1,69 @@
+/* ---------------------------------------------------------------------------
+   Les joueurs, sur l'accueil, le classement et le vestiaire.
+
+   Deux presences complementaires, et c'est voulu : le bandeau assume l'image
+   en haut de page, le filigrane l'installe discretement dans le fond. L'un se
+   lit, l'autre s'oublie.
+   --------------------------------------------------------------------------- */
+
+/* --- Le bandeau ------------------------------------------------------------
+   Il appartient au flux, au-dessus du titre, et a la meme largeur que la
+   colonne de contenu. En plein format l'image repoussait toutes les cartes
+   sous la ligne de flottaison : on la plafonne en hauteur et on recadre sur le
+   tiers superieur, ou sont les visages. Le bas se fond dans la page par un
+   masque en degrade, pour eviter le bord net d'une image collee.
+   --------------------------------------------------------------------------- */
+.joueurs-bandeau {
+  position: relative;        /* au-dessus du filigrane, qui est en z-0 */
+  z-index: 1;
+  max-width: 704px;          /* 672 px de colonne + 2 x 16 px de padding */
+  margin: 0 auto;
+  padding: 10px 16px 0;
+}
+
+.joueurs-bandeau img {
+  display: block;
+  width: 100%;
+  height: 168px;
+  object-fit: cover;
+  object-position: center 26%;
+  -webkit-mask-image: linear-gradient(#000 70%, transparent 100%);
+          mask-image: linear-gradient(#000 70%, transparent 100%);
+}
+
+@media (min-width: 640px) {
+  .joueurs-bandeau img { height: 220px; }
+}
+
+/* --- Le filigrane ----------------------------------------------------------
+   Fixe dans le coin bas droit, derriere le contenu. Il ne defile pas et ne
+   prend aucune place dans le flux, donc il ne peut rien bousculer. Son opacite
+   differe selon le theme : sur le fond creme il faut l'attenuer davantage, une
+   image sombre y ressortant beaucoup plus que sur le fond nuit.
+   --------------------------------------------------------------------------- */
+.joueurs-filigrane {
+  position: fixed;
+  right: -40px;
+  bottom: -30px;
+  width: min(52vw, 520px);
+  z-index: 0;
+  pointer-events: none;
+  opacity: var(--joueurs-o, .2);
+}
+
+.joueurs-filigrane img { display: block; width: 100%; height: auto; }
+
+html[data-theme='creme'] .joueurs-filigrane { --joueurs-o: .22; }
+html[data-theme='nuit']  .joueurs-filigrane { --joueurs-o: .16; }
+
+/* Sur un petit ecran le filigrane occupe proportionnellement beaucoup plus de
+   place : on le reduit, sans quoi il concurrence les cartes. */
+@media (max-width: 520px) {
+  .joueurs-filigrane { width: 62vw; right: -52px; bottom: -20px; opacity: calc(var(--joueurs-o) * .8); }
+}
+
+/* Respect du reglage systeme : certains utilisateurs demandent moins d'images
+   decoratives. On garde le bandeau, qui porte du sens, et on retire le fond. */
+@media (prefers-reduced-motion: reduce) {
+  .joueurs-filigrane { opacity: calc(var(--joueurs-o) * .5); }
+}
