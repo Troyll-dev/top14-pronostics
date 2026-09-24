@@ -12,8 +12,14 @@ function loadDrafts() {
     const raw = JSON.parse(localStorage.getItem(DRAFT_KEY)) || {};
     const now = Date.now();
     const kept = {};
+    const vide = (x) => x === '' || x === undefined || x === null;
     for (const [id, d] of Object.entries(raw)) {
-      if (d && typeof d === 'object' && now - (d.t || 0) < DRAFT_TTL) kept[id] = d;
+      if (!d || typeof d !== 'object') continue;
+      if (now - (d.t || 0) >= DRAFT_TTL) continue;
+      // Purge des brouillons vides deja enregistres par les versions
+      // precedentes : ce sont eux qui masquaient des pronostics existants.
+      if (vide(d.home) && vide(d.away)) continue;
+      kept[id] = d;
     }
     return kept;
   } catch {
@@ -61,11 +67,29 @@ export default function MatchesPage() {
   useEffect(() => { fetchMatches(); }, [fetchMatches]);
   useEffect(() => { setBulkResult(null); }, [currentRound]);
 
+  /**
+   * Un brouillon vide n'est pas un brouillon — et le garder cache le
+   * pronostic enregistre.
+   *
+   * La carte lit `draft?.home ?? prediction?.homeScorePred`. Or `??` ne se
+   * declenche que sur null ou undefined, pas sur la chaine vide : un champ
+   * qu'on a vide a la main laissait donc un brouillon a '' qui masquait
+   * durablement un prono pourtant bien en base. Il suffisait d'avoir efface
+   * un chiffre pour croire son pronostic perdu.
+   *
+   * On supprime donc l'entree des que les deux cotes sont vides.
+   */
   const setDraft = useCallback((matchId, side, value) => {
-    setDrafts((prev) => ({
-      ...prev,
-      [matchId]: { ...prev[matchId], [side]: value, t: Date.now() },
-    }));
+    setDrafts((prev) => {
+      const d = { ...prev[matchId], [side]: value, t: Date.now() };
+      const vide = (x) => x === '' || x === undefined || x === null;
+      if (vide(d.home) && vide(d.away)) {
+        const next = { ...prev };
+        delete next[matchId];
+        return next;
+      }
+      return { ...prev, [matchId]: d };
+    });
   }, []);
 
   /**
