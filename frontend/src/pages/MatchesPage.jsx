@@ -68,28 +68,26 @@ export default function MatchesPage() {
   useEffect(() => { setBulkResult(null); }, [currentRound]);
 
   /**
-   * Un brouillon vide n'est pas un brouillon — et le garder cache le
-   * pronostic enregistre.
+   * Le brouillon suit la frappe, y compris quand on efface.
    *
-   * La carte lit `draft?.home ?? prediction?.homeScorePred`. Or `??` ne se
-   * declenche que sur null ou undefined, pas sur la chaine vide : un champ
-   * qu'on a vide a la main laissait donc un brouillon a '' qui masquait
-   * durablement un prono pourtant bien en base. Il suffisait d'avoir efface
-   * un chiffre pour croire son pronostic perdu.
+   * On avait tente de supprimer l'entree des que les deux champs etaient
+   * vides, pour empecher un brouillon vide de masquer un pronostic
+   * enregistre. C'etait le bon objectif mais le mauvais endroit : effacer ses
+   * deux chiffres pour en saisir d'autres faisait disparaitre le brouillon, la
+   * carte retombait sur le pronostic en base, et les anciens chiffres
+   * revenaient sous les doigts. On ne pouvait plus modifier un prono.
    *
-   * On supprime donc l'entree des que les deux cotes sont vides.
+   * Les deux besoins ne sont pas en conflit, ils ne vivent simplement pas au
+   * meme moment : pendant la saisie, un champ vide doit rester vide ; au
+   * chargement de la page, un brouillon vide n'a plus aucun sens et ne doit
+   * pas masquer ce qui est enregistre. La purge se fait donc dans loadDrafts,
+   * et nulle part ailleurs.
    */
   const setDraft = useCallback((matchId, side, value) => {
-    setDrafts((prev) => {
-      const d = { ...prev[matchId], [side]: value, t: Date.now() };
-      const vide = (x) => x === '' || x === undefined || x === null;
-      if (vide(d.home) && vide(d.away)) {
-        const next = { ...prev };
-        delete next[matchId];
-        return next;
-      }
-      return { ...prev, [matchId]: d };
-    });
+    setDrafts((prev) => ({
+      ...prev,
+      [matchId]: { ...prev[matchId], [side]: value, t: Date.now() },
+    }));
   }, []);
 
   /**
