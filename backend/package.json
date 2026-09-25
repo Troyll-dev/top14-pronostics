@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "API backend pour l'application de pronostics Top 14",
   "main": "src/app.js",
-  "prisma": { "schema": "src/prisma/schema.prisma" }
+  "prisma": { "schema": "src/prisma/schema.prisma" },
   "scripts": {
     "dev": "nodemon src/app.js",
     "start": "node src/app.js",
