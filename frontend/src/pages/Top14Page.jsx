@@ -193,8 +193,24 @@ export default function Top14Page() {
                     </div>
                   </div>
 
-                  <div className="flex justify-center mt-1.5">
+                  {/* Le diffuseur se pose sur la ligne d'état, pas à côté de
+                      l'heure : la colonne centrale ne fait que 74 px et doit
+                      rester lisible, alors que cette ligne-ci est déjà centrée
+                      et a de la place.
+
+                      Avant le coup d'envoi seulement — après, la chaîne qui a
+                      diffusé le match n'apprend plus rien. */}
+                  <div className="flex justify-center items-center gap-1.5 flex-wrap mt-1.5">
                     <StateChip state={state} />
+                    {m.broadcaster && state === 'avenir' && (
+                      <span
+                        title={`Diffusion : ${m.broadcaster}`}
+                        className="font-display text-[9.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded
+                                   bg-slate-700/40 text-slate-400 border border-slate-700 whitespace-nowrap"
+                      >
+                        📺 {m.broadcaster}
+                      </span>
+                    )}
                   </div>
                 </div>
               );
