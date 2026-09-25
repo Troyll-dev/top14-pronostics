@@ -154,9 +154,29 @@ export default function MatchCard({ match, draft, onDraftChange, onPredictionSav
 
   return (
     <div className={`card stitched laced ${bordure}`}>
-      {/* En-tête */}
-      <div className="relative z-10 flex items-center justify-between mb-3">
-        <span className="text-[11.5px] italic text-slate-500 first-letter:uppercase">{dateStr}</span>
+      {/* En-tête
+
+          Date, heure et diffuseur sur la même ligne, à gauche : ce sont les
+          trois réponses à la même question — quand, et sur quelle chaîne. Le
+          groupe peut passer à la ligne sur les petits écrans plutôt que de
+          pousser l'étiquette d'état hors du cadre.
+
+          Le diffuseur ne s'affiche qu'avant le coup d'envoi. Après, savoir sur
+          quelle chaîne le match a été diffusé n'apprend plus rien, et la place
+          revient au score. */}
+      <div className="relative z-10 flex items-center justify-between gap-2 flex-wrap mb-3">
+        <span className="flex items-center gap-1.5 flex-wrap min-w-0">
+          <span className="text-[11.5px] italic text-slate-500 first-letter:uppercase">{dateStr}</span>
+          {match.broadcaster && state === 'avenir' && (
+            <span
+              title={`Diffusion : ${match.broadcaster}`}
+              className="font-display text-[9.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded
+                         bg-slate-700/40 text-slate-400 border border-slate-700 whitespace-nowrap"
+            >
+              📺 {match.broadcaster}
+            </span>
+          )}
+        </span>
         {state === 'avenir' ? (
           <span className={`font-display text-[10.5px] font-bold uppercase tracking-wider px-2.5 py-1 rounded ${etat.chip}`}>
             {etat.libelle}

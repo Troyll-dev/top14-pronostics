@@ -16,8 +16,10 @@ const reminderRoutes = require('./routes/reminder.routes');
 const { startResultsCron } = require('./cron/results.cron');
 const { startBackupCron } = require('./cron/backup.cron');
 const { startReminderCron } = require('./cron/reminder.cron');
+const { startScheduleCron } = require('./cron/schedule.cron');
 
 const app = express();
+
 
 // Middleware
 app.use(cors({
@@ -55,6 +57,7 @@ app.listen(PORT, () => {
   startResultsCron();
   startBackupCron();
   startReminderCron();
+  startScheduleCron();
 });
 
 module.exports = app;

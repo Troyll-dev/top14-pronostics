@@ -72,6 +72,7 @@ model Match {
   homeScore    Int?                    // Score final équipe domicile
   awayScore    Int?                    // Score final équipe extérieure
   venue        String?
+  broadcaster  String?
   predictions  Prediction[]
   updatedAt    DateTime      @updatedAt
 
