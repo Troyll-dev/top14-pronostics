@@ -71,7 +71,7 @@ function wrap(title, intro, buttonLabel, link, footer) {
 </body></html>`;
 }
 
-async function sendViaBrevo(c, { to, subject, html, text }) {
+async function sendViaBrevo(c, { to, subject, html, text, attachments }) {
   await axios.post(
     BREVO_URL,
     {
@@ -80,6 +80,16 @@ async function sendViaBrevo(c, { to, subject, html, text }) {
       subject,
       htmlContent: html,
       textContent: text,
+      // Brevo attend le contenu en base64 ; nodemailer veut un Buffer. On
+      // garde donc l'interface commune en Buffer et on convertit ici.
+      ...(attachments?.length
+        ? {
+            attachment: attachments.map((a) => ({
+              name: a.name,
+              content: Buffer.from(a.content).toString('base64'),
+            })),
+          }
+        : {}),
     },
     { headers: { 'api-key': c.brevoKey, 'content-type': 'application/json' }, timeout: 15000 }
   );
@@ -87,7 +97,7 @@ async function sendViaBrevo(c, { to, subject, html, text }) {
 
 let transport = null;
 
-async function sendViaSmtp(c, { to, subject, html, text }) {
+async function sendViaSmtp(c, { to, subject, html, text, attachments }) {
   let nodemailer;
   try {
     // Charge a la demande : si l'on n'utilise que Brevo, le paquet n'a pas
@@ -109,6 +119,9 @@ async function sendViaSmtp(c, { to, subject, html, text }) {
   await transport.sendMail({
     from: `"${c.fromName}" <${c.from}>`,
     to, subject, html, text,
+    ...(attachments?.length
+      ? { attachments: attachments.map((a) => ({ filename: a.name, content: a.content })) }
+      : {}),
   });
 }
 
@@ -140,4 +153,4 @@ async function sendPasswordReset(to, username, token) {
   });
 }
 
-module.exports = { isConfigured, provider, sendPasswordReset };
+module.exports = { isConfigured, provider, send, sendPasswordReset };

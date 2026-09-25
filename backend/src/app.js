@@ -13,7 +13,8 @@ const userRoutes = require('./routes/user.routes');
 const { startResultsCron } = require('./cron/results.cron');
 
 const app = express();
-
+const backupRoutes = require('./routes/backup.routes');
+const { startBackupCron } = require('./cron/backup.cron');
 // Middleware
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:5173',
@@ -33,7 +34,7 @@ app.use('/api/sync', syncRoutes);
 app.use('/api/standings', standingsRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/users', userRoutes);
-
+app.use('/api/admin/backup', backupRoutes);
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -45,6 +46,7 @@ app.listen(PORT, () => {
 
   // Synchronisation automatique des resultats et du classement
   startResultsCron();
+  startBackupCron();
 });
 
 module.exports = app;
