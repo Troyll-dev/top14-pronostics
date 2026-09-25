@@ -2,7 +2,27 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 const MAX_LENGTH = 1000;
-const AUTHOR = { select: { id: true, username: true, avatarColor: true, initials: true, avatarRing: true } };
+/**
+ * Ce que l'on renvoie de l'auteur d'un message.
+ *
+ * Le composant Avatar a besoin de quatre choses : l'identifiant pour aller
+ * chercher la photo, la couleur de fond, les initiales choisies et le liseré.
+ * Il en manquait deux, et le chat retombait donc sur la pastille par defaut
+ * alors que chacun avait configure la sienne.
+ *
+ * On ne renvoie surtout pas la photo elle-meme : elle vit dans sa propre table
+ * et se sert par son URL, sans quoi chaque message trainerait quelques
+ * kilo-octets d'image.
+ */
+const AUTHOR = {
+  select: {
+    id: true,
+    username: true,
+    avatarColor: true,
+    initials: true,
+    avatarRing: true,
+  },
+};
 
 /**
  * GET /api/messages?limit=100
