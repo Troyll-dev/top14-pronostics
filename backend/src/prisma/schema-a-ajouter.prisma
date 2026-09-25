@@ -1,0 +1,35 @@
+// ---------------------------------------------------------------------------
+// A AJOUTER dans backend/src/prisma/schema.prisma
+//
+// 1. Une ligne dans le modele User, parmi les autres relations :
+//
+//        reminders    Reminder[]
+//
+// 2. Le modele ci-dessous, a la fin du fichier.
+//
+// Puis, depuis la console Railway du service backend :
+//
+//        npx prisma db push
+//
+// ---------------------------------------------------------------------------
+
+/// Trace des rappels deja envoyes.
+///
+/// Elle n'existe que pour garantir qu'on n'ecrit qu'une fois a chacun par
+/// journee. La contrainte d'unicite fait tout le travail : on insere avant
+/// d'envoyer, et si l'insertion echoue c'est que le rappel est deja parti.
+/// L'unicite est ainsi garantie par la base, pas par la regularite du
+/// planificateur — un redemarrage du serveur un vendredi soir ne peut donc pas
+/// produire un second courriel.
+model Reminder {
+  id        Int      @id @default(autoincrement())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int
+  round     Int
+  kind      String   @default("PRONOS_MANQUANTS")
+  sentAt    DateTime @default(now())
+
+  @@unique([userId, round, kind])
+  @@index([round])
+  @@map("reminders")
+}

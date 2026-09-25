@@ -21,6 +21,7 @@ model User {
   messages     Message[]
   avatar       UserAvatar?
   authTokens   AuthToken[]
+  reminders    Reminder[]
 
   @@map("users")
 }
@@ -148,4 +149,24 @@ model LeagueTable {
   fetchedAt DateTime @default(now())
 
   @@map("league_table")
+}
+/// Trace des rappels deja envoyes.
+///
+/// Elle n'existe que pour garantir qu'on n'ecrit qu'une fois a chacun par
+/// journee. La contrainte d'unicite fait tout le travail : on insere avant
+/// d'envoyer, et si l'insertion echoue c'est que le rappel est deja parti.
+/// L'unicite est ainsi garantie par la base, pas par la regularite du
+/// planificateur — un redemarrage du serveur un vendredi soir ne peut donc pas
+/// produire un second courriel.
+model Reminder {
+  id        Int      @id @default(autoincrement())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int
+  round     Int
+  kind      String   @default("PRONOS_MANQUANTS")
+  sentAt    DateTime @default(now())
+
+  @@unique([userId, round, kind])
+  @@index([round])
+  @@map("reminders")
 }

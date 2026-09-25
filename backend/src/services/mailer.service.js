@@ -153,4 +153,4 @@ async function sendPasswordReset(to, username, token) {
   });
 }
 
-module.exports = { isConfigured, provider, send, sendPasswordReset };
+module.exports = { isConfigured, provider, send, wrap, sendPasswordReset };
