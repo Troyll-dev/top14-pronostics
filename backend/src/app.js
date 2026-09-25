@@ -10,16 +10,21 @@ const syncRoutes = require('./routes/sync.routes');
 const standingsRoutes = require('./routes/standings.routes');
 const messageRoutes = require('./routes/message.routes');
 const userRoutes = require('./routes/user.routes');
+const backupRoutes = require('./routes/backup.routes');
+const reminderRoutes = require('./routes/reminder.routes');
+
 const { startResultsCron } = require('./cron/results.cron');
+const { startBackupCron } = require('./cron/backup.cron');
+const { startReminderCron } = require('./cron/reminder.cron');
 
 const app = express();
-const backupRoutes = require('./routes/backup.routes');
-const { startBackupCron } = require('./cron/backup.cron');
+
 // Middleware
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:5173',
   credentials: true,
 }));
+
 // 1 Mo au lieu des 100 ko par defaut : la photo de profil arrive en data URL
 // dans le corps de la requete. Le navigateur envoie environ 6 ko, la marge
 // couvre un navigateur qui ne saurait pas encoder en webp.
@@ -35,6 +40,8 @@ app.use('/api/standings', standingsRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/admin/backup', backupRoutes);
+app.use('/api/admin/reminders', reminderRoutes);
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -44,9 +51,10 @@ const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`Serveur Top 14 Pronostics demarre sur http://localhost:${PORT}`);
 
-  // Synchronisation automatique des resultats et du classement
+  // Taches automatiques : resultats et classement, sauvegarde, rappels
   startResultsCron();
   startBackupCron();
+  startReminderCron();
 });
 
 module.exports = app;
