@@ -224,13 +224,31 @@ export default function MatchCard({ match, draft, onDraftChange, onPredictionSav
       {/* Saisie */}
       {!locked && (
         <div className="relative z-10 mt-3.5 pt-3 border-t border-slate-800 flex items-center gap-3 flex-wrap">
-          <button
-            onClick={handleSave}
-            disabled={saving || !complete || (!dirty && !!prediction)}
-            className="btn-primary text-[13px] py-2"
-          >
-            {saving ? '…' : saved ? '✅ Enregistré' : prediction ? 'Modifier' : 'Valider'}
-          </button>
+          {/* Le bouton ne s'affiche que s'il a quelque chose a faire.
+
+              Il portait « Modifier » en grise tant que rien n'avait change.
+              L'etiquette promettait une action — « clique ici pour modifier » —
+              alors qu'elle en decrivait une autre : « enregistrer la
+              modification ». On cliquait donc dessus sans effet, et l'on en
+              concluait qu'un prono enregistre ne se modifiait plus.
+
+              Un bouton grise qui ne s'explique pas est toujours un piege. Ici
+              il disparait, et une phrase dit quoi faire. */}
+          {(dirty || !prediction || saving || saved) && (
+            <button
+              onClick={handleSave}
+              disabled={saving || !complete}
+              className="btn-primary text-[13px] py-2"
+            >
+              {saving
+                ? '…'
+                : saved
+                ? '✅ Enregistré'
+                : prediction
+                ? 'Enregistrer la modification'
+                : 'Valider'}
+            </button>
+          )}
 
           {dirty && !saving && !saved && (
             <span className="font-display text-[11px] font-bold uppercase tracking-wider px-2 py-1 rounded bg-amber-500/20 text-amber-500 border border-amber-500/45">
@@ -239,7 +257,8 @@ export default function MatchCard({ match, draft, onDraftChange, onPredictionSav
           )}
           {!dirty && prediction && !saving && !saved && (
             <span className="text-[11.5px] text-slate-500">
-              Enregistré : {prediction.homeScorePred}–{prediction.awayScorePred}
+              Enregistré&nbsp;: <b className="text-slate-400">{prediction.homeScorePred}–{prediction.awayScorePred}</b>
+              {' · '}change un score pour le modifier
             </span>
           )}
           {error && <span className="text-[11.5px] text-red-400">{error}</span>}
