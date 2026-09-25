@@ -212,32 +212,12 @@ export default function MatchesPage() {
         </div>
       )}
 
-      {/* Liste des matchs */}
-      {loading ? (
-        <div className="text-center py-16 text-slate-500 animate-pulse">Chargement des matchs…</div>
-      ) : matches.length === 0 ? (
-        <div className="text-center py-16">
-          <p className="text-slate-500 text-lg mb-2">Aucun match pour la journée {currentRound}</p>
-          <p className="text-slate-600 text-sm">Les matchs seront ajoutés prochainement</p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {matches.map((match) => (
-            <MatchCard
-              key={match.id}
-              match={match}
-              draft={drafts[match.id]}
-              now={now}
-              onDraftChange={setDraft}
-              onPredictionSaved={handleSaved}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Tout valider */}
+      {/* Tout valider — place AVANT la liste, et c'est tout l'objet du
+          changement. En dessous des sept matchs, il fallait faire defiler
+          toute la page pour le decouvrir : autant dire que personne ne le
+          voyait, et qu'on pouvait quitter la page en croyant avoir joue. */}
       {!loading && (toSave.length > 0 || bulkResult) && (
-        <div className="card mt-5 border-l-4 border-l-amber-500">
+        <div className="card mb-5 border-l-4 border-l-amber-500">
           {toSave.length > 0 ? (
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <div>
@@ -277,6 +257,30 @@ export default function MatchesPage() {
           )}
         </div>
       )}
+
+      {/* Liste des matchs */}
+      {loading ? (
+        <div className="text-center py-16 text-slate-500 animate-pulse">Chargement des matchs…</div>
+      ) : matches.length === 0 ? (
+        <div className="text-center py-16">
+          <p className="text-slate-500 text-lg mb-2">Aucun match pour la journée {currentRound}</p>
+          <p className="text-slate-600 text-sm">Les matchs seront ajoutés prochainement</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {matches.map((match) => (
+            <MatchCard
+              key={match.id}
+              match={match}
+              draft={drafts[match.id]}
+              now={now}
+              onDraftChange={setDraft}
+              onPredictionSaved={handleSaved}
+            />
+          ))}
+        </div>
+      )}
+
     </div>
   );
 }

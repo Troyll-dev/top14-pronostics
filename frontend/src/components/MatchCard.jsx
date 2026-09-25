@@ -78,6 +78,31 @@ export default function MatchCard({ match, draft, onDraftChange, onPredictionSav
     complete &&
     (!prediction || prediction.homeScorePred !== home || prediction.awayScorePred !== away);
 
+  /**
+   * Trois etats, et un seul mot pour les dire.
+   *
+   * Avant, tous les matchs ouverts portaient le meme liseré orange et la meme
+   * etiquette « Ouvert ». Un signal present partout ne signale rien : on ne
+   * distinguait pas un prono enregistre d'un prono seulement saisi, et l'on
+   * pouvait remplir ses sept matchs, oublier de valider, et le decouvrir au
+   * classement.
+   *
+   * Desormais l'orange est reserve a ce qui demande une action.
+   */
+  const etat = dirty
+    ? { libelle: 'non validé', chip: 'bg-amber-500/20 text-amber-500 border border-amber-500/45' }
+    : prediction
+    ? { libelle: 'enregistré', chip: 'bg-green-500/15 text-green-400 border border-green-500/40' }
+    : { libelle: 'à faire', chip: 'chip-accent' };
+
+  const bordure = locked
+    ? ''
+    : dirty
+    ? 'border-l-4 border-l-amber-500'
+    : prediction
+    ? 'border-l-4 border-l-green-500/70'
+    : 'border-l-4 border-l-slate-600';
+
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
@@ -128,13 +153,13 @@ export default function MatchCard({ match, draft, onDraftChange, onPredictionSav
   const awayWon = isFinished && match.awayScore > match.homeScore;
 
   return (
-    <div className={`card stitched laced ${!locked ? 'border-l-4 border-l-amber-500' : ''}`}>
+    <div className={`card stitched laced ${bordure}`}>
       {/* En-tête */}
       <div className="relative z-10 flex items-center justify-between mb-3">
         <span className="text-[11.5px] italic text-slate-500 first-letter:uppercase">{dateStr}</span>
         {state === 'avenir' ? (
-          <span className="font-display text-[10.5px] font-bold uppercase tracking-wider px-2.5 py-1 rounded chip-accent">
-            Ouvert
+          <span className={`font-display text-[10.5px] font-bold uppercase tracking-wider px-2.5 py-1 rounded ${etat.chip}`}>
+            {etat.libelle}
           </span>
         ) : (
           <span className={`font-display text-[10.5px] font-bold uppercase tracking-wider px-2.5 py-1 rounded flex items-center gap-1.5 ${STATE_CHIP[state]}`}>
