@@ -51,6 +51,13 @@ import TeamCrest from '../components/TeamCrest';
  * Le repli sur `points` couvre les pronostics d'avant les multiplicateurs, dont
  * `basePoints` est nul : à cette époque les deux valeurs étaient égales.
  */
+/* La colonne des joueurs flotte au-dessus du tableau qui defile. Une ombre
+   portee a droite le dit : sans elle, on ne comprend pas pourquoi une colonne
+   reste immobile pendant que les autres bougent — on croit a un defaut
+   d'affichage. Elle ne se voit que quand il y a effectivement quelque chose
+   dessous, c'est-a-dire pendant le defilement. */
+const OMBRE_COLONNE = '6px 0 8px -6px rgba(0,0,0,.45)';
+
 const CELLULE = {
   3: { background: '#2563eb', color: '#ffffff', fontWeight: 800 },  // bleu vif    score exact
   2: { background: '#4ade80', color: '#064e3b', fontWeight: 700 },  // vert franc  bon vainqueur, ecart proche
@@ -151,11 +158,28 @@ export default function RoundPredictionsPage() {
         </div>
       ) : (
         <>
-          <div className="card overflow-x-auto">
+          {/* Le rembourrage horizontal est annulé sur la carte, et reporté
+              sur les cellules des deux bords.
+
+              La raison tient à la façon dont fonctionne une colonne collée :
+              `left: 0` désigne le bord de la **boîte de contenu**, donc
+              l'intérieur du rembourrage. Avec seize pixels de rembourrage, les
+              cases qui défilent passent dans cette bande, à gauche du nom, et
+              on les voit glisser à côté. Sur ordinateur les sept colonnes
+              tiennent, rien ne défile, et le défaut reste invisible — il
+              n'apparaît que sur téléphone.
+
+              En style direct parce qu'il doit l'emporter sur `.card` quel que
+              soit l'ordre des feuilles de style ; le rembourrage vertical,
+              lui, est conservé. */}
+          <div className="card overflow-x-auto" style={{ paddingLeft: 0, paddingRight: 0 }}>
             <table className="w-full border-separate border-spacing-0 text-xs">
               <thead>
                 <tr>
-                  <th className="sticky left-0 z-20 bg-slate-900 text-left font-display text-[10.5px] font-bold uppercase tracking-wider text-slate-500 px-2 pb-2.5 min-w-[7rem]">
+                  <th
+                    className="sticky left-0 z-20 bg-slate-900 text-left font-display text-[10.5px] font-bold uppercase tracking-wider text-slate-500 pl-4 pr-2 pb-2.5 min-w-[7rem]"
+                    style={{ boxShadow: OMBRE_COLONNE }}
+                  >
                     Joueur
                   </th>
                   {matches.map((m) => (
@@ -174,7 +198,7 @@ export default function RoundPredictionsPage() {
                       </div>
                     </th>
                   ))}
-                  <th className="px-2 pb-2.5 text-right font-display text-[10.5px] font-bold uppercase tracking-wider text-slate-500 min-w-[3.5rem]">
+                  <th className="pl-2 pr-4 pb-2.5 text-right font-display text-[10.5px] font-bold uppercase tracking-wider text-slate-500 min-w-[3.5rem]">
                     Pts
                   </th>
                 </tr>
@@ -184,7 +208,29 @@ export default function RoundPredictionsPage() {
                   const isMe = pl.id === user?.id;
                   return (
                     <tr key={pl.id}>
-                      <td className={`sticky left-0 z-10 px-2 py-1.5 ${isMe ? 'bg-amber-500/10' : 'bg-slate-900'}`}>
+                      {/* La colonne des joueurs reste collée à gauche pendant
+                          que le reste défile : son fond doit donc être opaque,
+                          sinon les cases passent derrière et le nom devient
+                          illisible.
+
+                          C'était le cas d'une seule ligne — la mienne — qui
+                          portait `bg-amber-500/10` pour se distinguer. Un voile
+                          à 10 %, donc 90 % de transparence. Sur ordinateur les
+                          sept colonnes tiennent, rien ne défile, et le défaut
+                          restait invisible.
+
+                          Le repère reste, mais sous une forme qui ne troue pas
+                          le fond : un liseré à gauche et le nom en ambre. C'est
+                          déjà la façon dont « toi » est signalé dans la liste
+                          des pronostics d'un match. */}
+                      <td
+                        className="sticky left-0 z-10 pl-4 pr-2 py-1.5 bg-slate-900"
+                        style={{
+                          boxShadow: isMe
+                            ? `inset 3px 0 0 rgb(var(--a-500)), ${OMBRE_COLONNE}`
+                            : OMBRE_COLONNE,
+                        }}
+                      >
                         <div className="flex items-center gap-1.5 whitespace-nowrap">
                           <span
                             className="w-[7px] h-[7px] rounded-full shrink-0"
@@ -221,7 +267,7 @@ export default function RoundPredictionsPage() {
                         );
                       })}
 
-                      <td className={`px-2 py-1.5 text-right font-display text-[15px] font-extrabold tabular-nums ${isMe ? 'text-amber-500' : ''}`}>
+                      <td className={`pl-2 pr-4 py-1.5 text-right font-display text-[15px] font-extrabold tabular-nums ${isMe ? 'text-amber-500' : ''}`}>
                         {pl.points}
                       </td>
                     </tr>
