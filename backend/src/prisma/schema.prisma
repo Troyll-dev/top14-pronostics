@@ -73,6 +73,7 @@ model Match {
   awayScore    Int?                    // Score final équipe extérieure
   venue        String?
   broadcaster  String?
+  featured     Boolean       @default(false)
   predictions  Prediction[]
   updatedAt    DateTime      @updatedAt
 
@@ -95,6 +96,8 @@ model Prediction {
   homeScorePred  Int               // Score prédit domicile
   awayScorePred  Int               // Score prédit extérieur
   points         Int?              // Points attribués après résultat
+  basePoints     Int?              // le bareme seul, de 0 a 3
+  joker          Boolean  @default(false)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -170,29 +173,4 @@ model Reminder {
   @@unique([userId, round, kind])
   @@index([round])
   @@map("reminders")
-}
-// ---------------------------------------------------------------------------
-// À AJOUTER dans backend/src/prisma/schema.prisma — ne remplace pas le fichier.
-// Trois lignes, dans deux modèles. Toutes facultatives ou avec valeur par
-// défaut : aucune migration destructrice, rien à confirmer.
-// ---------------------------------------------------------------------------
-
-model Match {
-  // … tout ce qui existe déjà, inchangé …
-
-  venue        String?
-  broadcaster  String?
-  featured     Boolean   @default(false)   // match de la semaine (×3)
-
-  // … la suite inchangée …
-}
-
-model Prediction {
-  // … tout ce qui existe déjà, inchangé …
-
-  points         Int?              // total attribué, multiplicateur compris
-  basePoints     Int?              // le barème seul, de 0 à 3
-  joker          Boolean  @default(false)
-
-  // … la suite inchangée …
 }
