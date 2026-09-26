@@ -13,8 +13,8 @@ import './JoueursDecor.css';
  *
  * Pour changer cela, il n'y a que la constante ci-dessous a modifier.
  *
- * L'image est servie en trois tailles ; le navigateur choisit la plus legere
- * qui convienne a l'ecran.
+ * Les images sont servies en plusieurs tailles ; le navigateur choisit la plus
+ * legere qui convienne a l'ecran.
  */
 const PAGES_BANDEAU = ['/', '/classement'];
 
@@ -26,6 +26,21 @@ const SRCSET =
 // remarquerait immediatement.
 const SRCSET_G =
   '/equipe-g-400.webp 400w, /equipe-g-600.webp 600w, /equipe-g-900.webp 900w';
+
+/**
+ * Le bandeau : la soiree au pub.
+ *
+ * Il ne partage plus son image avec le filigrane, et c'est volontaire. Cette
+ * image-ci porte du texte — l'enseigne du pub, l'ardoise — qui se lit tres
+ * bien en bandeau et deviendrait un brouillage illisible a 20 % d'opacite dans
+ * un coin de page. Un filigrane ne garde que des silhouettes ; les lettres n'y
+ * survivent pas.
+ *
+ * Servie en trois largeurs. La colonne fait 672 px au maximum, donc 1344
+ * couvre les ecrans a double densite sans gaspiller d'octets au-dela.
+ */
+const SRCSET_PUB =
+  '/pub-400.webp 400w, /pub-672.webp 672w, /pub-1008.webp 1008w, /pub-1344.webp 1344w';
 
 export default function JoueursDecor() {
   const { pathname } = useLocation();
@@ -61,12 +76,12 @@ export default function JoueursDecor() {
       {avecBandeau && (
         <div className="joueurs-bandeau" aria-hidden="true">
           <img
-            src="/equipe-g-600.webp"
-            srcSet={SRCSET_G}
+            src="/pub-672.webp"
+            srcSet={SRCSET_PUB}
             sizes="(min-width: 704px) 672px, 100vw"
             alt=""
-            width={600}
-            height={556}
+            width={672}
+            height={361}
             decoding="async"
           />
         </div>
