@@ -214,12 +214,28 @@ function analyserBloc({ html: bloc, jour }) {
 
   const diffuseurs = lireDiffuseurs(bloc);
 
-  // Un score affiche pendant la rencontre n'est pas un score homologue. On ne
-  // declare « termine » qu'a partir du lendemain ; le reste du temps on laisse
-  // l'orchestrateur trancher a l'heure, comme il le fait deja pour les autres
-  // sources.
-  const finJour = jour ? new Date(jour.getTime() + 36 * 3600 * 1000) : null;
-  const final = !score ? false : finJour ? Date.now() > finJour.getTime() : null;
+  // Un score affiche pendant la rencontre n'est pas un score homologue : il
+  // faut donc un delai avant de dire « termine ».
+  //
+  // Ce delai se comptait a partir de minuit du jour du match, faute de mieux :
+  // la page ne donnait pas l'heure, et il fallait couvrir aussi bien un match
+  // de 14h30 qu'un match de 21h05, d'ou trente-six heures. C'etait large au
+  // point d'etre nuisible — les rencontres du samedi restaient « en cours »
+  // jusqu'au dimanche apres-midi, et les points des pronostics avec elles.
+  //
+  // L'heure exacte permet la vraie regle : deux heures trente apres le coup
+  // d'envoi, une rencontre de rugby est finie. Le meme seuil que celui de
+  // l'orchestrateur, pour que les deux ne se contredisent pas.
+  //
+  // Le calcul par le jour reste en secours, pour une page qui n'annoncerait
+  // pas l'heure.
+  const FIN_MS = 2.5 * 3600 * 1000;
+  const fin = kickoff
+    ? kickoff.getTime() + FIN_MS
+    : jour
+    ? jour.getTime() + 36 * 3600 * 1000
+    : null;
+  const final = !score ? false : fin ? Date.now() > fin : null;
 
   return {
     jour,
