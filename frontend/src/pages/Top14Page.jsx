@@ -265,15 +265,14 @@ export default function Top14Page() {
             ⚠ Ce classement n'est plus à jour
           </p>
           <p style={{ opacity: 0.92 }}>
+            Il compte {data.fraicheur.comptees} rencontre
+            {data.fraicheur.comptees > 1 ? 's' : ''} sur les {data.fraicheur.termines}{' '}
+            terminées à ce jour
             {data.fraicheur.retard === 1
-              ? 'Une rencontre a été homologuée'
-              : `${data.fraicheur.retard} rencontres ont été homologuées`}{' '}
-            depuis le dernier calcul
-            {data.fraicheur.depuis && (
-              <> , le premier {format(new Date(data.fraicheur.depuis), "d MMMM 'à' HH'h'mm", { locale: fr })}</>
-            )}
-            . Le recalcul se fait automatiquement au coup de sifflet final ; s'il
-            ne se produit pas, c'est que la source ne répond plus.
+              ? ' — il en manque une.'
+              : ` — il en manque ${data.fraicheur.retard}.`}{' '}
+            Le recalcul est automatique et se retente toutes les quelques
+            minutes ; s'il persiste, c'est que la source ne répond plus.
           </p>
         </div>
       )}

@@ -1,11 +1,6 @@
 const cron = require('node-cron');
-const { PrismaClient } = require('@prisma/client');
 const { syncResults, shouldSync } = require('../services/results-sync.service');
-const { syncStandings } = require('../services/standings.service');
-
-const prisma = new PrismaClient();
-
-const SEASON = process.env.SPORTSDB_SEASON || '2026-2027';
+const { syncStandings, etatFraicheur } = require('../services/standings.service');
 
 /**
  * Suivi des scores pendant les matchs.
@@ -24,24 +19,32 @@ const SEASON = process.env.SPORTSDB_SEASON || '2026-2027';
 const RYTHME = process.env.SYNC_CRON || '*/3 * * * *';
 
 /**
- * Le classement ne se recalcule que quand une rencontre vient d'etre
- * homologuee.
+ * Le classement se recalcule quand il ne reflete pas tous les resultats connus.
  *
- * C'est le point qui merite l'explication. Le reflexe serait de le recalculer
- * des que la synchronisation signale un changement — mais pendant un match le
- * score bouge sans arret, et chaque mouvement serait un changement : on
- * relirait alors toutes les journees de la saison sur la LNR toutes les trois
- * minutes pendant neuf heures, pour un classement qui, lui, ne bouge pas tant
- * que l'arbitre n'a pas siffle.
+ * C'est le point qui merite l'explication, parce que la version precedente
+ * paraissait juste et ne l'etait pas.
  *
- * On compte donc les rencontres terminees avant et apres. Un nombre qui a
- * augmente, c'est un resultat de plus : la, et seulement la, le classement a
- * reellement change.
+ * Le premier reflexe serait de recalculer des que la synchronisation signale un
+ * changement. Mauvaise idee : pendant un match le score bouge sans arret, et
+ * l'on relirait toutes les journees de la saison sur la LNR toutes les trois
+ * minutes pendant neuf heures, pour un classement qui ne bouge pas tant que
+ * l'arbitre n'a pas siffle.
+ *
+ * Le deuxieme reflexe — le mien — etait de compter les rencontres terminees
+ * avant et apres, et de recalculer quand ce nombre augmente. Ca a l'air
+ * imparable et ca a echoue des la J4 : ESPN a declare Pau–La Rochelle termine,
+ * le compte a augmente, le recalcul s'est declenche — mais la LNR n'avait pas
+ * encore publie le score. Le classement a donc ete recalcule SANS ce match, et
+ * comme le declencheur ne se rearme qu'a la transition suivante, il n'y en a
+ * plus eu. Le tableau est reste faux jusqu'au filet de securite suivant.
+ *
+ * La lecon : un declencheur fonde sur un EVENEMENT ne rattrape jamais son
+ * echec, puisque l'evenement ne se reproduit pas. On compare donc un ETAT —
+ * le nombre de rencontres que le tableau compte contre le nombre que la base
+ * connait — et tant qu'il y a un ecart, chaque passage retente. Une source qui
+ * publie avec dix minutes de retard est alors rattrapee au passage suivant,
+ * sans que personne n'ait a s'en apercevoir.
  */
-function compterTerminees() {
-  return prisma.match.count({ where: { season: SEASON, status: 'FINISHED' } });
-}
-
 function startResultsCron() {
   cron.schedule(
     RYTHME,
@@ -49,12 +52,14 @@ function startResultsCron() {
       try {
         if (!(await shouldSync())) return;
 
-        const avant = await compterTerminees();
         await syncResults();
-        const apres = await compterTerminees();
 
-        if (apres > avant) {
-          console.log(`[cron] ${apres - avant} rencontre(s) homologuee(s), classement recalcule`);
+        const etat = await etatFraicheur();
+        if (!etat.aJour) {
+          console.log(
+            `[cron] classement en retard : ${etat.comptees} rencontre(s) comptee(s) ` +
+            `sur ${etat.termines} terminee(s), recalcul`
+          );
           await syncStandings();
         }
       } catch (err) {

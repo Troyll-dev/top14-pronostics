@@ -315,44 +315,57 @@ async function syncStandings({ dryRun = false } = {}) {
 }
 
 /**
- * Le classement est-il en retard sur les resultats ?
+ * Le classement reflete-t-il tous les resultats connus ?
  *
  * La question n'est pas « depuis quand a-t-il ete relu ». Hors periode de
  * championnat, un tableau vieux de cinq jours est parfaitement juste : rien ne
- * s'est joue. Un delai fixe declencherait donc une alerte fausse chaque treve
- * internationale, et une alerte fausse qu'on apprend a ignorer ne sert plus a
- * rien le jour ou elle est vraie.
+ * s'est joue. Un delai fixe declencherait une alerte fausse a chaque treve, et
+ * une alerte fausse qu'on apprend a ignorer ne sert plus a rien le jour ou elle
+ * est vraie.
  *
- * La bonne question est : **un resultat est-il tombe depuis le dernier
- * calcul ?** Si oui, le tableau ne le reflete pas, quel que soit son age. Si
- * non, il est a jour, meme vieux d'une semaine.
+ * Ce n'est pas non plus « a-t-il ete calcule apres le dernier resultat ». Cette
+ * mesure-la parait bonne et ne l'est pas, on l'a verifie a nos depens sur la J4
+ * 2026-2027 : ESPN a declare Pau–La Rochelle termine, la base l'a enregistre,
+ * le recalcul s'est declenche — mais la LNR n'avait pas encore publie le score.
+ * Le classement a donc ete calcule APRES le resultat tout en l'ignorant. Il
+ * etait faux, et par cette mesure il se serait declare a jour.
  *
- * C'est exactement la panne qu'on avait eue : la source s'etait tue pendant
- * quatre jours, des journees se jouaient, et l'application continuait de
- * servir un instantane perime sans rien signaler. Le silence d'une source
- * cassee est indiscernable du silence d'une source qui n'a rien a dire — sauf
- * si on regarde les donnees a cote.
- *
- * `retard` compte les rencontres homologuees apres le dernier calcul. Zero
- * veut dire « a jour ».
+ * La bonne question est donc : **le tableau compte-t-il autant de rencontres
+ * que la base en connait de terminees ?** Chaque rencontre apparait dans la
+ * ligne de deux clubs, d'ou la division par deux. C'est une comparaison de
+ * contenu et non de dates : elle ne peut pas etre trompee par l'ordre des
+ * evenements.
  */
-async function fraicheur(fetchedAt) {
-  if (!fetchedAt) return { aJour: false, retard: null, depuis: null };
-
-  const apres = await prisma.match.findMany({
-    where: { season: SEASON, status: 'FINISHED', updatedAt: { gt: fetchedAt } },
-    select: { updatedAt: true },
-    orderBy: { updatedAt: 'asc' },
+async function fraicheur(snap) {
+  const termines = await prisma.match.count({
+    where: { season: SEASON, status: 'FINISHED' },
   });
 
+  const lignes = snap?.data || [];
+  if (!lignes.length) return { aJour: false, retard: termines, comptees: 0, termines };
+
+  const comptees = Math.round(lignes.reduce((s, r) => s + (r.played || 0), 0) / 2);
+
   return {
-    aJour: apres.length === 0,
-    retard: apres.length,
-    // Depuis quand le tableau est faux : l'heure du premier resultat non pris
-    // en compte, et non l'heure du dernier calcul. C'est cette duree-la qui
-    // dit la gravite.
-    depuis: apres.length ? apres[0].updatedAt : null,
+    // Superieur et non egal : la LNR peut avoir publie un resultat que la base
+    // n'a pas encore enregistre. Le tableau est alors en avance, pas en retard.
+    aJour: comptees >= termines,
+    retard: Math.max(0, termines - comptees),
+    comptees,
+    termines,
   };
+}
+
+/**
+ * L'etat de fraicheur seul, sans le tableau ni la forme des equipes.
+ *
+ * `getStandings` recalcule la forme de chaque club, ce qui n'a aucun interet
+ * pour une tache qui veut seulement savoir s'il faut relancer le calcul — et
+ * qui pose la question toutes les trois minutes pendant neuf heures.
+ */
+async function etatFraicheur() {
+  const snap = await prisma.leagueTable.findUnique({ where: { season: SEASON } });
+  return fraicheur(snap);
 }
 
 async function getStandings() {
@@ -364,7 +377,7 @@ async function getStandings() {
     form: form[row.teamId] || null,
   }));
 
-  const etat = await fraicheur(snap?.fetchedAt || null);
+  const etat = await fraicheur(snap);
 
   return {
     table,
@@ -375,4 +388,4 @@ async function getStandings() {
   };
 }
 
-module.exports = { syncStandings, getStandings, computeForm, parseTable, weatherFor, fraicheur };
+module.exports = { syncStandings, getStandings, computeForm, parseTable, weatherFor, fraicheur, etatFraicheur };
