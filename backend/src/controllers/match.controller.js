@@ -1,4 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
+const { pointsFor } = require('../services/scoring');
+
 const prisma = new PrismaClient();
 
 // GET /api/matches?round=1&season=2026-2027
@@ -95,26 +97,25 @@ exports.getTeams = async (req, res) => {
   }
 };
 
-// Calcul des points après résultat
+/**
+ * Attribue les points de tous les pronostics d'une rencontre.
+ *
+ * Le barème lui-même est dans `services/scoring.js` et pas ici. La raison est
+ * la vérifiabilité : tant que la règle vivait dans cette boucle, la seule façon
+ * de savoir combien vaut un prono 20-18 sur un 15-14 était d'avoir une base de
+ * données, des pronostics enregistrés, et de lire le résultat après coup —
+ * autrement dit, de jouer une journée. `pointsFor` prend deux couples de
+ * nombres et rend un nombre ; `backend/test/scoring.test.js` la passe au
+ * crible, frontière des cinq points et match nul compris.
+ *
+ * Cette fonction ne garde donc que ce qui lui appartient : lire les pronostics
+ * et écrire les points.
+ */
 async function calculatePoints(match) {
   const predictions = await prisma.prediction.findMany({ where: { matchId: match.id } });
 
   for (const pred of predictions) {
-    let points = 0;
-    const predWinner = Math.sign(pred.homeScorePred - pred.awayScorePred);
-    const realWinner = Math.sign(match.homeScore - match.awayScore);
-    const exactScore =
-      pred.homeScorePred === match.homeScore && pred.awayScorePred === match.awayScore;
-
-    if (exactScore) {
-      points = 3; // Score exact
-    } else if (predWinner === realWinner) {
-      // Bon vainqueur : bonus si écart prédit proche de l'écart réel (≤5 pts)
-      const predDiff = Math.abs(pred.homeScorePred - pred.awayScorePred);
-      const realDiff = Math.abs(match.homeScore - match.awayScore);
-      points = Math.abs(predDiff - realDiff) <= 5 ? 2 : 1;
-    }
-
+    const points = pointsFor(pred, match);
     await prisma.prediction.update({ where: { id: pred.id }, data: { points } });
   }
 }
