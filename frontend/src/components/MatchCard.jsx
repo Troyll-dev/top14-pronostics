@@ -92,7 +92,7 @@ function PointsChip({ prediction }) {
  */
 export default function MatchCard({
   match, draft, onDraftChange, onPredictionSaved, now = Date.now(),
-  regles = null, onToggleJoker,
+  regles = null,
 }) {
   const { user } = useAuth();
   const prediction = match.predictions?.[0];
@@ -108,13 +108,18 @@ export default function MatchCard({
   const reglesActives = !!regles?.actif;
   const estAffiche = reglesActives && regles.afficheMatchId === match.id;
   const estJoker = reglesActives && regles.jokerMatchId === match.id;
-  const jokerAilleurs = reglesActives && regles.jokerMatchId != null && !estJoker;
-  const multiplicateur = estAffiche ? 3 : estJoker ? 2 : 1;
 
-  // Le joker ne se propose que là où il peut servir : journée concernée, match
-  // pas encore commencé, pronostic déjà enregistré, et pas sur l'affiche —
-  // celle-ci est déjà multipliée pour tout le monde.
-  const jokerPossible = reglesActives && !estAffiche && !!prediction;
+  /* Le joker se pose depuis le Récapitulatif, en haut de la page, et non
+     depuis les cartes.
+  
+     Il y avait ici une case à cocher par match — sept contrôles pour une
+     décision qui n'est prise qu'une fois par journée. Tout ce qu'il avait
+     fallu ajouter ensuite (la mention « il est posé sur un autre match », le
+     rappel dans le Récapitulatif) ne servait qu'à recoller l'unité qu'on avait
+     cassée en éclatant le contrôle en sept.
+  
+     La carte se contente donc d'afficher l'étiquette là où le joker est posé :
+     elle montre l'état, elle ne le pilote plus. */
   const state = matchState(match, now);
   const isFinished = state === 'termine';
   const locked = state !== 'avenir';
@@ -367,36 +372,6 @@ export default function MatchCard({
           )}
           {error && <span className="text-[11.5px] text-red-400">{error}</span>}
 
-          {/* Le joker.
-
-              Il n'apparaît qu'une fois le pronostic enregistré : un joker se
-              pose sur un pari, pas sur une case vide — et le serveur refuse
-              d'ailleurs l'inverse.
-
-              Le libellé dit ce qui va se passer, pas ce que c'est. « Déplacer
-              ici » quand le joker est ailleurs, parce que c'est bien ce que le
-              clic fera : on n'en a qu'un par journée. */}
-          {jokerPossible && (
-            <button
-              type="button"
-              onClick={() => onToggleJoker?.(match.id)}
-              title={
-                estJoker
-                  ? 'Retirer le joker de ce match'
-                  : jokerAilleurs
-                  ? 'Déplacer ton joker sur ce match'
-                  : 'Doubler tes points sur ce match'
-              }
-              className={`font-display text-[11px] font-bold uppercase tracking-wider px-2.5 py-1.5 rounded
-                          border transition-colors ${
-                            estJoker
-                              ? 'bg-violet-600 text-white border-violet-600 hover:bg-violet-700'
-                              : 'bg-transparent text-slate-400 border-slate-700 hover:bg-violet-600 hover:text-white hover:border-violet-600'
-                          }`}
-            >
-              {estJoker ? '🃏 Retirer le joker' : jokerAilleurs ? '🃏 Déplacer ici' : '🃏 Joker ×2'}
-            </button>
-          )}
         </div>
       )}
 
