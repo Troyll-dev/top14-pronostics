@@ -171,3 +171,28 @@ model Reminder {
   @@index([round])
   @@map("reminders")
 }
+// ---------------------------------------------------------------------------
+// À AJOUTER dans backend/src/prisma/schema.prisma — ne remplace pas le fichier.
+// Trois lignes, dans deux modèles. Toutes facultatives ou avec valeur par
+// défaut : aucune migration destructrice, rien à confirmer.
+// ---------------------------------------------------------------------------
+
+model Match {
+  // … tout ce qui existe déjà, inchangé …
+
+  venue        String?
+  broadcaster  String?
+  featured     Boolean   @default(false)   // match de la semaine (×3)
+
+  // … la suite inchangée …
+}
+
+model Prediction {
+  // … tout ce qui existe déjà, inchangé …
+
+  points         Int?              // total attribué, multiplicateur compris
+  basePoints     Int?              // le barème seul, de 0 à 3
+  joker          Boolean  @default(false)
+
+  // … la suite inchangée …
+}

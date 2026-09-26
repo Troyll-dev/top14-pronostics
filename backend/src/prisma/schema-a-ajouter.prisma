@@ -1,35 +1,37 @@
 // ---------------------------------------------------------------------------
-// A AJOUTER dans backend/src/prisma/schema.prisma
-//
-// 1. Une ligne dans le modele User, parmi les autres relations :
-//
-//        reminders    Reminder[]
-//
-// 2. Le modele ci-dessous, a la fin du fichier.
-//
-// Puis, depuis la console Railway du service backend :
-//
-//        npx prisma db push
-//
+// À AJOUTER dans backend/src/prisma/schema.prisma — ne remplace pas le fichier.
+// Trois lignes, dans deux modèles. Toutes facultatives ou avec valeur par
+// défaut : aucune migration destructrice, rien à confirmer.
 // ---------------------------------------------------------------------------
 
-/// Trace des rappels deja envoyes.
-///
-/// Elle n'existe que pour garantir qu'on n'ecrit qu'une fois a chacun par
-/// journee. La contrainte d'unicite fait tout le travail : on insere avant
-/// d'envoyer, et si l'insertion echoue c'est que le rappel est deja parti.
-/// L'unicite est ainsi garantie par la base, pas par la regularite du
-/// planificateur — un redemarrage du serveur un vendredi soir ne peut donc pas
-/// produire un second courriel.
-model Reminder {
-  id        Int      @id @default(autoincrement())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId    Int
-  round     Int
-  kind      String   @default("PRONOS_MANQUANTS")
-  sentAt    DateTime @default(now())
+model Match {
+  // … tout ce qui existe déjà, inchangé …
 
-  @@unique([userId, round, kind])
-  @@index([round])
-  @@map("reminders")
+  venue        String?
+  broadcaster  String?
+  featured     Boolean   @default(false)   // match de la semaine (×3)
+
+  // … la suite inchangée …
 }
+
+model Prediction {
+  // … tout ce qui existe déjà, inchangé …
+
+  points         Int?              // total attribué, multiplicateur compris
+  basePoints     Int?              // le barème seul, de 0 à 3
+  joker          Boolean  @default(false)
+
+  // … la suite inchangée …
+}
+
+// Pourquoi deux colonnes de points plutôt qu'une.
+//
+// `points` se somme : c'est ce que le classement additionne, et tout le code
+// existant continue de marcher sans être touché.
+//
+// `basePoints` se compte : « combien de scores exacts » ne doit pas se lire sur
+// un total multiplié, sinon un score exact joué en joker vaut 6 et n'est plus
+// reconnu comme un score exact.
+//
+//   npx prisma db push --schema=src/prisma/schema.prisma
+//   npx prisma generate --schema=src/prisma/schema.prisma

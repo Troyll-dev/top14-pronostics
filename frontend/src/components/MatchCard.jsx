@@ -25,34 +25,62 @@ function ScoreInput({ value, onChange, disabled }) {
   );
 }
 
+/**
+ * Les étiquettes de points.
+ *
+ * Elles étaient indexées par le nombre de points, de 0 à 3. Avec les
+ * multiplicateurs ça ne tient plus : un score exact joué en joker vaut 6, et
+ * l'index retombait alors sur la valeur par défaut, c'est-à-dire « ❌ Raté 0 »
+ * — le pire pronostic de la journée affiché sur le meilleur.
+ *
+ * L'étiquette se lit donc sur `basePoints`, qui reste de 0 à 3 et dit la
+ * qualité du pronostic, tandis que le total multiplié est affiché à côté. Les
+ * deux nombres répondent à deux questions différentes : « ai-je bien deviné »
+ * et « combien ça rapporte ».
+ *
+ * Le repli sur `points` couvre les pronostics d'avant les multiplicateurs, dont
+ * `basePoints` est nul : à cette époque les deux valeurs étaient égales.
+ */
 const POINTS = {
-  3: { cls: 'bg-green-500 text-slate-950', label: '🎯 Score exact +3' },
-  2: { cls: 'bg-amber-500/20 text-amber-400 border border-amber-500/45', label: '✅ Bon vainqueur +2' },
-  1: { cls: 'bg-slate-700/40 text-slate-400 border border-slate-700', label: '✅ Bon vainqueur +1' },
-  0: { cls: 'bg-slate-800/60 text-slate-500 border border-slate-800', label: '❌ Raté 0' },
+  3: { cls: 'bg-green-500 text-slate-950', label: '🎯 Score exact' },
+  2: { cls: 'bg-amber-500/20 text-amber-400 border border-amber-500/45', label: '✅ Bon vainqueur' },
+  1: { cls: 'bg-slate-700/40 text-slate-400 border border-slate-700', label: '✅ Bon vainqueur' },
+  0: { cls: 'bg-slate-800/60 text-slate-500 border border-slate-800', label: '❌ Raté' },
 };
 
-function PointsBadge({ points }) {
-  if (points === null || points === undefined) return null;
-  const c = POINTS[points] || POINTS[0];
+const base = (p) => (p?.basePoints ?? p?.points);
+
+function PointsBadge({ prediction }) {
+  const total = prediction?.points;
+  if (total === null || total === undefined) return null;
+
+  const b = base(prediction);
+  const c = POINTS[b] ?? POINTS[0];
+  const mult = b > 0 ? Math.round(total / b) : 1;
+
   return (
     <span className={`font-display text-[10.5px] font-bold uppercase tracking-wider px-2.5 py-1 rounded whitespace-nowrap ${c.cls}`}>
-      {c.label}
+      {c.label} +{total}
+      {mult > 1 && <span className="opacity-75"> ({b} ×{mult})</span>}
     </span>
   );
 }
 
-function PointsChip({ points }) {
-  if (points === null || points === undefined) return null;
+function PointsChip({ prediction }) {
+  const total = prediction?.points;
+  if (total === null || total === undefined) return null;
+
+  const b = base(prediction);
   const cls = {
     3: 'bg-green-500 text-slate-950',
     2: 'bg-amber-500/20 text-amber-400',
     1: 'bg-slate-700/45 text-slate-400',
     0: 'bg-slate-800/60 text-slate-500',
-  }[points] || 'bg-slate-800/60 text-slate-500';
+  }[b] || 'bg-slate-800/60 text-slate-500';
+
   return (
     <span className={`font-display text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${cls}`}>
-      +{points}
+      {prediction.joker && '🃏'}+{total}
     </span>
   );
 }
@@ -62,9 +90,31 @@ function PointsChip({ points }) {
  * qui les sauvegarde dans le navigateur et sait tout valider d'un coup.
  * La carte est donc pilotee par `draft` et remonte chaque frappe.
  */
-export default function MatchCard({ match, draft, onDraftChange, onPredictionSaved, now = Date.now() }) {
+export default function MatchCard({
+  match, draft, onDraftChange, onPredictionSaved, now = Date.now(),
+  regles = null, onToggleJoker,
+}) {
   const { user } = useAuth();
   const prediction = match.predictions?.[0];
+
+  /**
+   * Les multiplicateurs.
+   *
+   * `regles` vient du serveur ; tant qu'il n'est pas arrivé, ou si la journée
+   * est antérieure à la mise en vigueur, tout ce bloc s'efface et la carte
+   * retrouve exactement son apparence d'avant. Une règle qu'on n'a pas encore
+   * lue ne doit pas s'afficher à moitié.
+   */
+  const reglesActives = !!regles?.actif;
+  const estAffiche = reglesActives && regles.afficheMatchId === match.id;
+  const estJoker = reglesActives && regles.jokerMatchId === match.id;
+  const jokerAilleurs = reglesActives && regles.jokerMatchId != null && !estJoker;
+  const multiplicateur = estAffiche ? 3 : estJoker ? 2 : 1;
+
+  // Le joker ne se propose que là où il peut servir : journée concernée, match
+  // pas encore commencé, pronostic déjà enregistré, et pas sur l'affiche —
+  // celle-ci est déjà multipliée pour tout le monde.
+  const jokerPossible = reglesActives && !estAffiche && !!prediction;
   const state = matchState(match, now);
   const isFinished = state === 'termine';
   const locked = state !== 'avenir';
@@ -167,6 +217,24 @@ export default function MatchCard({ match, draft, onDraftChange, onPredictionSav
       <div className="relative z-10 flex items-center justify-between gap-2 flex-wrap mb-3">
         <span className="flex items-center gap-1.5 flex-wrap min-w-0">
           <span className="text-[11.5px] italic text-slate-500 first-letter:uppercase">{dateStr}</span>
+          {estAffiche && (
+            <span
+              title="Match de la semaine : tous les points de cette rencontre sont multipliés par 3"
+              className="font-display text-[9.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded
+                         bg-amber-500/20 text-amber-400 border border-amber-500/50 whitespace-nowrap"
+            >
+              ⭐ Affiche ×3
+            </span>
+          )}
+          {estJoker && (
+            <span
+              title="Ton joker est posé ici : tes points sur cette rencontre sont doublés"
+              className="font-display text-[9.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded
+                         bg-violet-500/20 text-violet-300 border border-violet-500/50 whitespace-nowrap"
+            >
+              🃏 Joker ×2
+            </span>
+          )}
           {match.broadcaster && state === 'avenir' && (
             <span
               title={`Diffusion : ${match.broadcaster}`}
@@ -237,7 +305,7 @@ export default function MatchCard({ match, draft, onDraftChange, onPredictionSav
               {prediction.homeScorePred} – {prediction.awayScorePred}
             </b>
           </span>
-          <PointsBadge points={prediction.points} />
+          <PointsBadge prediction={prediction} />
         </div>
       )}
 
@@ -282,6 +350,37 @@ export default function MatchCard({ match, draft, onDraftChange, onPredictionSav
             </span>
           )}
           {error && <span className="text-[11.5px] text-red-400">{error}</span>}
+
+          {/* Le joker.
+
+              Il n'apparaît qu'une fois le pronostic enregistré : un joker se
+              pose sur un pari, pas sur une case vide — et le serveur refuse
+              d'ailleurs l'inverse.
+
+              Le libellé dit ce qui va se passer, pas ce que c'est. « Déplacer
+              ici » quand le joker est ailleurs, parce que c'est bien ce que le
+              clic fera : on n'en a qu'un par journée. */}
+          {jokerPossible && (
+            <button
+              type="button"
+              onClick={() => onToggleJoker?.(match.id)}
+              title={
+                estJoker
+                  ? 'Retirer le joker de ce match'
+                  : jokerAilleurs
+                  ? 'Déplacer ton joker sur ce match'
+                  : 'Doubler tes points sur ce match'
+              }
+              className={`font-display text-[11px] font-bold uppercase tracking-wider px-2.5 py-1.5 rounded
+                          border transition-colors ${
+                            estJoker
+                              ? 'bg-violet-500/25 text-violet-200 border-violet-500/60 hover:bg-violet-500/35'
+                              : 'bg-transparent text-slate-400 border-slate-700 hover:border-violet-500/60 hover:text-violet-300'
+                          }`}
+            >
+              {estJoker ? '🃏 Retirer le joker' : jokerAilleurs ? '🃏 Déplacer ici' : '🃏 Joker ×2'}
+            </button>
+          )}
         </div>
       )}
 
@@ -337,7 +436,7 @@ export default function MatchCard({ match, draft, onDraftChange, onPredictionSav
                       <span className="ml-auto font-display font-bold text-[13.5px] tabular-nums shrink-0">
                         {p.homeScorePred} – {p.awayScorePred}
                       </span>
-                      <PointsChip points={p.points} />
+                      <PointsChip prediction={p} />
                     </li>
                   );
                 })}

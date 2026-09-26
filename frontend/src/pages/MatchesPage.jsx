@@ -41,6 +41,20 @@ export default function MatchesPage() {
   const [bulkSaving, setBulkSaving] = useState(false);
   const [bulkResult, setBulkResult] = useState(null);
 
+  /**
+   * L'état des règles de la journée : multiplicateurs actifs, quel match est
+   * l'affiche, et où est mon joker.
+   *
+   * Il vient du serveur et n'est pas recalculé ici, alors que le navigateur
+   * aurait tout ce qu'il faut pour le faire. C'est délibéré : la règle du
+   * « match qui commence le plus tard » et son gel au premier coup d'envoi
+   * existeraient alors en deux exemplaires, et deux implémentations d'une même
+   * règle finissent toujours par diverger — l'écran afficherait une affiche et
+   * le calcul en compterait une autre.
+   */
+  const [regles, setRegles] = useState(null);
+  const [jokerErreur, setJokerErreur] = useState('');
+
   useEffect(() => {
     api.get('/matches/rounds').then((res) => setRounds(res.data)).catch(console.error);
     api.get('/matches/next-round').then((res) => setCurrentRound(res.data.round)).catch(console.error);
@@ -64,8 +78,37 @@ export default function MatchesPage() {
       .finally(() => setLoading(false));
   }, [currentRound]);
 
+  const fetchRegles = useCallback(() => {
+    if (!currentRound) return;
+    api.get(`/predictions/round/${currentRound}/regles`)
+      .then((res) => setRegles(res.data))
+      // Les règles ne sont qu'un habillage : si l'appel échoue, la page reste
+      // utilisable pour ce qui compte, c'est-à-dire pronostiquer.
+      .catch(() => setRegles(null));
+  }, [currentRound]);
+
   useEffect(() => { fetchMatches(); }, [fetchMatches]);
-  useEffect(() => { setBulkResult(null); }, [currentRound]);
+  useEffect(() => { fetchRegles(); }, [fetchRegles]);
+  useEffect(() => { setBulkResult(null); setJokerErreur(''); }, [currentRound]);
+
+  /**
+   * Poser, déplacer ou retirer le joker — un seul geste pour les trois.
+   *
+   * On relit ensuite les matchs et les règles plutôt que de deviner le nouvel
+   * état : le serveur peut avoir refusé, ou avoir déplacé le joker depuis un
+   * autre match. Deux requêtes de plus sur un clic rare, contre un écran qui
+   * ment.
+   */
+  const toggleJoker = useCallback(async (matchId) => {
+    setJokerErreur('');
+    try {
+      await api.post('/predictions/joker', { matchId });
+      fetchMatches();
+      fetchRegles();
+    } catch (err) {
+      setJokerErreur(err.response?.data?.error || 'Impossible de poser le joker');
+    }
+  }, [fetchMatches, fetchRegles]);
 
   /**
    * Le brouillon suit la frappe, y compris quand on efface.
@@ -266,6 +309,9 @@ export default function MatchesPage() {
         </div>
       ) : (
         <div className="space-y-3">
+          {jokerErreur && (
+            <p className="text-[12.5px] text-red-400 px-1">{jokerErreur}</p>
+          )}
           {matches.map((match) => (
             <MatchCard
               key={match.id}
@@ -274,6 +320,8 @@ export default function MatchesPage() {
               now={now}
               onDraftChange={setDraft}
               onPredictionSaved={handleSaved}
+              regles={regles}
+              onToggleJoker={toggleJoker}
             />
           ))}
         </div>

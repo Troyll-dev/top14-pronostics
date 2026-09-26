@@ -22,6 +22,7 @@
 const { PrismaClient } = require('@prisma/client');
 const lnr = require('./sources/lnr');
 const { resolveTeam } = require('./results-sync.service');
+const { DEPUIS, afficheDeLaJournee, journeeCommencee } = require('./rules');
 
 const prisma = new PrismaClient();
 
@@ -138,6 +139,18 @@ async function syncSchedule({ dryRun = false, rounds = null } = {}) {
     }
   }
 
+  // Une fois les horaires a jour, on peut designer l'affiche : elle depend
+  // d'eux.
+  for (const round of cibles) {
+    try {
+      const change = await marquerAffiche(round, { dryRun });
+      if (change) { rapport.changes.push(change); rapport.updated++; }
+    } catch (err) {
+      rapport.ok = false;
+      console.error(`[horaires] affiche J${round} : ${err.message}`);
+    }
+  }
+
   if (rapport.unmatched.length) console.warn('[horaires] non reconnus :', rapport.unmatched);
   console.log(
     `[horaires] ${dryRun ? '(simulation) ' : ''}J${cibles.join(', J')} : ` +
@@ -146,4 +159,51 @@ async function syncSchedule({ dryRun = false, rounds = null } = {}) {
   return rapport;
 }
 
-module.exports = { syncSchedule, prochainesJournees };
+/**
+ * Ecrit le match de la semaine d'une journee.
+ *
+ * L'affiche est la rencontre qui commence le plus tard — celle du dimanche
+ * soir. Elle est calculee et non choisie a la main : pas de page
+ * d'administration a maintenir, et les joueurs peuvent la deduire du
+ * calendrier.
+ *
+ * **Une journee commencee n'est plus touchee.** C'est le point important. Les
+ * horaires bougent jusqu'au dernier moment, et sans ce garde-fou un decalage
+ * annonce le samedi soir deplacerait l'affiche au milieu de la journee, apres
+ * que des joueurs ont place leur joker en consequence. On changerait la regle
+ * en cours de partie.
+ *
+ * Avant la journee d'entree en vigueur, aucune affiche n'est designee : les
+ * multiplicateurs n'y ont pas cours.
+ */
+async function marquerAffiche(round, { dryRun = false } = {}) {
+  if (round < DEPUIS) return null;
+
+  const matchs = await prisma.match.findMany({
+    where: { round, season: SEASON },
+    select: { id: true, kickoff: true, featured: true },
+  });
+  if (!matchs.length) return null;
+
+  if (journeeCommencee(matchs)) return null;
+
+  const voulue = afficheDeLaJournee(matchs);
+  if (!voulue) return null;
+
+  const actuelle = matchs.find((m) => m.featured);
+  if (actuelle && actuelle.id === voulue.id) return null;
+
+  if (!dryRun) {
+    await prisma.$transaction([
+      prisma.match.updateMany({
+        where: { round, season: SEASON, featured: true },
+        data: { featured: false },
+      }),
+      prisma.match.update({ where: { id: voulue.id }, data: { featured: true } }),
+    ]);
+  }
+
+  return `J${round} match de la semaine : ${affiche(voulue.kickoff)}`;
+}
+
+module.exports = { syncSchedule, prochainesJournees, marquerAffiche };

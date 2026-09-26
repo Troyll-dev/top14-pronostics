@@ -1,5 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
 const { pointsFor } = require('../services/scoring');
+const { multiplicateur, afficheDeLaJournee, journeeCommencee } = require('../services/rules');
 
 const prisma = new PrismaClient();
 
@@ -16,7 +17,16 @@ exports.getMatches = async (req, res) => {
         homeTeam: true,
         awayTeam: true,
         predictions: req.user
-          ? { where: { userId: req.user.id }, select: { homeScorePred: true, awayScorePred: true, points: true } }
+          // `basePoints` et `joker` servent a l'affichage : l'etiquette se lit
+          // sur le bareme, le total sur `points`. Sans eux la carte afficherait
+          // « Rate » sur un score exact joue en joker.
+          ? {
+              where: { userId: req.user.id },
+              select: {
+                homeScorePred: true, awayScorePred: true,
+                points: true, basePoints: true, joker: true,
+              },
+            }
           : false,
       },
       orderBy: [{ round: 'asc' }, { kickoff: 'asc' }],
@@ -113,11 +123,48 @@ exports.getTeams = async (req, res) => {
  */
 async function calculatePoints(match) {
   const predictions = await prisma.prediction.findMany({ where: { matchId: match.id } });
+  const affiche = await estLAffiche(match);
 
   for (const pred of predictions) {
-    const points = pointsFor(pred, match);
-    await prisma.prediction.update({ where: { id: pred.id }, data: { points } });
+    // `basePoints` garde la valeur du bareme, de 0 a 3 ; `points` porte le
+    // total multiplie. Les deux sont enregistres parce qu'ils repondent a deux
+    // questions differentes : « combien ca rapporte » se somme au classement,
+    // « le score etait-il exact » se compte sur le bareme. Sans la premiere
+    // colonne, un score exact joue en joker vaudrait 6 et ne serait plus
+    // reconnu comme un score exact.
+    const basePoints = pointsFor(pred, match);
+    const points = basePoints * multiplicateur({
+      joker: pred.joker,
+      affiche,
+      round: match.round,
+    });
+    await prisma.prediction.update({ where: { id: pred.id }, data: { basePoints, points } });
   }
+}
+
+/**
+ * Cette rencontre est-elle le match de la semaine ?
+ *
+ * On relit la journee entiere parce que la reponse depend des autres matchs :
+ * l'affiche est celle qui commence le plus tard. Une requete de plus au moment
+ * d'attribuer les points, c'est-a-dire quelques fois par week-end.
+ *
+ * Des que la journee a commence, on croit le champ `featured` ecrit en base
+ * plutot que de recalculer : l'affiche doit etre figee, sinon un decalage
+ * d'horaire la deplacerait apres que des joueurs ont place leur joker.
+ */
+async function estLAffiche(match) {
+  const journee = await prisma.match.findMany({
+    where: { round: match.round, season: match.season },
+    select: { id: true, kickoff: true, featured: true },
+  });
+  if (!journee.length) return false;
+
+  const a = journeeCommencee(journee)
+    ? journee.find((m) => m.featured) || null
+    : afficheDeLaJournee(journee);
+
+  return !!a && a.id === match.id;
 }
 
 /**
