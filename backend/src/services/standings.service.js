@@ -314,6 +314,47 @@ async function syncStandings({ dryRun = false } = {}) {
   return report;
 }
 
+/**
+ * Le classement est-il en retard sur les resultats ?
+ *
+ * La question n'est pas « depuis quand a-t-il ete relu ». Hors periode de
+ * championnat, un tableau vieux de cinq jours est parfaitement juste : rien ne
+ * s'est joue. Un delai fixe declencherait donc une alerte fausse chaque treve
+ * internationale, et une alerte fausse qu'on apprend a ignorer ne sert plus a
+ * rien le jour ou elle est vraie.
+ *
+ * La bonne question est : **un resultat est-il tombe depuis le dernier
+ * calcul ?** Si oui, le tableau ne le reflete pas, quel que soit son age. Si
+ * non, il est a jour, meme vieux d'une semaine.
+ *
+ * C'est exactement la panne qu'on avait eue : la source s'etait tue pendant
+ * quatre jours, des journees se jouaient, et l'application continuait de
+ * servir un instantane perime sans rien signaler. Le silence d'une source
+ * cassee est indiscernable du silence d'une source qui n'a rien a dire — sauf
+ * si on regarde les donnees a cote.
+ *
+ * `retard` compte les rencontres homologuees apres le dernier calcul. Zero
+ * veut dire « a jour ».
+ */
+async function fraicheur(fetchedAt) {
+  if (!fetchedAt) return { aJour: false, retard: null, depuis: null };
+
+  const apres = await prisma.match.findMany({
+    where: { season: SEASON, status: 'FINISHED', updatedAt: { gt: fetchedAt } },
+    select: { updatedAt: true },
+    orderBy: { updatedAt: 'asc' },
+  });
+
+  return {
+    aJour: apres.length === 0,
+    retard: apres.length,
+    // Depuis quand le tableau est faux : l'heure du premier resultat non pris
+    // en compte, et non l'heure du dernier calcul. C'est cette duree-la qui
+    // dit la gravite.
+    depuis: apres.length ? apres[0].updatedAt : null,
+  };
+}
+
 async function getStandings() {
   const snap = await prisma.leagueTable.findUnique({ where: { season: SEASON } });
   const form = await computeForm();
@@ -323,12 +364,15 @@ async function getStandings() {
     form: form[row.teamId] || null,
   }));
 
+  const etat = await fraicheur(snap?.fetchedAt || null);
+
   return {
     table,
     fetchedAt: snap?.fetchedAt || null,
     source: snap?.source || null,
     season: SEASON,
+    fraicheur: etat,
   };
 }
 
-module.exports = { syncStandings, getStandings, computeForm, parseTable, weatherFor };
+module.exports = { syncStandings, getStandings, computeForm, parseTable, weatherFor, fraicheur };

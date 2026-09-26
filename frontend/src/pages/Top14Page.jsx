@@ -44,6 +44,22 @@ const FILTERS = [
   { key: 'termine', label: 'Terminés'  },
 ];
 
+/**
+ * L'encadré d'alerte. Couleurs en clair, pour la même raison que les pastilles
+ * de multiplicateur : `text-white` et l'échelle `slate` du projet sont des
+ * couleurs relatives au thème, et basculent avec lui. Sur un fond de couleur
+ * fixe, elles donneraient de l'encre sombre sur fond sombre la moitié du temps.
+ */
+const ALERTE = {
+  background: '#7c2d12',
+  color: '#fed7aa',
+  border: '1px solid #c2410c',
+  borderRadius: '8px',
+  padding: '10px 14px',
+  fontSize: '12.5px',
+  lineHeight: 1.45,
+};
+
 export default function Top14Page() {
   const now = useNow(60000);
 
@@ -230,6 +246,37 @@ export default function Top14Page() {
           <> · classement relevé {format(new Date(data.fetchedAt), "d MMMM 'à' HH'h'mm", { locale: fr })}</>
         )}
       </p>
+
+      {/* L'alerte de fraîcheur.
+
+          Elle ne s'affiche que lorsque le tableau est réellement en retard sur
+          les résultats, pas au bout d'un certain temps. Hors championnat, un
+          classement vieux de cinq jours est juste : rien ne s'est joué. Un
+          délai fixe déclencherait une alerte fausse à chaque trêve — et une
+          alerte fausse qu'on apprend à ignorer ne sert plus à rien le jour où
+          elle est vraie.
+
+          Couleurs en style direct : sur un aplat de couleur fixe, il faut une
+          encre fixe. Les classes de la palette du projet sont relatives au
+          thème et basculeraient avec lui alors que le fond, lui, ne bouge pas. */}
+      {data?.fraicheur && !data.fraicheur.aJour && data.fraicheur.retard > 0 && (
+        <div style={ALERTE} className="mb-5">
+          <p style={{ fontWeight: 700, marginBottom: 2 }}>
+            ⚠ Ce classement n'est plus à jour
+          </p>
+          <p style={{ opacity: 0.92 }}>
+            {data.fraicheur.retard === 1
+              ? 'Une rencontre a été homologuée'
+              : `${data.fraicheur.retard} rencontres ont été homologuées`}{' '}
+            depuis le dernier calcul
+            {data.fraicheur.depuis && (
+              <> , le premier {format(new Date(data.fraicheur.depuis), "d MMMM 'à' HH'h'mm", { locale: fr })}</>
+            )}
+            . Le recalcul se fait automatiquement au coup de sifflet final ; s'il
+            ne se produit pas, c'est que la source ne répond plus.
+          </p>
+        </div>
+      )}
 
       {loading ? (
         <div className="text-center py-16 text-slate-500 animate-pulse">Chargement…</div>
