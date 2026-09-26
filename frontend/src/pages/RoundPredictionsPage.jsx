@@ -23,17 +23,39 @@ import TeamCrest from '../components/TeamCrest';
  *
  * On lit donc le barème (`basePoints`, toujours de 0 à 3) et on pose des
  * couleurs fixes, en clair : fond clair, encre sombre, identiques quel que soit
- * le thème puisque ni l'un ni l'autre ne dépend du fond de la page. Contrastes
- * mesurés : 7,5 / 7,3 / 8,4 / 4,3.
+ * le thème puisque ni l'un ni l'autre ne dépend du fond de la page.
+ *
+ * Et surtout, quatre **teintes** différentes et non quatre valeurs de gris. Ma
+ * première correction posait bien des couleurs fixes, mais « bon vainqueur » et
+ * « raté » y étaient deux gris clairs voisins : indiscernables, donc le tableau
+ * restait illisible. Deux nuances d'une même couleur ne se distinguent pas, quel
+ * que soit le thème — il faut changer de teinte.
+ *
+ * Le code couleur suit le sens, et il se lit en deux temps. D'abord marqué ou
+ * pas : vert si le pronostic rapporte, rouge pâle sinon — deux familles, deux
+ * réponses. Ensuite, dans le vert, deux intensités selon que l'écart était
+ * proche ou non. Et le bleu se réserve au score exact, qui n'est pas « mieux
+ * marqué » mais autre chose : la performance rare de la journée, qu'on veut
+ * repérer d'un bout à l'autre du tableau.
+ *
+ * Le score exact est le seul fond **saturé** du tableau, blanc sur bleu vif :
+ * les trois autres cases sont des pastels, donc celle-là saute aux yeux sans
+ * qu'on la cherche. C'est voulu — une récompense rare doit se voir de loin, et
+ * un pastel de plus se serait fondu dans les autres.
+ *
+ * Mesuré : contraste du texte 5,2 / 5,6 / 7,5 / 5,3 (seuil 4,5) et écart
+ * perceptif entre fonds de 42 au minimum, sur une échelle où 20 suffit à parler
+ * de teintes franchement différentes. Le bleu vif est à 92 de la case la plus
+ * proche, autrement dit hors de toute confusion possible.
  *
  * Le repli sur `points` couvre les pronostics d'avant les multiplicateurs, dont
  * `basePoints` est nul : à cette époque les deux valeurs étaient égales.
  */
 const CELLULE = {
-  3: { background: '#bbf7d0', color: '#14532d', fontWeight: 800 },
-  2: { background: '#fde68a', color: '#78350f', fontWeight: 700 },
-  1: { background: '#e2e8f0', color: '#334155', fontWeight: 700 },
-  0: { background: '#f1f5f9', color: '#64748b', fontWeight: 600 },
+  3: { background: '#2563eb', color: '#ffffff', fontWeight: 800 },  // bleu vif    score exact
+  2: { background: '#4ade80', color: '#064e3b', fontWeight: 700 },  // vert franc  bon vainqueur, ecart proche
+  1: { background: '#bbf7d0', color: '#14532d', fontWeight: 700 },  // vert pale   bon vainqueur
+  0: { background: '#fca5a5', color: '#7f1d1d', fontWeight: 600 },  // rouge pale  rate
 };
 
 // Pronostic posé, match pas encore joué : neutre et discret, il n'y a rien à
