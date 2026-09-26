@@ -43,7 +43,7 @@ function ScoreInput({ value, onChange, disabled }) {
  */
 const POINTS = {
   3: { cls: 'bg-green-500 text-slate-950', label: '🎯 Score exact' },
-  2: { cls: 'bg-amber-500/20 text-amber-400 border border-amber-500/45', label: '✅ Bon vainqueur' },
+  2: { cls: 'bg-amber-500/20 text-amber-400 border border-amber-500/45', label: '✅ À 5 points près' },
   1: { cls: 'bg-slate-700/40 text-slate-400 border border-slate-700', label: '✅ Bon vainqueur' },
   0: { cls: 'bg-slate-800/60 text-slate-500 border border-slate-800', label: '❌ Raté' },
 };

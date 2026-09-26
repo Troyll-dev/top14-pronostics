@@ -14,14 +14,28 @@
  *
  * Bareme :
  *   score exact                                        3 points
- *   bon vainqueur, ecart predit a 5 points ou moins     2 points
- *   bon vainqueur, ecart plus eloigne                   1 point
- *   mauvais vainqueur                                   0 point
+ *   bon vainqueur, et chaque score a 5 pres            2 points
+ *   bon vainqueur                                      1 point
+ *   mauvais vainqueur                                  0 point
+ *
+ * Le 2 points, et pourquoi il a change.
+ *
+ * Il se lisait autrefois sur l'ECART : on comparait l'ecart predit a l'ecart
+ * reel, et deux points s'il y avait moins de cinq points entre les deux. La
+ * regle etait incomprehensible a l'usage, et pour une bonne raison — elle ne
+ * regardait pas les scores du tout. Predire 20-10 sur un vrai 40-30 donnait
+ * deux points, les deux ecarts valant dix, alors qu'on s'etait trompe de vingt
+ * points sur chaque equipe. On ne pouvait pas deviner ce qui rapportait.
+ *
+ * Desormais on compare les scores eux-memes, equipe par equipe : deux points
+ * si l'on est a cinq points ou moins du vrai score des deux cotes. C'est ce
+ * qu'on veut dire quand on dit « j'etais tout pres », et ca se verifie d'un
+ * coup d'oeil sur la feuille de match.
  */
 
-// L'ecart entre l'ecart predit et l'ecart reel en deca duquel le bon vainqueur
-// vaut 2 points au lieu d'un seul. Nomme plutot qu'ecrit en dur : c'est le
-// nombre qu'on voudra discuter un jour, pas les 3/2/1/0.
+// L'ecart tolere sur chaque equipe, en deca duquel le bon vainqueur vaut 2
+// points au lieu d'un seul. Nomme plutot qu'ecrit en dur : c'est le nombre
+// qu'on voudra discuter un jour, pas les 3/2/1/0.
 const MARGE = 5;
 
 /**
@@ -42,9 +56,17 @@ function pointsFor(prono, resultat) {
 
   // Math.sign rend -1, 0 ou 1 : le match nul est donc un « vainqueur » a part
   // entiere, et predire un nul sur un nul compte comme un bon vainqueur.
+  //
+  // Le bon vainqueur reste la condition d'entree : un pronostic tres proche
+  // mais du mauvais cote ne rapporte rien. Dire qui gagne est l'enjeu
+  // principal, et un bareme ou l'on marque en se trompant de vainqueur
+  // brouillerait ce message.
   if (Math.sign(ph - pa) !== Math.sign(rh - ra)) return 0;
 
-  return Math.abs(Math.abs(ph - pa) - Math.abs(rh - ra)) <= MARGE ? 2 : 1;
+  // Les deux cotes doivent etre proches, pas seulement leur moyenne : sinon
+  // une erreur de dix points d'un cote se compenserait avec dix de l'autre.
+  const proche = Math.abs(ph - rh) <= MARGE && Math.abs(pa - ra) <= MARGE;
+  return proche ? 2 : 1;
 }
 
 module.exports = { pointsFor, MARGE };

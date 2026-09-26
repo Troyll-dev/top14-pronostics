@@ -283,7 +283,7 @@ export default function RoundPredictionsPage() {
           <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-xs text-slate-500">
             {[
               [3, 'Score exact'],
-              [2, 'Bon vainqueur, écart proche'],
+              [2, 'Bon vainqueur, à 5 points près'],
               [1, 'Bon vainqueur'],
               [0, 'Raté'],
             ].map(([n, libelle]) => (
