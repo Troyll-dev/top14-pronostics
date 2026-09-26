@@ -215,26 +215,10 @@ export default function MatchCard({
           quelle chaîne le match a été diffusé n'apprend plus rien, et la place
           revient au score. */}
       <div className="relative z-10 flex items-center justify-between gap-2 flex-wrap mb-3">
+        {/* À gauche, quand et sur quelle chaîne : deux réponses à la même
+            question, elles vont ensemble. */}
         <span className="flex items-center gap-1.5 flex-wrap min-w-0">
           <span className="text-[11.5px] italic text-slate-500 first-letter:uppercase">{dateStr}</span>
-          {estAffiche && (
-            <span
-              title="Match de la semaine : tous les points de cette rencontre sont multipliés par 3"
-              className="font-display text-[9.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded
-                         bg-amber-500/20 text-amber-400 border border-amber-500/50 whitespace-nowrap"
-            >
-              ⭐ Affiche ×3
-            </span>
-          )}
-          {estJoker && (
-            <span
-              title="Ton joker est posé ici : tes points sur cette rencontre sont doublés"
-              className="font-display text-[9.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded
-                         bg-violet-500/20 text-violet-300 border border-violet-500/50 whitespace-nowrap"
-            >
-              🃏 Joker ×2
-            </span>
-          )}
           {match.broadcaster && state === 'avenir' && (
             <span
               title={`Diffusion : ${match.broadcaster}`}
@@ -245,16 +229,48 @@ export default function MatchCard({
             </span>
           )}
         </span>
-        {state === 'avenir' ? (
-          <span className={`font-display text-[10.5px] font-bold uppercase tracking-wider px-2.5 py-1 rounded ${etat.chip}`}>
-            {etat.libelle}
-          </span>
-        ) : (
-          <span className={`font-display text-[10.5px] font-bold uppercase tracking-wider px-2.5 py-1 rounded flex items-center gap-1.5 ${STATE_CHIP[state]}`}>
-            {state === 'encours' && <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />}
-            {STATE[state].label}
-          </span>
-        )}
+
+        {/* À droite, ce qui concerne le pronostic : les multiplicateurs puis
+            l'état. Les multiplicateurs étaient à gauche, coincés entre l'heure
+            et le diffuseur — au milieu des informations sur la rencontre, alors
+            qu'ils parlent de ce que rapporte le pari. L'état reste à
+            l'extrême droite, là où l'œil a pris l'habitude de le trouver.
+
+            Fonds pleins et non teintés : un aplat violet ou ambre avec du texte
+            blanc ou noir se lit sur les deux thèmes. La version précédente
+            posait du violet clair sur un voile transparent — correct sur fond
+            nuit, illisible sur le fond crème. */}
+        <span className="flex items-center gap-1.5 flex-wrap justify-end">
+          {estAffiche && (
+            <span
+              title="Match de la semaine : tous les points de cette rencontre sont multipliés par 3"
+              className="font-display text-[9.5px] font-bold uppercase tracking-wider px-2 py-1 rounded
+                         bg-amber-500 text-slate-950 whitespace-nowrap"
+            >
+              ⭐ Affiche ×3
+            </span>
+          )}
+          {estJoker && (
+            <span
+              title="Ton joker est posé ici : tes points sur cette rencontre sont doublés"
+              className="font-display text-[9.5px] font-bold uppercase tracking-wider px-2 py-1 rounded
+                         bg-violet-600 text-white whitespace-nowrap"
+            >
+              🃏 Joker ×2
+            </span>
+          )}
+
+          {state === 'avenir' ? (
+            <span className={`font-display text-[10.5px] font-bold uppercase tracking-wider px-2.5 py-1 rounded ${etat.chip}`}>
+              {etat.libelle}
+            </span>
+          ) : (
+            <span className={`font-display text-[10.5px] font-bold uppercase tracking-wider px-2.5 py-1 rounded flex items-center gap-1.5 ${STATE_CHIP[state]}`}>
+              {state === 'encours' && <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />}
+              {STATE[state].label}
+            </span>
+          )}
+        </span>
       </div>
 
       {/* Affiche */}
@@ -374,8 +390,8 @@ export default function MatchCard({
               className={`font-display text-[11px] font-bold uppercase tracking-wider px-2.5 py-1.5 rounded
                           border transition-colors ${
                             estJoker
-                              ? 'bg-violet-500/25 text-violet-200 border-violet-500/60 hover:bg-violet-500/35'
-                              : 'bg-transparent text-slate-400 border-slate-700 hover:border-violet-500/60 hover:text-violet-300'
+                              ? 'bg-violet-600 text-white border-violet-600 hover:bg-violet-700'
+                              : 'bg-transparent text-slate-400 border-slate-700 hover:bg-violet-600 hover:text-white hover:border-violet-600'
                           }`}
             >
               {estJoker ? '🃏 Retirer le joker' : jokerAilleurs ? '🃏 Déplacer ici' : '🃏 Joker ×2'}
