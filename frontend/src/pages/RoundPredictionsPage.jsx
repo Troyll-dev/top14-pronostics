@@ -4,14 +4,49 @@ import api from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 import TeamCrest from '../components/TeamCrest';
 
-function cellClass(points) {
-  if (points === null || points === undefined) return 'bg-slate-800/45 text-slate-400';
-  return {
-    3: 'bg-green-500/25 text-green-400 font-extrabold',
-    2: 'bg-amber-500/20 text-amber-500',
-    1: 'bg-slate-700/30 text-slate-400',
-    0: 'bg-slate-800/60 text-slate-500',
-  }[points] || 'bg-slate-800/60 text-slate-500';
+/**
+ * La couleur d'une cellule du tableau.
+ *
+ * Deux choses étaient fausses ici, et elles se cumulaient.
+ *
+ * D'abord les couleurs. C'étaient des voiles translucides — `bg-green-500/25`,
+ * `bg-amber-500/20` — posés sur le fond de la carte. Un voile prend la couleur
+ * de ce qu'il y a dessous : sur le fond nuit ils se détachaient, sur le fond
+ * crème les quatre teintes devenaient quatre pâleurs presque identiques. On ne
+ * distinguait plus un score exact d'un pronostic raté, ce qui vide le tableau
+ * de son intérêt.
+ *
+ * Ensuite l'index. La fonction était indexée par le nombre de points, de 0 à 3.
+ * Avec le joker, un score exact vaut 6 : l'index retombait alors sur la valeur
+ * par défaut, c'est-à-dire la couleur de « raté ». Le meilleur pronostic de la
+ * journée s'affichait comme le pire.
+ *
+ * On lit donc le barème (`basePoints`, toujours de 0 à 3) et on pose des
+ * couleurs fixes, en clair : fond clair, encre sombre, identiques quel que soit
+ * le thème puisque ni l'un ni l'autre ne dépend du fond de la page. Contrastes
+ * mesurés : 7,5 / 7,3 / 8,4 / 4,3.
+ *
+ * Le repli sur `points` couvre les pronostics d'avant les multiplicateurs, dont
+ * `basePoints` est nul : à cette époque les deux valeurs étaient égales.
+ */
+const CELLULE = {
+  3: { background: '#bbf7d0', color: '#14532d', fontWeight: 800 },
+  2: { background: '#fde68a', color: '#78350f', fontWeight: 700 },
+  1: { background: '#e2e8f0', color: '#334155', fontWeight: 700 },
+  0: { background: '#f1f5f9', color: '#64748b', fontWeight: 600 },
+};
+
+// Pronostic posé, match pas encore joué : neutre et discret, il n'y a rien à
+// juger. Volontairement différent des quatre autres, pour qu'on ne le prenne
+// pas pour une note.
+const CELLULE_ATTENTE = { background: 'rgba(148,163,184,.22)', color: 'inherit', fontWeight: 700 };
+const CELLULE_VIDE = { background: 'rgba(148,163,184,.10)', color: 'inherit', fontWeight: 600 };
+
+function styleCellule(p) {
+  if (!p) return CELLULE_VIDE;
+  const base = p.basePoints ?? p.points;
+  if (base === null || base === undefined) return CELLULE_ATTENTE;
+  return CELLULE[base] || CELLULE[0];
 }
 
 export default function RoundPredictionsPage() {
@@ -144,11 +179,21 @@ export default function RoundPredictionsPage() {
                         return (
                           <td key={m.id} className="px-0.5 py-0.5">
                             <div
-                              className={`rounded py-1.5 text-center font-display text-[12px] font-bold tabular-nums ${
-                                p ? cellClass(p.points) : 'bg-slate-800/25 text-slate-600'
-                              }`}
+                              style={styleCellule(p)}
+                              className="rounded py-1 text-center font-display text-[12px] tabular-nums leading-tight"
                             >
                               {p ? `${p.homeScorePred}–${p.awayScorePred}` : '—'}
+                              {/* Le gain, sous le pronostic. La couleur disait
+                                  déjà la qualité du pari, mais pas ce qu'il a
+                                  rapporté — et avec les multiplicateurs les
+                                  deux ne coïncident plus : un « bon vainqueur »
+                                  joué en joker rapporte plus qu'un score exact
+                                  ordinaire. */}
+                              {p && p.points !== null && p.points !== undefined && (
+                                <div className="text-[9.5px] font-bold opacity-80">
+                                  {p.joker && '🃏'}+{p.points}
+                                </div>
+                              )}
                             </div>
                           </td>
                         );
@@ -165,19 +210,25 @@ export default function RoundPredictionsPage() {
           </div>
 
           {/* Légende */}
+          {/* La légende reprend exactement les couleurs des cellules, en
+              partageant le même objet : elles ne peuvent plus diverger. */}
           <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-xs text-slate-500">
-            <span className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-sm bg-green-500/25 border border-green-500/45" /> Score exact +3
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-sm bg-amber-500/20 border border-amber-500/45" /> Bon vainqueur, écart proche +2
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-sm bg-slate-700/30 border border-slate-700" /> Bon vainqueur +1
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-sm bg-slate-800/60 border border-slate-800" /> Raté 0
-            </span>
+            {[
+              [3, 'Score exact'],
+              [2, 'Bon vainqueur, écart proche'],
+              [1, 'Bon vainqueur'],
+              [0, 'Raté'],
+            ].map(([n, libelle]) => (
+              <span key={n} className="flex items-center gap-1.5">
+                <span
+                  className="w-3 h-3 rounded-sm"
+                  style={{ background: CELLULE[n].background, border: '1px solid rgba(0,0,0,.15)' }}
+                />
+                {libelle} +{n}
+              </span>
+            ))}
+            <span className="flex items-center gap-1.5">🃏 Joker : points doublés</span>
+            <span className="flex items-center gap-1.5">⭐ Affiche : points triplés</span>
           </div>
         </>
       )}
