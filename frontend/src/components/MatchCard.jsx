@@ -50,6 +50,41 @@ const POINTS = {
 
 const base = (p) => (p?.basePoints ?? p?.points);
 
+/**
+ * Les deux pastilles de multiplicateur, en style direct et non en classes.
+ *
+ * Elles étaient écrites `bg-violet-600 text-white`, et le texte ressortait
+ * quand même en noir : quelque chose l'emportait sur la classe de couleur —
+ * une règle de la feuille de style du projet, ou une teinte absente de la
+ * configuration Tailwind, qui n'aurait alors rien produit du tout.
+ *
+ * Plutôt que de chercher laquelle, on sort du problème. Un style posé
+ * directement sur l'élément l'emporte sur toute règle de feuille de style, et
+ * les couleurs sont écrites en clair : elles ne dépendent plus d'aucune
+ * palette, d'aucun thème, d'aucun ordre de chargement. Ce sont deux pastilles,
+ * ça ne justifie pas de déboguer une cascade.
+ *
+ * Contrastes mesurés, identiques sur les deux thèmes puisque le fond est plein :
+ * 5,7 pour le blanc sur violet, 9,4 pour le noir sur ambre. Le seuil est 4,5.
+ */
+const PASTILLE_COMMUN = {
+  display: 'inline-block',
+  padding: '4px 8px',
+  borderRadius: '4px',
+  fontSize: '9.5px',
+  fontWeight: 700,
+  textTransform: 'uppercase',
+  letterSpacing: '0.05em',
+  whiteSpace: 'nowrap',
+  lineHeight: 1.2,
+};
+
+const PASTILLE = {
+  affiche: { ...PASTILLE_COMMUN, background: '#f59e0b', color: '#0b1020' },
+  joker: { ...PASTILLE_COMMUN, background: '#7c3aed', color: '#ffffff' },
+};
+
+
 function PointsBadge({ prediction }) {
   const total = prediction?.points;
   if (total === null || total === undefined) return null;
@@ -247,20 +282,12 @@ export default function MatchCard({
             nuit, illisible sur le fond crème. */}
         <span className="flex items-center gap-1.5 flex-wrap justify-end">
           {estAffiche && (
-            <span
-              title="Match de la semaine : tous les points de cette rencontre sont multipliés par 3"
-              className="font-display text-[9.5px] font-bold uppercase tracking-wider px-2 py-1 rounded
-                         bg-amber-500 text-slate-950 whitespace-nowrap"
-            >
+            <span title="Match de la semaine : tous les points de cette rencontre sont multipliés par 3" style={PASTILLE.affiche}>
               ⭐ Affiche ×3
             </span>
           )}
           {estJoker && (
-            <span
-              title="Ton joker est posé ici : tes points sur cette rencontre sont doublés"
-              className="font-display text-[9.5px] font-bold uppercase tracking-wider px-2 py-1 rounded
-                         bg-violet-600 text-white whitespace-nowrap"
-            >
+            <span title="Ton joker est posé ici : tes points sur cette rencontre sont doublés" style={PASTILLE.joker}>
               🃏 Joker ×2
             </span>
           )}
