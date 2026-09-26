@@ -32,7 +32,6 @@ export default function HomePage() {
   const [round, setRound] = useState(null);           // prochaine journée à pronostiquer
   const [resultsRound, setResultsRound] = useState(null); // journée en cours ou dernière jouée
   const [matches, setMatches] = useState([]);
-  const [previous, setPrevious] = useState([]);
   const [results, setResults] = useState([]);
   const [board, setBoard] = useState([]);
   const [standings, setStandings] = useState(null);
@@ -57,7 +56,11 @@ export default function HomePage() {
 
         // Les trois journées utiles se recoupent souvent : on ne demande chacune
         // qu'une seule fois.
-        const wanted = [...new Set([r, r - 1, cr])].filter((x) => x >= 1);
+        // La journée à pronostiquer et celle des résultats suffisent. On
+        // allait aussi chercher « r - 1 » pour un bloc « tes derniers pronos »
+        // qui affichait toujours la journée d'avant celle des résultats — donc
+        // systématiquement périmée. Bloc retiré, requête avec.
+        const wanted = [...new Set([r, cr])].filter((x) => x >= 1);
         const [pairs, lb] = await Promise.all([
           Promise.all(
             wanted.map((x) => api.get(`/matches?round=${x}`).then((q) => [x, q.data]))
@@ -68,7 +71,6 @@ export default function HomePage() {
 
         const byRound = Object.fromEntries(pairs);
         setMatches(byRound[r] || []);
-        setPrevious(byRound[r - 1] || []);
         setResults(byRound[cr] || []);
         setBoard(lb.data);
       } catch (err) {
@@ -91,8 +93,6 @@ export default function HomePage() {
   const me = myIndex >= 0 ? board[myIndex] : null;
   const leader = board[0];
 
-  const lastResults = previous.filter((m) => m.status === 'FINISHED').slice(-3).reverse();
-
   // On affiche la journée en cours dans l'ordre des coups d'envoi : les matchs
   // joués remontent naturellement au-dessus de ceux qui restent à venir.
   const dayResults = [...results].sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff));
@@ -100,10 +100,6 @@ export default function HomePage() {
   const dayPoints = dayResults.reduce((sum, m) => sum + (m.predictions?.[0]?.points || 0), 0);
 
   const topFive = (standings?.table || []).slice(0, 5);
-
-  // Le bloc « tes derniers pronos » ferait doublon si la journée affichée
-  // au-dessus est déjà la précédente.
-  const showLastResults = lastResults.length > 0 && resultsRound !== round - 1;
 
   if (loading) {
     return <div className="text-center py-20 text-slate-500 animate-pulse">Chargement…</div>;
@@ -303,34 +299,6 @@ export default function HomePage() {
 
           <Link to="/top14" className="inline-block mt-3 text-[13px] text-slate-500 hover:text-amber-500 transition-colors">
             Classement complet et résultats →
-          </Link>
-        </div>
-      )}
-
-      {/* Derniers résultats */}
-      {showLastResults && (
-        <div className="card">
-          <h2 className="rule-label mb-3">Tes derniers pronos · journée {round - 1}</h2>
-          <ul className="divide-y divide-slate-800">
-            {lastResults.map((m) => {
-              const p = m.predictions?.[0];
-              return (
-                <li key={m.id} className="flex items-center gap-3 py-2 text-[13px]">
-                  <span className="flex-1 min-w-0 truncate text-slate-400">
-                    {m.homeTeam.shortName} – {m.awayTeam.shortName}
-                  </span>
-                  <span className="font-display font-bold tabular-nums shrink-0">
-                    {m.homeScore}–{m.awayScore}
-                  </span>
-                  <span className={`font-display font-bold text-xs shrink-0 w-12 text-right ${pointsTone(p?.points)}`}>
-                    {p ? `+${p.points ?? 0}` : '—'}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-          <Link to="/pronos" className="inline-block mt-3 text-[13px] text-slate-500 hover:text-amber-500 transition-colors">
-            Voir les pronos de tout le monde →
           </Link>
         </div>
       )}
