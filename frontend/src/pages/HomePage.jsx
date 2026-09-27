@@ -87,11 +87,39 @@ export default function HomePage() {
     return () => { alive = false; };
   }, []);
 
+  /**
+   * Les matchs encore ouverts à la saisie, et ce qu'il reste à faire.
+   *
+   * On compare au `now` du `useNow` et non à un `new Date()` posé pendant
+   * l'affichage. La différence n'est pas théorique : un `new Date()` est figé au
+   * moment où la page se dessine, donc un match dont le coup d'envoi passe
+   * pendant que l'onglet est ouvert reste indéfiniment « à pronostiquer » — et
+   * le bouton continue de promettre une saisie que le serveur refusera. Avec
+   * `now`, la page se remet d'accord avec la réalité toutes les minutes.
+   */
   const open = matches.filter(
-    (m) => m.status === 'SCHEDULED' && new Date() < new Date(m.kickoff)
+    (m) => m.status === 'SCHEDULED' && now < new Date(m.kickoff)
   );
   const todo = open.filter((m) => !(m.predictions?.length > 0));
   const nextMatch = [...open].sort((a, b) => new Date(a.kickoff) - new Date(b.kickoff))[0];
+
+  /**
+   * Le compteur : on compte les pronostics réellement posés.
+   *
+   * Il calculait `matches.length - todo.length`. Or un match qui n'est plus
+   * `SCHEDULED` sort de `open`, donc de `todo`, donc passait pour posé — même
+   * sans pronostic. Le compteur annonçait alors une journée complète alors qu'un
+   * match était parti sans toi, ce qui est exactement l'information qu'on
+   * attendait de lui.
+   *
+   * Trois nombres, désormais, et ils s'additionnent toujours au total : posés,
+   * restant à poser, et manqués — ceux dont le coup d'envoi est passé sans
+   * pronostic. Le dernier ne se dit qu'à voix basse, puisqu'il n'y a plus rien à
+   * y faire, mais il se dit : un silence sur un prono manqué le fera manquer
+   * encore la fois suivante.
+   */
+  const poses = matches.filter((m) => m.predictions?.length > 0).length;
+  const manques = Math.max(0, matches.length - poses - todo.length);
 
   const myIndex = board.findIndex((p) => p.id === user?.id);
   const me = myIndex >= 0 ? board[myIndex] : null;
@@ -117,6 +145,8 @@ export default function HomePage() {
       <p className="text-xs italic text-slate-500 mb-6">
         {todo.length > 0
           ? `Il te reste ${todo.length} prono${todo.length > 1 ? 's' : ''} à poser.`
+          : manques > 0
+          ? `Plus rien à poser — ${manques} match${manques > 1 ? 's sont partis' : ' est parti'} sans ton prono.`
           : open.length > 0
           ? 'Tous tes pronos sont posés. Plus qu’à regarder les matchs.'
           : 'Rien à pronostiquer pour le moment.'}
@@ -130,13 +160,16 @@ export default function HomePage() {
           <div className="flex items-end justify-between gap-4">
             <div>
               <p className="font-display text-[34px] font-extrabold leading-none tabular-nums">
-                <span className={todo.length > 0 ? 'text-amber-500' : 'text-green-400'}>
-                  {matches.length - todo.length}
+                <span className={todo.length > 0 ? 'text-amber-500' : manques > 0 ? 'text-slate-400' : 'text-green-400'}>
+                  {poses}
                 </span>
                 <span className="text-slate-600">/{matches.length}</span>
               </p>
               <p className="text-[11px] uppercase tracking-wide text-slate-500 mt-1.5">
                 pronostics posés
+                {manques > 0 && (
+                  <span className="normal-case tracking-normal"> · {manques} manqué{manques > 1 ? 's' : ''}</span>
+                )}
               </p>
             </div>
 
