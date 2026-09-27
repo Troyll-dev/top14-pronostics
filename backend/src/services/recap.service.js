@@ -24,7 +24,7 @@
 
 const { PrismaClient } = require('@prisma/client');
 const mailer = require('./mailer.service');
-const { stats, classer } = require('./ranking');
+const { stats, classer, retenuAuClassement } = require('./ranking');
 
 const prisma = new PrismaClient();
 
@@ -107,7 +107,13 @@ async function bilan(round) {
    * et classe deux fois par la meme fonction. La difference des rangs donne les
    * places gagnees et perdues, que la base ne garde nulle part.
    */
-  const ligne = (u, pronos) => ({ id: u.id, username: u.username, email: u.email, ...stats(pronos) });
+  // Meme filtre que le site : les journees anterieures au seuil ne comptent pas
+  // au cumul. Sans cela le mail annoncerait un total et un rang que la page
+  // contredirait.
+  const ligne = (u, pronos) => ({
+    id: u.id, username: u.username, email: u.email,
+    ...stats(pronos.filter(retenuAuClassement)),
+  });
 
   const apres = classer(users.map((u) => ligne(u, parJoueur.get(u.id) || [])));
   const avant = classer(users.map((u) => ligne(u, (parJoueur.get(u.id) || []).filter((p) => p.match.round < round))));

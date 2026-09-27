@@ -72,7 +72,11 @@ export default function HomePage() {
         const byRound = Object.fromEntries(pairs);
         setMatches(byRound[r] || []);
         setResults(byRound[cr] || []);
-        setBoard(lb.data);
+        // Le classement est passé d'un tableau à un objet, qui porte aussi le
+        // seuil de départ et les critères de départage. Le repli couvre le
+        // temps d'un déploiement, où le navigateur peut avoir l'ancienne page
+        // et le serveur la nouvelle réponse.
+        setBoard(Array.isArray(lb.data) ? lb.data : lb.data.classement || []);
       } catch (err) {
         console.error(err);
       } finally {

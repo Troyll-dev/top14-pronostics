@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { ecart, stats, comparer, classer, CRITERES } = require('../src/services/ranking');
+const { ecart, stats, comparer, classer, CRITERES, DEPUIS, retenuAuClassement } = require('../src/services/ranking');
 
 /** Un pronostic note, tel qu'il sort de la base. */
 const P = (ph, pa, rh, ra, base, points = base, joker = false) => ({
@@ -143,4 +143,35 @@ test('l\'ordre ne depend pas de l\'ordre d\'entree', () => {
     const melange = [...base].sort(() => Math.random() - 0.5);
     assert.deepEqual(classer(melange).map((l) => l.username), attendu);
   }
+});
+
+
+/* --- le seuil de depart du classement general ---------------------------- */
+
+/**
+ * Les journees 1 et 2 sont exclues du cumul : un seul joueur y avait un compte,
+ * le site venant d'ouvrir. Les garder lui donnerait une avance que personne n'a
+ * eu l'occasion de disputer.
+ *
+ * Le filtre est expose separement et non applique dans `stats`, parce que le
+ * classement d'une journee doit pouvoir compter la J1 et la J2 : sur ces
+ * pages-la, la question n'est pas l'equite du cumul mais ce qui s'est passe ce
+ * week-end-la.
+ */
+test('les journees anterieures au seuil ne comptent pas au general', () => {
+  const avant = { match: { round: DEPUIS - 1 } };
+  const pile  = { match: { round: DEPUIS } };
+  const apres = { match: { round: DEPUIS + 5 } };
+
+  assert.equal(retenuAuClassement(avant), false);
+  assert.equal(retenuAuClassement(pile), true, 'le seuil est inclusif');
+  assert.equal(retenuAuClassement(apres), true);
+});
+
+test('un pronostic sans journee connue est conserve', () => {
+  // Mieux vaut compter que perdre : une donnee incomplete ne doit pas faire
+  // disparaitre des points en silence.
+  assert.equal(retenuAuClassement({ match: {} }), true);
+  assert.equal(retenuAuClassement({}), true);
+  assert.equal(retenuAuClassement(null), true);
 });

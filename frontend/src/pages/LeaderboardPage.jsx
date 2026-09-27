@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
-import Avatar from '../components/Avatar';
 
 function MedalIcon({ rank }) {
   if (rank === 1) return <span className="text-2xl">🥇</span>;
@@ -26,7 +25,16 @@ function PlayerRow({ rank, player, points, stats, isMe }) {
         <MedalIcon rank={rank} />
       </div>
 
-      <Avatar user={player} size={40} />
+      <div
+        className="w-10 h-10 rounded-full flex items-center justify-center font-display font-bold text-lg shrink-0"
+        style={{
+          backgroundColor: player.avatarColor,
+          color: '#fff',
+          boxShadow: '0 0 0 2px rgb(var(--a-500) / .45)',
+        }}
+      >
+        {player.username[0].toUpperCase()}
+      </div>
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
@@ -64,13 +72,25 @@ export default function LeaderboardPage() {
 
   const [rounds, setRounds] = useState([]);
   const [round, setRound] = useState(null);
+  // Le seuil et les critères viennent du serveur : c'est lui qui les applique,
+  // et deux énoncés d'une même règle finissent toujours par diverger.
+  const [depuis, setDepuis] = useState(null);
+  const [criteres, setCriteres] = useState([]);
   const [roundBoard, setRoundBoard] = useState([]);
   const [roundMatches, setRoundMatches] = useState([]);
   const [loadingRound, setLoadingRound] = useState(false);
 
   useEffect(() => {
     api.get('/leaderboard')
-      .then((res) => setGeneral(res.data))
+      .then((res) => {
+        // La réponse est passée d'un tableau à un objet, pour porter le seuil
+        // et les critères. Le repli couvre le temps d'un déploiement où le
+        // navigateur garde l'ancienne page et le serveur sert déjà la nouvelle
+        // forme, ou l'inverse.
+        const d = res.data;
+        setGeneral(Array.isArray(d) ? d : d.classement || []);
+        if (!Array.isArray(d)) { setDepuis(d.depuis ?? null); setCriteres(d.criteres || []); }
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
 
@@ -106,7 +126,7 @@ export default function LeaderboardPage() {
       <h1 className="font-display text-[26px] font-extrabold leading-none mb-1">🏆 Classement</h1>
       <p className="text-xs italic text-slate-500 mb-4">
         {view === 'general'
-          ? 'Saison 2026-2027 · toutes journées confondues'
+          ? `Saison 2026-2027 · ${depuis && depuis > 1 ? `à partir de la journée ${depuis}` : 'toutes journées confondues'}`
           : `Saison 2026-2027 · journée ${round ?? '—'} seule`}
       </p>
 
@@ -245,6 +265,37 @@ export default function LeaderboardPage() {
             <span className="font-display font-bold text-red-400 shrink-0">0 pt</span>
           </div>
         </div>
+
+        {/* Le départage.
+
+            Il n'était expliqué nulle part, et une règle qu'on ne peut pas lire
+            passe pour de l'arbitraire le jour où elle décide d'une place. Elle
+            vient du serveur plutôt que d'être réécrite ici : c'est lui qui
+            l'applique, et deux énoncés d'une même règle finissent toujours par
+            diverger. */}
+        {criteres.length > 0 && (
+          <div className="mt-5 pt-4 border-t border-slate-800">
+            <h4 className="rule-label mb-2.5">En cas d'égalité</h4>
+            <ol className="text-[13px] text-slate-400 space-y-1 list-decimal list-inside marker:text-slate-600">
+              {criteres.map((c) => <li key={c}>{c}</li>)}
+            </ol>
+            <p className="text-[12px] text-slate-500 mt-2.5 leading-relaxed">
+              La somme des écarts additionne, sur chaque pronostic, l'erreur commise
+              sur les deux équipes — prédire 20–15 sur un 22–12 fait 5. C'est le seul
+              critère qui tient compte des pronostics ratés, et celui qui départage
+              quand tout le reste est égal.
+            </p>
+          </div>
+        )}
+
+        {depuis && depuis > 1 && (
+          <p className="text-[12px] text-slate-500 mt-4 pt-3.5 border-t border-slate-800 leading-relaxed">
+            Le classement général part de la <b>journée {depuis}</b> : sur les
+            précédentes, un seul joueur avait un compte. Ses points y restent
+            visibles journée par journée, mais ils ne sont pas additionnés ici —
+            une avance que personne n'a pu disputer n'est pas une performance.
+          </p>
+        )}
       </div>
     </div>
   );

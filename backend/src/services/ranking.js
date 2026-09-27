@@ -42,6 +42,35 @@
  */
 
 /**
+ * La premiere journee qui compte au classement general.
+ *
+ * Les journees 1 et 2 sont exclues parce qu'un seul joueur y a pronostique :
+ * le site venait d'ouvrir, les autres n'avaient pas encore de compte. Les
+ * garder donnerait a ce joueur une avance que personne n'a eu l'occasion de
+ * disputer — ce n'est pas une performance, c'est une anteriorite.
+ *
+ * Les points de ces journees restent attribues et visibles journee par
+ * journee : on ne reecrit pas l'histoire, on decide seulement de ce que le
+ * classement general additionne.
+ *
+ * La variable d'environnement permet de deplacer ce seuil sans redeployer, et
+ * `CLASSEMENT_DEPUIS=1` retablit le comportement d'origine.
+ */
+const DEPUIS = Number(process.env.CLASSEMENT_DEPUIS || 3);
+
+/**
+ * Ce pronostic compte-t-il au classement general ?
+ *
+ * Exportee plutot qu'appliquee dans `stats`, parce que le classement d'une
+ * journee doit pouvoir compter la J1 et la J2 : sur ces pages-la, la question
+ * n'est pas l'equite du cumul mais ce qui s'est passe ce week-end-la.
+ */
+function retenuAuClassement(prono) {
+  const round = prono?.match?.round;
+  return !Number.isFinite(round) || round >= DEPUIS;
+}
+
+/**
  * L'ecart total d'un pronostic : la somme des erreurs sur les deux equipes.
  *
  * Rend `null` quand la rencontre n'a pas de score : une rencontre non jouee ne
@@ -114,4 +143,4 @@ const CRITERES = [
   'la plus petite somme d\'écarts',
 ];
 
-module.exports = { ecart, stats, comparer, classer, CRITERES };
+module.exports = { ecart, stats, comparer, classer, CRITERES, DEPUIS, retenuAuClassement };

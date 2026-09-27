@@ -1,5 +1,5 @@
 const { PrismaClient } = require('@prisma/client');
-const { stats, classer } = require('../services/ranking');
+const { stats, classer, retenuAuClassement, DEPUIS, CRITERES } = require('../services/ranking');
 
 const prisma = new PrismaClient();
 
@@ -19,14 +19,18 @@ exports.getLeaderboard = async (req, res) => {
             homeScorePred: true, awayScorePred: true,
             // Les scores reels servent au quatrieme critere de departage, la
             // somme des ecarts.
-            match: { select: { status: true, homeScore: true, awayScore: true } },
+            match: { select: { status: true, round: true, homeScore: true, awayScore: true } },
           },
         },
       },
     });
 
     const leaderboard = users.map((u) => {
-      const played = u.predictions.filter((p) => p.match.status === 'FINISHED');
+      // Les journees anterieures a `DEPUIS` ne comptent pas : un seul joueur y
+      // avait un compte, et son avance n'aurait pas pu etre disputee.
+      const played = u.predictions.filter(
+        (p) => p.match.status === 'FINISHED' && retenuAuClassement(p)
+      );
 
       // Les quatre nombres du departage sont calcules par `ranking`, qui sert
       // aussi au classement d'une journee et au bilan du lundi. C'est la seule
@@ -57,7 +61,12 @@ exports.getLeaderboard = async (req, res) => {
       };
     });
 
-    res.json(classer(leaderboard));
+    // La reponse est un objet et non un tableau : `depuis` accompagne le
+    // classement pour que l'ecran puisse expliquer d'ou il part sans redire la
+    // regle de son cote. Un tableau ne pouvait pas le porter — JSON ignore les
+    // proprietes non indicees d'un tableau, et la valeur disparaissait
+    // silencieusement a la serialisation.
+    res.json({ classement: classer(leaderboard), depuis: DEPUIS, criteres: CRITERES });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erreur serveur' });
