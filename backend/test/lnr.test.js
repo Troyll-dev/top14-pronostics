@@ -67,35 +67,30 @@ test('le score est lu, et son absence signifie « pas joue »', () => {
 });
 
 /**
- * L'attribution des bonus.
+ * Les badges de bonus.
  *
- * C'est le point le plus fragile de l'analyseur : la page ne dit pas a qui
- * appartient un badge, elle le pose simplement avant ou apres le score. Une
- * erreur ici donnerait un classement faux de un a deux points par club, et
- * rien dans l'affichage ne le signalerait.
+ * Cet analyseur les lisait, et trois tests verifiaient a qui chaque badge
+ * revenait — la page ne le dit pas, elle pose simplement le badge avant ou apres
+ * le score. Ils ne servaient qu'au recalcul du classement, remplace depuis par la
+ * lecture du tableau officiel, qui publie les bonus lui-meme. La lecture a donc
+ * ete retiree, et ces trois tests avec elle.
+ *
+ * Mais les badges sont toujours dans la page. Ce test-la reste, et il est le
+ * seul qui compte maintenant : leur presence au milieu du bloc ne doit pas
+ * decaler la lecture des clubs, du score ou de l'heure. C'est exactement le
+ * genre de balise qu'on oublie une fois qu'on ne la lit plus.
  */
-test('un bonus place avant le score revient au club qui recoit', () => {
+test('les badges de bonus, toujours dans la page, ne genent pas la lecture', () => {
   const x = seul(page('samedi 19 septembre', [
-    rencontre({ dom: USAP, ext: UBB, score: '40 - 10', bonusDom: 'Bo' }),
+    rencontre({ dom: USAP, ext: UBB, score: '35 - 30', bonusDom: 'Bo', bonusExt: 'Bd', heure: '16h35' }),
   ]));
-  assert.deepEqual(x.bonus.home, { o: true, d: false });
-  assert.deepEqual(x.bonus.away, { o: false, d: false });
-});
 
-test('un bonus place apres le score revient au club visiteur', () => {
-  const x = seul(page('samedi 19 septembre', [
-    rencontre({ dom: USAP, ext: UBB, score: '20 - 17', bonusExt: 'Bd' }),
-  ]));
-  assert.deepEqual(x.bonus.home, { o: false, d: false });
-  assert.deepEqual(x.bonus.away, { o: false, d: true });
-});
-
-test('les deux clubs peuvent avoir un bonus sur la meme rencontre', () => {
-  const x = seul(page('samedi 19 septembre', [
-    rencontre({ dom: USAP, ext: UBB, score: '35 - 30', bonusDom: 'Bo', bonusExt: 'Bd' }),
-  ]));
-  assert.equal(x.bonus.home.o, true);
-  assert.equal(x.bonus.away.d, true);
+  assert.equal(x.homeTeam, 'USA Perpignan');
+  assert.equal(x.awayTeam, 'Union Bordeaux-Bègles');
+  assert.equal(x.homeScore, 35);
+  assert.equal(x.awayScore, 30);
+  assert.equal(x.heure, '16h35');
+  assert.equal(x.bonus, undefined, 'le champ n\'est plus rendu du tout');
 });
 
 test('le diffuseur est lu dans l\'attribut alt, et les chaines multiples sont gardees', () => {

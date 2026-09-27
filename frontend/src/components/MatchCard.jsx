@@ -5,6 +5,8 @@ import api from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 import TeamCrest from './TeamCrest';
 import { matchState, STATE, STATE_CHIP } from '../utils/matchState';
+import CompositionsMatch from './CompositionsMatch';
+import FormeClubs from './FormeClubs';
 
 function ScoreInput({ value, onChange, disabled }) {
   return (
@@ -146,13 +148,13 @@ export default function MatchCard({
 
   /* Le joker se pose depuis le Récapitulatif, en haut de la page, et non
      depuis les cartes.
-  
+
      Il y avait ici une case à cocher par match — sept contrôles pour une
      décision qui n'est prise qu'une fois par journée. Tout ce qu'il avait
      fallu ajouter ensuite (la mention « il est posé sur un autre match », le
      rappel dans le Récapitulatif) ne servait qu'à recoller l'unité qu'on avait
      cassée en éclatant le contrôle en sept.
-  
+
      La carte se contente donc d'afficher l'étiquette là où le joker est posé :
      elle montre l'état, elle ne le pilote plus. */
   const state = matchState(match, now);
@@ -410,6 +412,25 @@ export default function MatchCard({
           </b>
         </div>
       )}
+
+      {/* De quoi pronostiquer : la forme des deux clubs, puis les compositions.
+
+          Dans cet ordre, et c'est réfléchi. La forme est toujours visible parce
+          qu'on la veut sous les yeux pendant qu'on saisit un score ; les
+          compositions sont repliées parce que quatre-vingt-douze noms sur sept
+          cartes rendraient la page illisible pour la seule personne qui veut
+          vérifier si le buteur est titulaire.
+
+          Les deux blocs disparaissent complètement quand il n'y a rien à
+          montrer — aucune journée jouée, ou composition pas encore publiée par
+          la LNR. Il n'y a donc rien à prévoir pour le mardi ni pour le début de
+          saison : la carte reste exactement comme avant.
+
+          Ils sont placés après le pronostic et avant les pronos des autres :
+          ce qui aide à décider vient avant ce qui raconte ce que les autres ont
+          décidé. */}
+      <FormeClubs match={match} />
+      <CompositionsMatch match={match} />
 
       {/* Pronostics des autres joueurs */}
       <div className="relative z-10 mt-3 pt-3 border-t border-slate-800">

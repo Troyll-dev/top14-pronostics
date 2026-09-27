@@ -58,7 +58,7 @@ function startResultsCron() {
         if (!etat.aJour) {
           console.log(
             `[cron] classement en retard : ${etat.comptees} rencontre(s) comptee(s) ` +
-            `sur ${etat.termines} terminee(s), recalcul`
+            `sur ${etat.termines} terminee(s), relecture`
           );
           await syncStandings();
         }
