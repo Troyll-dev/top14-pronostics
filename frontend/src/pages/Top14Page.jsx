@@ -30,21 +30,38 @@ function StateChip({ state }) {
 /**
  * La variation de rang, telle que la LNR l'affiche : une flèche, pas un chiffre.
  *
- * La source peut renvoyer un nombre (1, -2), une chaîne signée (« +1 ») ou rien
- * du tout à la première journée, où personne n'a encore bougé. On normalise, et
- * on n'affiche strictement rien quand il n'y a rien à dire : une flèche neutre
- * sur quatorze lignes ne fait que du bruit.
+ * Le champ arrive en mots — « up », « down », « same » — et non en nombre. La
+ * première version de ce composant faisait `Number(value)` : sur « up » ça donne
+ * NaN, et la flèche ne s'affichait jamais. On accepte donc les deux formes, les
+ * mots comme les nombres signés, au cas où la source change d'avis.
+ *
+ * Rien ne s'affiche quand rien n'a bougé : une flèche neutre sur quatorze lignes
+ * ne fait que du bruit.
  */
 function Variation({ value }) {
-  const n = Number(value);
-  if (!Number.isFinite(n) || n === 0) return null;
-  const monte = n > 0;
+  const mot = String(value ?? '').trim().toLowerCase();
+  const n = Number(mot);
+
+  const sens = Number.isFinite(n) && mot !== ''
+    ? (n > 0 ? 1 : n < 0 ? -1 : 0)
+    : ['up', 'hausse', 'monte', 'plus'].includes(mot) ? 1
+    : ['down', 'baisse', 'descend', 'moins'].includes(mot) ? -1
+    : 0;
+
+  if (sens === 0) return null;
+
+  // Le nombre de places n'est connu que si la source l'a donné en chiffres.
+  const places = Number.isFinite(n) && n !== 0 ? Math.abs(n) : null;
+  const titre = places
+    ? `${sens > 0 ? 'Gagne' : 'Perd'} ${places} place${places > 1 ? 's' : ''}`
+    : sens > 0 ? 'En progression' : 'En recul';
+
   return (
     <span
-      title={`${monte ? 'Gagne' : 'Perd'} ${Math.abs(n)} place${Math.abs(n) > 1 ? 's' : ''}`}
-      className={`ml-0.5 text-[9px] leading-none ${monte ? 'text-green-400' : 'text-red-400'}`}
+      title={titre}
+      className={`ml-0.5 text-[9px] leading-none ${sens > 0 ? 'text-green-400' : 'text-red-400'}`}
     >
-      {monte ? '▲' : '▼'}
+      {sens > 0 ? '▲' : '▼'}
     </span>
   );
 }
@@ -444,12 +461,19 @@ export default function Top14Page() {
                       </td>
                       {/* Le prochain match. Le lien va sur la feuille de match de
                           la LNR quand elle est connue ; sinon on se contente du
-                          texte, plutôt qu'un lien mort. */}
+                          texte, plutôt qu'un lien mort.
+
+                          La date arrive en francais et en clair (« 3 octobre »),
+                          pas en ISO : on l'affiche telle quelle. La premiere
+                          version la passait a `new Date()` puis a `format()`, qui
+                          leve une exception sur une date invalide — et une
+                          exception pendant l'affichage, ce n'est pas une colonne
+                          vide, c'est la page entiere en blanc. */}
                       <td className="py-2 pl-2 pr-1 hidden lg:table-cell whitespace-nowrap text-slate-400">
                         {!r.prochain ? (
                           <span className="text-slate-600">—</span>
                         ) : (
-                          <span title={r.prochain.date ? format(new Date(r.prochain.date), "EEEE d MMMM 'à' HH'h'mm", { locale: fr }) : ''}>
+                          <span title={r.prochain.date ? `Le ${r.prochain.date}` : ''}>
                             <span className="text-slate-600 mr-1">{r.prochain.domicile ? 'reçoit' : 'à'}</span>
                             {r.prochain.url ? (
                               <a
