@@ -88,8 +88,21 @@ export default function RoundPredictionsPage() {
 
   useEffect(() => {
     api.get('/matches/rounds').then((res) => setRounds(res.data)).catch(console.error);
+
+    /**
+     * Cette page regarde en arrière : elle montre qui a vu juste. Elle s'ouvre
+     * donc sur la journée en cours ou la dernière jouée — `currentRound` — et
+     * non sur `round`, qui désigne la journée à pronostiquer.
+     *
+     * Elle lisait `round`. Sur une journée pas encore jouée il n'y a ni score ni
+     * point : le tableau s'ouvrait sur la seule journée où il n'a rien à
+     * montrer, quand il ne tombait pas sur « Aucun pronostic pour la journée 5 ».
+     *
+     * Le repli sur `round - 1` couvre le temps d'un déploiement, où le
+     * navigateur peut avoir la nouvelle page et le serveur l'ancienne réponse.
+     */
     api.get('/matches/next-round')
-      .then((res) => setCurrentRound(res.data.round))
+      .then((res) => setCurrentRound(res.data.currentRound ?? Math.max(1, res.data.round - 1)))
       .catch(() => setCurrentRound(1));
   }, []);
 
