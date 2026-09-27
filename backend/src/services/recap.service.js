@@ -24,12 +24,21 @@
 
 const { PrismaClient } = require('@prisma/client');
 const mailer = require('./mailer.service');
+const journal = require('./job-log.service');
 const { stats, classer, retenuAuClassement } = require('./ranking');
 
 const prisma = new PrismaClient();
 
 const KIND = 'RECAP_JOURNEE';
 const SEASON = process.env.SPORTSDB_SEASON || '2026-2027';
+
+/**
+ * Au-dela de combien de jours une sauvegarde manquante est une anomalie.
+ *
+ * Elles passent le samedi et le lundi : le plus grand intervalle normal est de
+ * cinq jours, du lundi au samedi. A huit, un tour a forcement ete manque.
+ */
+const SAUVEGARDE_SEUIL_JOURS = 8;
 
 const dateFr = new Intl.DateTimeFormat('fr-FR', {
   weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit',
@@ -195,7 +204,43 @@ async function prochaineJournee(now = new Date()) {
   return m || null;
 }
 
-function corps(moi, b, suivant, lien) {
+/**
+ * L'etat des sauvegardes, en une phrase.
+ *
+ * Ce que cette phrase affirme exactement : la derniere fois que la sauvegarde a
+ * ete acceptee par Brevo. Pas qu'elle est arrivee dans la boite — pour le
+ * savoir il faudrait interroger Brevo sur les messages delivres. C'est deja
+ * l'essentiel de la panne qu'on a eue : rien ne partait, et rien ne le disait.
+ *
+ * Trois etats, et le troisieme est le plus utile. Aucune trace : la tache n'a
+ * jamais rien enregistre. Une reussite recente : tout va bien. Un echec plus
+ * recent que la derniere reussite : la tache tourne mais elle rate, ce qui
+ * n'est pas du tout le meme probleme qu'une tache arretee.
+ */
+function etatSauvegarde(etat, now = new Date()) {
+  const jours = journal.joursDepuis(etat?.lastSuccessAt, now);
+
+  if (jours === null) {
+    return {
+      alerte: true,
+      texte: 'Aucune sauvegarde enregistrée à ce jour. À vérifier — ' +
+             'si le journal vient d\'être mis en place, la première trace arrivera samedi.',
+    };
+  }
+
+  const age = jours === 0 ? "aujourd'hui" : jours === 1 ? 'hier' : `il y a ${jours} jours`;
+  const rate =
+    etat.lastErrorAt && new Date(etat.lastErrorAt) > new Date(etat.lastSuccessAt)
+      ? ` Depuis, une tentative a échoué : ${etat.lastError}`
+      : '';
+
+  return {
+    alerte: jours > SAUVEGARDE_SEUIL_JOURS || !!rate,
+    texte: `Dernière sauvegarde : ${dateFr.format(new Date(etat.lastSuccessAt))} (${age}).${rate}`,
+  };
+}
+
+function corps(moi, b, suivant, lien, sauvegarde) {
   const vainq = b.vainqueurs;
   const titreVainqueur = !vainq.length
     ? `Journée ${b.round} : personne n'a marqué`
@@ -244,10 +289,29 @@ function corps(moi, b, suivant, lien) {
         `${dateFr.format(suivant.kickoff)}.`
       : '');
 
+  /**
+   * L'etat des sauvegardes ne part qu'a celui qui les recoit.
+   *
+   * Les quatre autres joueurs n'ont rien a faire de la sante d'une tache
+   * technique : pour eux ce serait du bruit dans un mail qui doit rester une
+   * lecture de plaisir, et un bruit qu'on apprend a sauter finit par masquer le
+   * reste. Le destinataire est donc identifie par `BACKUP_EMAIL_TO`, c'est-a-dire
+   * exactement celui a qui les sauvegardes sont envoyees.
+   */
+  const gardien = (process.env.BACKUP_EMAIL_TO || '').trim().toLowerCase();
+  const pourMoi = gardien && String(moi.email || '').trim().toLowerCase() === gardien;
+  const etat = pourMoi ? etatSauvegarde(sauvegarde) : null;
+
+  const pied =
+    `Tu reçois ce bilan chaque lundi matin, après la dernière rencontre de la journée. ` +
+    `Un seul par journée, jamais davantage.` +
+    (etat ? `<br><br>${etat.alerte ? '⚠ ' : ''}${etat.texte}` : '');
+
   const texte =
     `${titreVainqueur}\n\n` +
     `Toi : ${moi.journee} point(s) ce week-end, ${moi.rang}e au general.\n\n` +
     b.classement.map((l) => `${l.rang}. ${l.username}  +${l.journee} ce week-end, ${l.total} pts au total (${fleche(l.mouvement)})`).join('\n') +
+    (etat ? `\n\n${etat.alerte ? '/!\\ ' : ''}${etat.texte}` : '') +
     `\n\n${lien}\n`;
 
   return {
@@ -257,8 +321,7 @@ function corps(moi, b, suivant, lien) {
       intro,
       'Voir le classement',
       lien,
-      `Tu reçois ce bilan chaque lundi matin, après la dernière rencontre de la journée. ` +
-      `Un seul par journée, jamais davantage.`
+      pied
     ),
     text: texte,
   };
@@ -294,6 +357,11 @@ async function envoyerRecap({ dryRun = false, force = false, round = null } = {}
   const lien = `${(process.env.APP_URL || '').replace(/\/$/, '')}/classement`;
   const suivant = await prochaineJournee();
 
+  // Lu une fois pour tout le monde, meme si un seul destinataire le verra : une
+  // lecture de plus par joueur pour une information identique n'apporte rien.
+  const sauvegarde = await journal.dernier(journal.TACHES.SAUVEGARDE);
+  rapport.sauvegarde = etatSauvegarde(sauvegarde).texte;
+
   for (const moi of b.classement) {
     if (dryRun) {
       // La simulation rend le message reel, et pas seulement le calcul.
@@ -303,7 +371,7 @@ async function envoyerRecap({ dryRun = false, force = false, round = null } = {}
       // une fois le courriel parti. On rend donc la version texte de chaque
       // message — le HTML serait illisible dans un terminal, et les deux
       // portent le meme contenu.
-      const msg = corps(moi, b, suivant, lien);
+      const msg = corps(moi, b, suivant, lien, sauvegarde);
       rapport.envoyes.push(`${moi.username} (simulation)`);
       rapport.apercus = rapport.apercus || [];
       rapport.apercus.push({ pour: moi.username, sujet: msg.subject, texte: msg.text });
@@ -324,14 +392,21 @@ async function envoyerRecap({ dryRun = false, force = false, round = null } = {}
     }
 
     try {
-      await mailer.send({ to: moi.email, ...corps(moi, b, suivant, lien) });
+      await mailer.send({ to: moi.email, ...corps(moi, b, suivant, lien, sauvegarde) });
       rapport.envoyes.push(moi.username);
     } catch (err) {
       rapport.erreurs.push(`${moi.username} : ${err.message}`);
     }
   }
 
+  // Le bilan se journalise lui-meme : il est la tache dont la panne se
+  // remarquerait le plus tard, puisque personne n'attend un courriel qui n'est
+  // pas encore arrive.
+  if (!dryRun && rapport.envoyes.length) {
+    await journal.succes(journal.TACHES.BILAN, { round: cible, envoyes: rapport.envoyes.length });
+  }
+
   return rapport;
 }
 
-module.exports = { envoyerRecap, journeeAraconter, bilan, faitMarquant, KIND };
+module.exports = { envoyerRecap, journeeAraconter, bilan, faitMarquant, etatSauvegarde, KIND };

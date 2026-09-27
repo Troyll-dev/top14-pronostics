@@ -178,3 +178,30 @@ model Reminder {
   @@index([round])
   @@map("reminders")
 }
+
+/// Journal des taches automatiques : une ligne par tache, ecrasee a chaque
+/// passage.
+///
+/// Elle repond a une seule question — quand cette tache a-t-elle reussi pour la
+/// derniere fois ? — et cette question n'avait aucune reponse. Les sauvegardes
+/// n'ont rien envoye pendant des jours sans que rien ne le dise : l'envoi
+/// restait suspendu au lieu d'echouer, donc le `catch` ne se declenchait pas, et
+/// les journaux de la console disparaissent au redemarrage du conteneur.
+///
+/// Pas d'historique, volontairement. Ce qu'on veut savoir est l'etat present ;
+/// un historique qu'on ne consulte jamais est une table qui grossit pour rien.
+///
+/// `lastErrorAt` est conserve a cote de `lastSuccessAt` plutot qu'a la place :
+/// une tache qui tourne mais echoue et une tache qui ne tourne plus du tout sont
+/// deux pannes differentes, et la reponse n'est pas la meme.
+model JobRun {
+  id            Int       @id @default(autoincrement())
+  job           String    @unique           // "sauvegarde", "classement", ...
+  lastSuccessAt DateTime?
+  lastErrorAt   DateTime?
+  lastError     String?   @db.VarChar(500)
+  details       Json?                       // ce que la tache a fait : volumes, journee, taille
+  updatedAt     DateTime  @updatedAt
+
+  @@map("job_runs")
+}

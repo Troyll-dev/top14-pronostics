@@ -1,6 +1,7 @@
 const cron = require('node-cron');
 const { exportGzip } = require('../services/backup.service');
 const mailer = require('../services/mailer.service');
+const journal = require('../services/job-log.service');
 
 /**
  * Sauvegarde hebdomadaire envoyee par courriel.
@@ -62,6 +63,21 @@ async function envoyer(quand) {
   });
 
   console.log(`[sauvegarde] ${quand} : envoyee a ${process.env.BACKUP_EMAIL_TO} (${ko} ko)`);
+
+  /**
+   * On note le passage, et on le note ici — apres l'envoi.
+   *
+   * Ce que cette ligne affirme est donc exactement : « Brevo a accepte le
+   * message ». Ni plus : elle ne prouve pas que le courriel est arrive dans la
+   * boite. Ni moins : c'est precisement ce qui manquait pendant les jours ou
+   * rien ne partait sans que rien ne le dise.
+   *
+   * Le journal n'est pas attendu (`await` quand meme, mais il avale ses propres
+   * pannes) : une sauvegarde reussie ne doit pas etre declaree en echec parce
+   * que la ligne qui la raconte n'a pas pu s'ecrire.
+   */
+  await journal.succes(journal.TACHES.SAUVEGARDE, { quand, jour, ko, counts });
+
   return { ko, counts };
 }
 
@@ -88,6 +104,11 @@ function startBackupCron() {
           // `catch` ne se declenche que si quelque chose est leve. Le plafond
           // pose depuis dans `mailer.service` est ce qui rend cette ligne utile.
           console.error(`[sauvegarde] ECHEC (${quand}) :`, err.message);
+
+          // Et une trace qui survit au redemarrage, la ou la console ne survit
+          // a rien : le bilan du lundi lira cette ligne et dira que la derniere
+          // tentative a echoue, au lieu de laisser croire que tout va bien.
+          await journal.echec(journal.TACHES.SAUVEGARDE, err);
         }
       },
       { timezone: 'Europe/Paris' }
