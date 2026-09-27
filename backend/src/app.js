@@ -12,11 +12,13 @@ const messageRoutes = require('./routes/message.routes');
 const userRoutes = require('./routes/user.routes');
 const backupRoutes = require('./routes/backup.routes');
 const reminderRoutes = require('./routes/reminder.routes');
+const recapRoutes = require('./routes/recap.routes');
 
 const { startResultsCron } = require('./cron/results.cron');
 const { startBackupCron } = require('./cron/backup.cron');
 const { startReminderCron } = require('./cron/reminder.cron');
 const { startScheduleCron } = require('./cron/schedule.cron');
+const { startRecapCron } = require('./cron/recap.cron');
 
 const app = express();
 
@@ -43,6 +45,7 @@ app.use('/api/messages', messageRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/admin/backup', backupRoutes);
 app.use('/api/admin/reminders', reminderRoutes);
+app.use('/api/admin/recap', recapRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -53,11 +56,18 @@ const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`Serveur Top 14 Pronostics demarre sur http://localhost:${PORT}`);
 
-  // Taches automatiques : resultats et classement, sauvegarde, rappels
+  // Taches automatiques : resultats et classement, sauvegarde, rappels du
+  // vendredi, horaires et diffuseurs, bilan du lundi.
+  //
+  // Chacune annonce son activation dans les journaux au demarrage. C'est le
+  // moyen le plus simple de verifier qu'une tache est bien branchee : une ligne
+  // manquante au demarrage veut dire que l'appel a ete oublie ici, et c'est
+  // exactement ce qui nous a fait chercher les rappels du vendredi.
   startResultsCron();
   startBackupCron();
   startReminderCron();
   startScheduleCron();
+  startRecapCron();
 });
 
 module.exports = app;
