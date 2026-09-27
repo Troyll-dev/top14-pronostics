@@ -14,6 +14,32 @@ const axios = require('axios');
  * jour ou le compte est valide il suffit d'ajouter la cle : le code bascule
  * tout seul, Brevo etant essaye en premier.
  *
+ * ---------------------------------------------------------------------------
+ * AUCUN ENVOI NE PEUT PLUS RESTER SUSPENDU
+ *
+ * Le 27 septembre 2026, un envoi de test n'a jamais rendu la main : ni
+ * confirmation, ni erreur. Le transport SMTP n'avait aucun delai maximum, et
+ * quand la connexion au port 465 ne s'etablit pas, nodemailer attend
+ * indefiniment.
+ *
+ * C'est le pire mode de panne. Le cron de sauvegarde entoure bien son envoi
+ * d'un `try/catch` qui journalise l'echec — mais un `catch` ne se declenche que
+ * si quelque chose est leve. Une promesse qui ne se resout jamais ne leve rien :
+ * la sauvegarde du lundi se serait bloquee en silence, semaine apres semaine,
+ * et l'on ne l'aurait appris qu'en cherchant une sauvegarde qui n'existe pas.
+ *
+ * Deux garde-fous, a deux niveaux :
+ *
+ *   - le transport SMTP a desormais trois delais — connexion, salutation,
+ *     silence — donc il echoue de lui-meme au bout de vingt secondes ;
+ *   - et `send()` entier est plafonne, quel que soit le chemin emprunte. C'est
+ *     la ceinture en plus des bretelles : le jour ou l'on ajoutera un troisieme
+ *     fournisseur, il heritera de la garantie sans que personne y pense.
+ *
+ * La regle, une fois de plus : un echec bruyant vaut toujours mieux qu'un
+ * silence.
+ * ---------------------------------------------------------------------------
+ *
  * Variables communes :
  *   MAIL_FROM       l'adresse d'expedition
  *   MAIL_FROM_NAME  le nom affiche (defaut : Top 14 Pronos)
@@ -21,8 +47,31 @@ const axios = require('axios');
  *
  * Pour Gmail : SMTP_HOST=smtp.gmail.com, SMTP_PORT=465, SMTP_USER=ton adresse,
  * SMTP_PASS=un mot de passe d'application (pas ton mot de passe habituel).
+ *
+ * Si l'hebergeur bloque les connexions SMTP sortantes — beaucoup le font pour
+ * ne pas servir de relais a spam — aucun reglage de port n'y changera rien.
+ * C'est precisement le cas que le chemin Brevo couvre : il passe par HTTPS, que
+ * personne ne bloque. Une cle dans BREVO_API_KEY, et tout bascule sans toucher
+ * au code.
  */
 const BREVO_URL = 'https://api.brevo.com/v3/smtp/email';
+
+/**
+ * Les delais, en millisecondes.
+ *
+ * Vingt secondes pour une connexion SMTP, c'est large : un serveur en bonne
+ * sante repond en moins d'une seconde. Le but n'est pas d'etre rapide, c'est
+ * qu'il existe une fin.
+ *
+ * Le plafond global est plus haut que la somme des delais SMTP, pour qu'il ne
+ * se declenche que si le transport lui-meme a failli a sa promesse. S'il
+ * s'active, c'est qu'un chemin d'envoi ne respecte pas ses propres delais — et
+ * le message d'erreur le dit.
+ */
+const DELAI_CONNEXION_MS = 10000;
+const DELAI_SALUTATION_MS = 10000;
+const DELAI_SILENCE_MS = 20000;
+const PLAFOND_ENVOI_MS = Number(process.env.MAIL_TIMEOUT_MS || 45000);
 
 function config() {
   return {
@@ -165,28 +214,66 @@ function wrap(title, intro, buttonLabel, link, footer) {
 </body></html>`;
 }
 
+/**
+ * Brevo dit pourquoi il refuse — encore faut-il le lire.
+ *
+ * Axios resume toute reponse d'erreur par « Request failed with status code
+ * 401 », ce qui ne distingue pas une cle revoquee d'un compte non active, d'une
+ * restriction par adresse IP ou d'un expediteur non valide. Ces quatre pannes
+ * se reparent de quatre facons differentes.
+ *
+ * Le corps de la reponse, lui, porte un `code` et un `message` explicites. On
+ * les remonte donc dans l'erreur, avec le statut. Ca ne change rien au
+ * fonctionnement et tout au temps passe a comprendre.
+ */
+function erreurBrevo(err) {
+  const statut = err.response?.status;
+  const corps = err.response?.data;
+
+  if (!statut) {
+    // Ni reponse ni statut : on n'a jamais atteint Brevo.
+    return new Error(`Brevo injoignable : ${err.message}`);
+  }
+
+  const detail = corps?.message || (corps ? JSON.stringify(corps) : '(corps vide)');
+  const code = corps?.code ? ` [${corps.code}]` : '';
+
+  const piste =
+    statut === 401 ? ' — cle revoquee, remplacee, ou restreinte par adresse IP'
+    : statut === 403 ? ' — compte pas encore active par Brevo, ou expediteur non valide'
+    : statut === 400 ? ' — requete refusee : verifier l\'expediteur MAIL_FROM'
+    : '';
+
+  return new Error(`Brevo a repondu ${statut}${code} : ${detail}${piste}`);
+}
+
 async function sendViaBrevo(c, { to, subject, html, text, attachments }) {
-  await axios.post(
-    BREVO_URL,
-    {
-      sender: { name: c.fromName, email: c.from },
-      to: [{ email: to }],
-      subject,
-      htmlContent: html,
-      textContent: text,
-      // Brevo attend le contenu en base64 ; nodemailer veut un Buffer. On
-      // garde donc l'interface commune en Buffer et on convertit ici.
-      ...(attachments?.length
-        ? {
-            attachment: attachments.map((a) => ({
-              name: a.name,
-              content: Buffer.from(a.content).toString('base64'),
-            })),
-          }
-        : {}),
-    },
-    { headers: { 'api-key': c.brevoKey, 'content-type': 'application/json' }, timeout: 15000 }
-  );
+  const corps = {
+    sender: { name: c.fromName, email: c.from },
+    to: [{ email: to }],
+    subject,
+    htmlContent: html,
+    textContent: text,
+    // Brevo attend le contenu en base64 ; nodemailer veut un Buffer. On
+    // garde donc l'interface commune en Buffer et on convertit ici.
+    ...(attachments?.length
+      ? {
+          attachment: attachments.map((a) => ({
+            name: a.name,
+            content: Buffer.from(a.content).toString('base64'),
+          })),
+        }
+      : {}),
+  };
+
+  try {
+    await axios.post(BREVO_URL, corps, {
+      headers: { 'api-key': c.brevoKey, 'content-type': 'application/json' },
+      timeout: 15000,
+    });
+  } catch (err) {
+    throw erreurBrevo(err);
+  }
 }
 
 let transport = null;
@@ -207,16 +294,71 @@ async function sendViaSmtp(c, { to, subject, html, text, attachments }) {
       port: c.smtp.port,
       secure: c.smtp.port === 465,
       auth: { user: c.smtp.user, pass: c.smtp.pass },
+
+      // Les trois delais sans lesquels un envoi peut attendre pour toujours.
+      //
+      //   connectionTimeout : la connexion TCP ne s'ouvre pas — c'est le cas
+      //                       quand l'hebergeur bloque le port sortant, et
+      //                       c'est celui qu'on a rencontre ;
+      //   greetingTimeout   : elle s'ouvre mais le serveur ne se presente pas ;
+      //   socketTimeout     : elle est ouverte et plus rien ne circule.
+      //
+      // Les trois existent parce qu'ils decrivent trois pannes differentes, et
+      // que le message d'erreur de nodemailer nomme celui qui s'est declenche.
+      connectionTimeout: DELAI_CONNEXION_MS,
+      greetingTimeout: DELAI_SALUTATION_MS,
+      socketTimeout: DELAI_SILENCE_MS,
     });
   }
 
-  await transport.sendMail({
-    from: `"${c.fromName}" <${c.from}>`,
-    to, subject, html, text,
-    ...(attachments?.length
-      ? { attachments: attachments.map((a) => ({ filename: a.name, content: a.content })) }
-      : {}),
+  try {
+    await transport.sendMail({
+      from: `"${c.fromName}" <${c.from}>`,
+      to, subject, html, text,
+      ...(attachments?.length
+        ? { attachments: attachments.map((a) => ({ filename: a.name, content: a.content })) }
+        : {}),
+    });
+  } catch (err) {
+    // Un transport qui a echoue peut rester dans un etat inutilisable : on le
+    // jette pour que la tentative suivante reparte sur une connexion neuve.
+    transport = null;
+
+    // Le message brut de nodemailer ne dit pas ou chercher. Celui-ci, si.
+    const ou = `${c.smtp.host}:${c.smtp.port}`;
+    if (/timeout|ETIMEDOUT|ECONNREFUSED|ESOCKET/i.test(err.message)) {
+      throw new Error(
+        `SMTP injoignable sur ${ou} (${err.message}). ` +
+        `Si l'hebergeur bloque les connexions SMTP sortantes, aucun port n'y changera rien : ` +
+        `renseigner BREVO_API_KEY fait passer les envois par HTTPS.`
+      );
+    }
+    throw new Error(`Envoi SMTP refuse par ${ou} : ${err.message}`);
+  }
+}
+
+/**
+ * Le plafond global.
+ *
+ * `Promise.race` rend la main des que l'une des deux promesses aboutit. Si
+ * l'envoi met plus longtemps que le plafond, on leve — et l'appelant, qui a
+ * presque toujours un `try/catch`, peut enfin faire son travail.
+ *
+ * Le minuteur est annule dans tous les cas, sans quoi le processus resterait
+ * eveille jusqu'a son echeance apres chaque envoi reussi.
+ */
+function avecPlafond(promesse, ms, quoi) {
+  let minuteur;
+  const limite = new Promise((_, rejeter) => {
+    minuteur = setTimeout(
+      () => rejeter(new Error(
+        `${quoi} : aucune reponse au bout de ${Math.round(ms / 1000)} s, abandon. ` +
+        `Le chemin d'envoi n'a pas respecte ses propres delais.`
+      )),
+      ms
+    );
   });
+  return Promise.race([promesse, limite]).finally(() => clearTimeout(minuteur));
 }
 
 async function send(message) {
@@ -224,8 +366,8 @@ async function send(message) {
   const how = provider();
   if (!how) throw new Error('Envoi d e-mails non configure');
 
-  if (how === 'brevo') await sendViaBrevo(c, message);
-  else await sendViaSmtp(c, message);
+  const envoi = how === 'brevo' ? sendViaBrevo(c, message) : sendViaSmtp(c, message);
+  await avecPlafond(envoi, PLAFOND_ENVOI_MS, `Envoi ${how} vers ${message.to}`);
 
   console.log(`[mail] ${message.subject} -> ${message.to} (${how})`);
 }
