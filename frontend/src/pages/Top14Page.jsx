@@ -27,6 +27,28 @@ function StateChip({ state }) {
   );
 }
 
+/**
+ * La variation de rang, telle que la LNR l'affiche : une flèche, pas un chiffre.
+ *
+ * La source peut renvoyer un nombre (1, -2), une chaîne signée (« +1 ») ou rien
+ * du tout à la première journée, où personne n'a encore bougé. On normalise, et
+ * on n'affiche strictement rien quand il n'y a rien à dire : une flèche neutre
+ * sur quatorze lignes ne fait que du bruit.
+ */
+function Variation({ value }) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n === 0) return null;
+  const monte = n > 0;
+  return (
+    <span
+      title={`${monte ? 'Gagne' : 'Perd'} ${Math.abs(n)} place${Math.abs(n) > 1 ? 's' : ''}`}
+      className={`ml-0.5 text-[9px] leading-none ${monte ? 'text-green-400' : 'text-red-400'}`}
+    >
+      {monte ? '▲' : '▼'}
+    </span>
+  );
+}
+
 /** Pastille de la legende du classement, de la meme largeur que la barre du tableau. */
 function ZoneKey({ cls, children }) {
   return (
@@ -324,7 +346,27 @@ export default function Top14Page() {
             </div>
           )}
 
-          {/* Classement */}
+          {/*
+            Le classement, aux colonnes de la LNR.
+
+            L'ordre est le sien : rang, club, points, puis matchs joués, gagnés,
+            nuls, perdus, bonus, points marqués, encaissés, différence, état de
+            forme, prochain match. Les points arrivent juste après le club et non
+            tout à droite — c'est la seule colonne qu'on lit à tous les coups, et
+            la mettre en tête évite d'avoir à faire défiler le tableau pour la
+            voir sur un téléphone.
+
+            EM / EE / BO / BD ont disparu. La LNR ne publie pas les essais ni le
+            détail des bonus dans ce tableau : depuis qu'on prend son classement
+            tel quel, ces quatre colonnes n'affichaient plus que des tirets. Une
+            colonne vide n'est pas une information manquante, c'est du bruit — le
+            total « Bonus » de la LNR les remplace.
+
+            Les colonnes secondaires s'effacent par paliers plutôt que de forcer
+            un défilement horizontal : un tableau qu'il faut pousser du doigt
+            pour lire le classement est un tableau qu'on ne lit pas. Le reste
+            reste accessible en tournant le téléphone ou sur un écran plus large.
+          */}
           <h2 className="rule-label mb-3">Classement</h2>
           <div className="card overflow-x-auto">
             <table className="w-full border-separate border-spacing-0 text-xs">
@@ -332,17 +374,17 @@ export default function Top14Page() {
                 <tr className="font-display text-[10.5px] font-bold uppercase tracking-wider text-slate-500">
                   <th className="text-left pb-2.5 pl-1 pr-2">#</th>
                   <th className="text-left pb-2.5 pr-2">Club</th>
-                  <th className="pb-2.5 px-1.5">J</th>
-                  <th className="pb-2.5 px-1.5 hidden sm:table-cell">G</th>
-                  <th className="pb-2.5 px-1.5 hidden sm:table-cell">N</th>
-                  <th className="pb-2.5 px-1.5 hidden sm:table-cell">P</th>
-                  <th className="pb-2.5 px-1.5">Diff</th>
-                  <th className="pb-2.5 px-1.5 hidden md:table-cell" title="Essais marqués">EM</th>
-                  <th className="pb-2.5 px-1.5 hidden md:table-cell" title="Essais encaissés">EE</th>
-                  <th className="pb-2.5 px-1.5 hidden lg:table-cell" title="Bonus offensif">BO</th>
-                  <th className="pb-2.5 px-1.5 hidden lg:table-cell" title="Bonus défensif">BD</th>
-                  <th className="pb-2.5 px-1.5">Forme</th>
-                  <th className="pb-2.5 pl-2 pr-1 text-right">Pts</th>
+                  <th className="pb-2.5 px-1.5 text-right" title="Points de classement">Pts</th>
+                  <th className="pb-2.5 px-1.5" title="Matchs joués">M</th>
+                  <th className="pb-2.5 px-1.5 hidden sm:table-cell" title="Gagnés">G</th>
+                  <th className="pb-2.5 px-1.5 hidden sm:table-cell" title="Nuls">N</th>
+                  <th className="pb-2.5 px-1.5 hidden sm:table-cell" title="Perdus">P</th>
+                  <th className="pb-2.5 px-1.5 hidden md:table-cell" title="Points de bonus">Bonus</th>
+                  <th className="pb-2.5 px-1.5 hidden lg:table-cell" title="Points marqués">Pts M.</th>
+                  <th className="pb-2.5 px-1.5 hidden lg:table-cell" title="Points encaissés">Pts E.</th>
+                  <th className="pb-2.5 px-1.5" title="Différence de points">Diff</th>
+                  <th className="pb-2.5 px-1.5 hidden sm:table-cell" title="État de forme">Forme</th>
+                  <th className="text-left pb-2.5 pl-2 pr-1 hidden lg:table-cell" title="Prochaine rencontre">Prochain</th>
                 </tr>
               </thead>
               <tbody>
@@ -353,10 +395,19 @@ export default function Top14Page() {
                     : r.rank <= 6 ? 'border-l-[7px] border-l-blue-400'
                     : r.rank >= 14 ? 'border-l-[7px] border-l-red-400'
                     : 'border-l-[7px] border-l-transparent';
+
+                  // L'état de forme officiel de la LNR (V / N / D, du plus ancien
+                  // au plus récent). S'il manque, on retombe sur le nôtre, calculé
+                  // depuis nos propres résultats : les deux disent la même chose.
+                  const forme =
+                    (r.formeLnr && r.formeLnr.length ? r.formeLnr : null) ||
+                    (r.form?.recent || []).map((x) => x.res);
+
                   return (
                     <tr key={r.shortName} className="border-t border-slate-800">
-                      <td className={`py-2 pl-2 pr-2 font-display font-bold text-slate-500 tabular-nums ${zone}`}>
+                      <td className={`py-2 pl-2 pr-2 font-display font-bold text-slate-500 tabular-nums whitespace-nowrap ${zone}`}>
                         {r.rank}
+                        <Variation value={r.variation} />
                       </td>
                       <td className="py-2 pr-2">
                         <div className="flex items-center gap-2 whitespace-nowrap">
@@ -364,22 +415,56 @@ export default function Top14Page() {
                           <span className="font-display font-bold truncate">{r.name}</span>
                         </div>
                       </td>
+                      <td className="py-2 px-1.5 text-right font-display text-[15px] font-extrabold tabular-nums">
+                        {r.points}
+                      </td>
                       <td className="py-2 px-1.5 text-center tabular-nums text-slate-400">{r.played}</td>
                       <td className="py-2 px-1.5 text-center tabular-nums text-slate-400 hidden sm:table-cell">{r.won}</td>
                       <td className="py-2 px-1.5 text-center tabular-nums text-slate-400 hidden sm:table-cell">{r.drawn}</td>
                       <td className="py-2 px-1.5 text-center tabular-nums text-slate-400 hidden sm:table-cell">{r.lost}</td>
+                      <td className="py-2 px-1.5 text-center tabular-nums text-amber-500 hidden md:table-cell">
+                        {r.bonus ?? 0}
+                      </td>
+                      <td className="py-2 px-1.5 text-center tabular-nums text-slate-400 hidden lg:table-cell">{r.pointsFor}</td>
+                      <td className="py-2 px-1.5 text-center tabular-nums text-slate-500 hidden lg:table-cell">{r.pointsAgainst}</td>
                       <td className={`py-2 px-1.5 text-center tabular-nums font-medium ${r.diff > 0 ? 'text-green-400' : r.diff < 0 ? 'text-slate-500' : 'text-slate-400'}`}>
                         {r.diff > 0 ? '+' : ''}{r.diff}
                       </td>
-                      <td className="py-2 px-1.5 text-center tabular-nums text-slate-400 hidden md:table-cell">{r.triesFor ?? '—'}</td>
-                      <td className="py-2 px-1.5 text-center tabular-nums text-slate-500 hidden md:table-cell">{r.triesAgainst ?? '—'}</td>
-                      <td className="py-2 px-1.5 text-center tabular-nums text-amber-500 hidden lg:table-cell">{r.bonusOff}</td>
-                      <td className="py-2 px-1.5 text-center tabular-nums text-blue-400 hidden lg:table-cell">{r.bonusDef}</td>
-                      <td className="py-2 px-1.5 text-center" title={r.form?.weather?.label || ''}>
-                        <span className="text-base leading-none">{r.form?.weather?.icon || '—'}</span>
+                      <td className="py-2 px-1.5 hidden sm:table-cell">
+                        {forme.length === 0 ? (
+                          <span className="text-slate-600">—</span>
+                        ) : (
+                          <span
+                            className="flex gap-1 justify-center"
+                            title={r.form?.weather?.label || 'Du plus ancien au plus récent'}
+                          >
+                            {forme.slice(-5).map((res, i) => <ResultDot key={i} res={res} />)}
+                          </span>
+                        )}
                       </td>
-                      <td className="py-2 pl-2 pr-1 text-right font-display text-[15px] font-extrabold tabular-nums">
-                        {r.points}
+                      {/* Le prochain match. Le lien va sur la feuille de match de
+                          la LNR quand elle est connue ; sinon on se contente du
+                          texte, plutôt qu'un lien mort. */}
+                      <td className="py-2 pl-2 pr-1 hidden lg:table-cell whitespace-nowrap text-slate-400">
+                        {!r.prochain ? (
+                          <span className="text-slate-600">—</span>
+                        ) : (
+                          <span title={r.prochain.date ? format(new Date(r.prochain.date), "EEEE d MMMM 'à' HH'h'mm", { locale: fr }) : ''}>
+                            <span className="text-slate-600 mr-1">{r.prochain.domicile ? 'reçoit' : 'à'}</span>
+                            {r.prochain.url ? (
+                              <a
+                                href={r.prochain.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="hover:text-amber-500 transition-colors"
+                              >
+                                {r.prochain.adversaire}
+                              </a>
+                            ) : (
+                              r.prochain.adversaire
+                            )}
+                          </span>
+                        )}
                       </td>
                     </tr>
                   );
@@ -392,7 +477,7 @@ export default function Top14Page() {
             <ZoneKey cls="bg-green-500">Demi-finales</ZoneKey>
             <ZoneKey cls="bg-blue-400">Barrages</ZoneKey>
             <ZoneKey cls="bg-red-400">Relégation</ZoneKey>
-            <span>EM / EE : essais marqués et encaissés · BO / BD : bonus offensif et défensif</span>
+            <span>M : matchs joués · Pts M. / Pts E. : points marqués et encaissés · Forme : les cinq derniers, du plus ancien au plus récent</span>
           </div>
         </>
       )}
@@ -400,29 +485,12 @@ export default function Top14Page() {
       {/* Les résultats viennent directement sous le classement */}
       {matchesSection}
 
-      {/* Cinq derniers résultats */}
-      {!loading && table.length > 0 && (
-        <>
-          <h2 className="rule-label mt-8 mb-3">Les cinq derniers matchs de chaque club</h2>
-          <div className="card">
-            <div className="grid gap-2 sm:grid-cols-2">
-              {table.map((r) => (
-                <div key={r.shortName} className="flex items-center gap-2.5 py-1.5">
-                  <TeamCrest team={r} size={18} />
-                  <span className="text-[13px] truncate">{r.name}</span>
-                  <span className="ml-auto flex gap-1 shrink-0">
-                    {(r.form?.recent || []).length === 0 ? (
-                      <span className="text-slate-600 text-[11.5px]">pas encore joué</span>
-                    ) : (
-                      [...r.form.recent].reverse().map((x, i) => <ResultDot key={i} res={x.res} />)
-                    )}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </>
-      )}
+      {/*
+        Le bloc « les cinq derniers matchs de chaque club » a été retiré : la
+        colonne Forme du classement dit exactement la même chose, avec les mêmes
+        pastilles, sans faire défiler la page. C'était l'un des blocs que le
+        passage au classement officiel permettait de supprimer.
+      */}
 
       {data?.source && (
         <p className="text-[11px] italic text-slate-600 mt-5">
