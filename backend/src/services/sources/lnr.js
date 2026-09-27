@@ -5,13 +5,12 @@
  * venir » et TheSportsDB reste bloque sur des scores provisoires ; les deux
  * nous ont menti sur des journees entieres. La LNR, elle, fait autorite : c'est
  * elle qui homologue les resultats. Ses pages « calendrier et resultats » sont
- * rendues cote serveur, donc lisibles en une simple requete.
+ * rendues cote serveur, donc lisibles en une simple requete, contrairement a sa
+ * page classement qui est construite dans le navigateur.
  *
- * Correction. Ce commentaire affirmait que la page classement de la LNR, elle,
- * « est construite dans le navigateur ». C'etait faux, et n'avait jamais ete
- * verifiee — la page est rendue par le serveur comme les autres. L'affirmation a
- * servi de motif a tout un service de recalcul du classement. Voir
- * sources/lnr-classement.js.
+ * Bonus. La page affiche aussi les bonus offensif (Bo) et defensif (Bd) par
+ * match. C'est precieux : sans eux le classement serait faux de un a deux
+ * points par club, puisqu'un bonus vaut un point.
  *
  * Horaire et diffuseur. Chaque rencontre porte aussi son heure de coup d'envoi
  * et la ou les chaines qui la diffusent :
@@ -32,16 +31,15 @@
  *
  *   calendar-results__line
  *     club-line__name  -> club qui recoit
+ *     [club-special-icon--active : Bo|Bd]      <- bonus du club qui recoit
  *     match-line__score : "23 - 29"
+ *     [club-special-icon--active : Bo|Bd]      <- bonus du club visiteur
  *     club-line__name  -> club visiteur
  *     [match-line__broadcast-infos : heure + diffuseurs]
  *
- * Cette source lisait aussi les badges de bonus (Bo, Bd) affiches de part et
- * d'autre du score. Ils ne servaient qu'au recalcul du classement, lequel a ete
- * remplace par la lecture du tableau officiel — qui publie les bonus lui-meme.
- * La lecture des badges a donc ete retiree plutot que gardee « au cas ou » : une
- * donnee que personne ne lit n'est pas gratuite, elle donne juste l'impression
- * qu'elle sert.
+ * On n'utilise donc pas les noms de classes pour attribuer un bonus, mais la
+ * position du badge par rapport au score : avant, il est au recevant ; apres,
+ * au visiteur. C'est plus court a lire et ca resiste a un renommage de classe.
  */
 
 const axios = require('axios');
@@ -76,6 +74,7 @@ const RE_BLOCK = /class="calendar-results__line"/g;
 const RE_CLUB = /href="[^"]*\/club\/([a-z0-9-]+)"[^>]*>\s*([^<]+?)\s*<\/a>/g;
 const RE_SCORE = /match-line__score"[^>]*>\s*(\d+)\s*-\s*(\d+)\s*</;
 const RE_SHEET = /feuille-de-match\/[^/]+\/j(\d+)\/(\d+)-([a-z0-9-]+)/;
+const RE_BADGE = /club-special-icon--active'?"?>\s*(Bo|Bd)\s*</g;
 const RE_DATE = /calendar-results__fixture-date[^>]*>\s*([^<]+?)\s*</g;
 
 // « 14h30 », « 21h05 ». On tolere l'absence de minutes (« 21h »).
@@ -197,6 +196,15 @@ function analyserBloc({ html: bloc, jour }) {
   // Sans score chiffre, la rencontre n'est pas jouee : on la renvoie quand
   // meme, pour que l'appelant sache qu'elle existe et ne croie pas a un
   // analyseur casse.
+  const posScore = score ? score.index : bloc.length;
+
+  const bonus = { home: { o: false, d: false }, away: { o: false, d: false } };
+  RE_BADGE.lastIndex = 0;
+  while ((m = RE_BADGE.exec(bloc))) {
+    const cote = m.index < posScore ? bonus.home : bonus.away;
+    if (m[1] === 'Bo') cote.o = true;
+    else cote.d = true;
+  }
 
   const [dom, ext] = clubs;
 
@@ -240,12 +248,6 @@ function analyserBloc({ html: bloc, jour }) {
     kickoff,
     diffuseurs,
     final,
-    // Le chemin de la feuille de match, tel que la page l'ecrit. C'est la porte
-    // d'entree des compositions, et on le releve plutot que de le reconstruire :
-    // « 11840-perpignan-bordeaux-begles » melange un identifiant et deux slugs
-    // dont l'un contient un tiret, ce qui fait une regle a trois exceptions la
-    // ou il suffit de suivre le lien.
-    sheet: sheet ? sheet[0] : null,
     round: sheet ? Number(sheet[1]) : null,
     matchId: sheet ? Number(sheet[2]) : null,
     homeSlug: dom.slug,
@@ -255,6 +257,7 @@ function analyserBloc({ html: bloc, jour }) {
     homeScore: score ? Number(score[1]) : null,
     awayScore: score ? Number(score[2]) : null,
     played: !!score,
+    bonus,
     source: 'lnr',
   };
 }
@@ -318,8 +321,8 @@ function normalize(x) {
     kickoff: x.kickoff || null,
     broadcaster: x.diffuseurs && x.diffuseurs.length ? x.diffuseurs.join(' / ') : null,
     round: x.round,
+    bonus: x.bonus,
     jour: x.jour,
-    sheetPath: x.sheet || null,
   };
 }
 

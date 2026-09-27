@@ -73,10 +73,6 @@ model Match {
   awayScore    Int?                    // Score final équipe extérieure
   venue        String?
   broadcaster  String?
-  composition  Json?
-  compositionAt  DateTime?
-  stats          Json?
-  statsAt        DateTime?
   featured     Boolean       @default(false)
   predictions  Prediction[]
   updatedAt    DateTime      @updatedAt

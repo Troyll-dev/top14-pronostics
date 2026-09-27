@@ -5,5 +5,3 @@ build/
 .env.local
 *.log
 .DS_Store
-
-mdpgmailtop14.txt

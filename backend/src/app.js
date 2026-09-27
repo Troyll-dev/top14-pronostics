@@ -19,8 +19,6 @@ const { startBackupCron } = require('./cron/backup.cron');
 const { startReminderCron } = require('./cron/reminder.cron');
 const { startScheduleCron } = require('./cron/schedule.cron');
 const { startRecapCron } = require('./cron/recap.cron');
-const { startCompositionCron } = require('./cron/composition.cron');
-const { startStatsCron } = require('./cron/stats.cron');
 
 const app = express();
 
@@ -70,8 +68,6 @@ app.listen(PORT, () => {
   startReminderCron();
   startScheduleCron();
   startRecapCron();
-  startCompositionCron();
-  startStatsCron();
 });
 
 module.exports = app;

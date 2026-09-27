@@ -1,23 +1,171 @@
+const axios = require('axios');
 const lnr = require('./sources/lnr');
-const classement = require('./sources/lnr-classement');
+const { computeTable } = require('./standings-compute');
 const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
 
 const SEASON = process.env.SPORTSDB_SEASON || '2026-2027';
+const URL = process.env.STANDINGS_URL || 'https://www.allrugby.com/competitions/top-14/classement.html';
+
 /**
- * Un mot sur ce qui n'est plus la.
- *
- * Ce fichier a longtemps contenu un analyseur du tableau d'allrugby : une liste
- * des quatorze clubs avec leurs libelles, une table de vingt-quatre colonnes, et
- * de quoi retrouver une ligne de classement dans un HTML quelconque. Environ
- * cent quarante lignes.
- *
- * Il ne servait plus depuis qu'on avait cesse de lire allrugby, et il ne pouvait
- * plus servir du tout depuis qu'on lit le tableau officiel de la LNR. Il restait
- * la, exporte, teste par personne, et surtout : il donnait l'impression qu'un
- * second chemin existait. C'est la seule chose qu'il faisait encore.
+ * Libelles utilises par allrugby -> shortName dans notre base.
+ * Les libelles les plus longs passent en premier : "La Rochelle" doit etre
+ * reconnu avant "Rochelle", et "Racing 92" avant que le 92 ne soit pris
+ * pour une statistique.
  */
+const CLUBS = [
+  { label: 'Racing 92',   short: 'R92'  },
+  { label: 'La Rochelle', short: 'SR'   },
+  { label: 'Montpellier', short: 'MHR'  },
+  { label: 'Perpignan',   short: 'USAP' },
+  { label: 'Bordeaux',    short: 'UBB'  },
+  { label: 'Clermont',    short: 'ASM'  },
+  { label: 'Toulouse',    short: 'TLS'  },
+  { label: 'Castres',     short: 'CO'   },
+  { label: 'Bayonne',     short: 'AB'   },
+  { label: 'Vannes',      short: 'RCV'  },
+  { label: 'Toulon',      short: 'RCT'  },
+  { label: 'Paris',       short: 'SFP'  },
+  { label: 'Lyon',        short: 'LOU'  },
+  { label: 'Pau',         short: 'PAU'  },
+];
+
+/**
+ * Decalage de chaque statistique par rapport a la cellule du club.
+ * Releve sur la vraie page et verifie sur dix clubs : entre la difference
+ * (+6) et les points marques (+16) s'intercalent le pourcentage de victoires
+ * et un bloc de six cellules de forme, souvent vides.
+ * Une cellule vide vaut zero — c'est ce qui faisait echouer la version
+ * precedente, qui comptait les nombres au lieu des cellules.
+ */
+const COL = {
+  points: 1,
+  played: 2,
+  won: 3,
+  drawn: 4,
+  lost: 5,
+  diff: 6,
+  pointsFor: 16,
+  pointsAgainst: 17,
+  triesFor: 20,
+  triesAgainst: 21,
+  bonusOff: 22,
+  bonusDef: 23,
+};
+const LAST_COL = 23;
+
+// --- Lecture de la page -------------------------------------------------------
+
+/** Transforme le HTML en lignes de texte, les cellules separees par "|". */
+function toLines(html) {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<\/t[dh]>/gi, ' \u00a6 ')
+    .replace(/<\/tr>/gi, '\n')
+    .replace(/<br\s*\/?>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&[a-z]+;/gi, ' ')
+    .replace(/[ \t\u00a0]+/g, ' ')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
+}
+
+/** Valeur numerique d'une cellule ; vide ou non numerique vaut zero. */
+function cellValue(cell) {
+  if (cell === undefined) return 0;
+  const m = String(cell).match(/-?\d+(?:[.,]\d+)?/);
+  return m ? parseFloat(m[0].replace(',', '.')) : 0;
+}
+
+/**
+ * Extrait le classement general.
+ * Chaque club figure trois fois sur la page — general, domicile, exterieur.
+ * On retient la ligne ou le nombre de matchs joues est le plus eleve : le
+ * total general est toujours superieur a chacun de ses deux sous-totaux.
+ */
+function parseTable(html) {
+  const lines = toLines(String(html));
+  const rows = [];
+  const misses = [];
+
+  for (const club of CLUBS) {
+    let best = null;
+
+    lines.forEach((line, lineIndex) => {
+      const cells = line.split('\u00a6');
+      const clubIdx = cells.findIndex((c) => c.includes(club.label));
+      if (clubIdx === -1) return;
+      if (cells.length <= clubIdx + LAST_COL) return;
+
+      const played = cellValue(cells[clubIdx + COL.played]);
+      if (played <= 0) return;
+
+      if (!best || played > best.played) best = { cells, clubIdx, played, lineIndex };
+    });
+
+    if (!best) {
+      misses.push(club.label);
+      continue;
+    }
+
+    const at = (offset) => cellValue(best.cells[best.clubIdx + offset]);
+    rows.push({
+      label: club.label,
+      shortName: club.short,
+      lineIndex: best.lineIndex,
+      points: at(COL.points),
+      played: at(COL.played),
+      won: at(COL.won),
+      drawn: at(COL.drawn),
+      lost: at(COL.lost),
+      pointsFor: at(COL.pointsFor),
+      pointsAgainst: at(COL.pointsAgainst),
+      diff: at(COL.diff),
+      triesFor: at(COL.triesFor),
+      triesAgainst: at(COL.triesAgainst),
+      bonusOff: at(COL.bonusOff),
+      bonusDef: at(COL.bonusDef),
+      raw: best.cells.slice(best.clubIdx, best.clubIdx + LAST_COL + 1).map((c) => c.trim()),
+    });
+  }
+
+  // On respecte l'ordre d'affichage du site, qui applique les departages
+  // officiels ; les points ne servent que de filet.
+  rows.sort((a, b) => a.lineIndex - b.lineIndex || b.points - a.points);
+  rows.forEach((r, i) => { r.rank = i + 1; });
+
+  return { rows, misses };
+}
+
+// --- Rattachement aux equipes de la base --------------------------------------
+
+async function attachTeams(rows) {
+  const teams = await prisma.team.findMany();
+  const byShort = {};
+  for (const t of teams) byShort[t.shortName] = t;
+
+  // Castres peut etre stocke en CAO ou en CO selon que la base a ete alignee
+  const alias = { CO: ['CO', 'CAO'], CAO: ['CAO', 'CO'] };
+
+  const unmatched = [];
+  for (const r of rows) {
+    const candidates = alias[r.shortName] || [r.shortName];
+    const team = candidates.map((c) => byShort[c]).find(Boolean);
+    if (team) {
+      r.teamId = team.id;
+      r.name = team.name;
+      r.shortName = team.shortName;
+    } else {
+      unmatched.push(`${r.label} (${r.shortName})`);
+      r.name = r.label;
+    }
+  }
+  return unmatched;
+}
 
 // --- Forme des equipes, calculee sur nos propres matchs ------------------------
 
@@ -121,80 +269,35 @@ async function attachTeamsBySlug(rows) {
   return inconnus;
 }
 
-/**
- * Le classement, lu sur la page officielle de la LNR. Un seul chemin.
- *
- * Trois epoques, et la troisieme est la bonne.
- *
- * 1. On lisait un tableau tout fait sur allrugby. Il a cesse de fonctionner le
- *    19 septembre sans rien dire, et l'application a servi un instantane perime
- *    pendant quatre jours.
- *
- * 2. On a donc **recalcule** le classement a partir des resultats, en
- *    additionnant victoires, nuls et bonus. Le motif ecrit a l'epoque etait que
- *    la page classement de la LNR « est construite dans le navigateur ».
- *    C'etait faux, et jamais verifie.
- *
- * 3. Elle est rendue par le serveur. On lit donc le tableau **officiel**, celui
- *    qui fait autorite, avec ses points de penalisation eventuels et ses
- *    departages deja appliques — choses qu'aucun recalcul ne peut deviner.
- *
- * Le recalcul a ete supprime, et non garde en secours. C'est un choix, et il se
- * defend : un chemin de secours qui ne tourne jamais n'est pas teste, donc il ne
- * marche pas le jour ou l'on compte sur lui. Deux facons de produire un
- * classement, c'est aussi deux facons d'etre faux — et l'une des deux
- * silencieusement, puisqu'un classement recalcule ressemble en tout point a un
- * classement officiel.
- *
- * En echange, cette fonction **leve** quand la page est illisible, et n'ecrit
- * rien. Le tableau en base reste celui de la veille, et c'est la mesure de
- * fraicheur (voir plus bas) qui le signale : elle compare le nombre de
- * rencontres comptees au nombre de rencontres terminees, et dit « en retard de
- * sept matchs » des le lendemain. C'est ce garde-fou-la qui remplace le secours,
- * et lui, il tourne toutes les trois minutes.
- */
-
-/** La forme attendue par le reste de l'application, depuis le tableau officiel. */
-function depuisOfficiel(lignes) {
-  return lignes.map((l) => ({
-    slug: l.slug,
-    rank: l.rank,
-    played: l.played,
-    won: l.won,
-    drawn: l.drawn,
-    lost: l.lost,
-    pointsFor: l.pointsFor,
-    pointsAgainst: l.pointsAgainst,
-    diff: l.diff,
-    points: l.points,
-    bonus: l.bonus,
-    // La page donne le total des bonus, pas leur repartition offensif /
-    // defensif. On rend donc `null` plutot que zero : une case vide assumee vaut
-    // mieux qu'un zero qui se lit comme « aucun bonus offensif ».
-    bonusOff: null,
-    bonusDef: null,
-    triesFor: null,
-    triesAgainst: null,
-    // Nouveau, et gratuit : la LNR les publie dans le meme tableau.
-    variation: l.variation,
-    formeLnr: l.forme,
-    prochain: l.prochain,
-  }));
-}
-
 async function syncStandings({ dryRun = false } = {}) {
-  const report = { source: 'lnr-classement', season: SEASON, rounds: [], table: [], unmatched: [] };
+  const report = { source: 'lnr', season: SEASON, rounds: [], table: [], unmatched: [] };
 
-  // Pas de try/catch : si la page est illisible, l'erreur remonte et rien n'est
-  // ecrit. Le cron la journalise, le tableau de la veille reste servi, et la
-  // mesure de fraicheur annonce le retard. Avaler l'erreur ici serait refaire
-  // exactement la panne d'allrugby.
-  const officiel = await classement.fetchClassement({ season: SEASON });
+  // Jusqu'ou lire : la derniere journee dont au moins un match est termine chez
+  // nous. Inutile d'aller chercher des journees a venir, et cela evite de
+  // marteler le site de la LNR avec vingt-six requetes a chaque passage.
+  const joues = await prisma.match.findMany({
+    where: { season: SEASON, status: 'FINISHED' },
+    select: { round: true },
+  });
+  const derniere = joues.reduce((m, x) => Math.max(m, x.round || 0), 0);
+  if (!derniere) {
+    report.reason = 'aucun match termine en base : rien a classer';
+    return report;
+  }
 
-  const lignes = depuisOfficiel(officiel.lignes);
-  report.journeeAnnoncee = officiel.journeeAnnoncee;
-  report.journeesJouees = officiel.journeesJouees;
-  report.rounds = officiel.journeesJouees ? [officiel.journeesJouees] : [];
+  const matchs = [];
+  for (let r = 1; r <= derniere; r += 1) {
+    // fetchRound leve si la page ne rend pas ses sept rencontres. On laisse
+    // remonter : mieux vaut une erreur visible qu'un classement ampute d'une
+    // journee, qui aurait l'air juste et serait faux.
+    matchs.push(...(await lnr.fetchRound(r)));
+    report.rounds.push(r);
+  }
+
+  const lignes = computeTable(matchs);
+  if (lignes.length !== 14) {
+    throw new Error(`classement : ${lignes.length} clubs au lieu de 14 — rien n'a ete ecrit`);
+  }
 
   report.unmatched = await attachTeamsBySlug(lignes);
   report.table = lignes;
@@ -203,13 +306,11 @@ async function syncStandings({ dryRun = false } = {}) {
 
   await prisma.leagueTable.upsert({
     where: { season: SEASON },
-    update: { data: report.table, source: report.source, fetchedAt: new Date() },
-    create: { season: SEASON, data: report.table, source: report.source },
+    update: { data: report.table, source: 'lnr', fetchedAt: new Date() },
+    create: { season: SEASON, data: report.table, source: 'lnr' },
   });
 
-  console.log(
-    `[classement] officiel : 14 clubs enregistres, ${officiel.journeesJouees} journees`
-  );
+  console.log(`[classement] calcule sur J1-J${derniere}, 14 clubs enregistres`);
   return report;
 }
 
@@ -287,7 +388,4 @@ async function getStandings() {
   };
 }
 
-module.exports = {
-  syncStandings, getStandings, computeForm, weatherFor,
-  fraicheur, etatFraicheur, depuisOfficiel,
-};
+module.exports = { syncStandings, getStandings, computeForm, parseTable, weatherFor, fraicheur, etatFraicheur };
