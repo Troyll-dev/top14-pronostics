@@ -52,22 +52,116 @@ function isConfigured() {
   return provider() !== null;
 }
 
-/** Gabarit commun : sobre, lisible, sans image ni feuille de style externe. */
+/**
+ * Le gabarit commun, aux couleurs du site.
+ *
+ * Un courriel ne se construit pas comme une page. Trois contraintes decident de
+ * tout ce qui suit, et elles expliquent pourquoi ce code a l'air d'avoir vingt
+ * ans :
+ *
+ * 1. **Tableaux et styles en ligne.** Outlook sur Windows utilise le moteur de
+ *    rendu de Word : ni flexbox, ni grille, ni variables CSS, ni feuille de
+ *    style externe. Une mise en page qui tient partout se fait en `<table>`,
+ *    avec les styles ecrits sur chaque balise.
+ *
+ * 2. **Les images sont bloquees par defaut** dans la plupart des logiciels de
+ *    courrier, et l'on ne sait jamais si le destinataire les affichera. Le
+ *    message doit donc rester complet sans elles : le bandeau porte un texte de
+ *    remplacement, et aucune information ne vit uniquement dans une image.
+ *
+ * 3. **Pas de WebP.** Outlook et plusieurs clients ne le lisent pas. Le bandeau
+ *    est servi en JPEG, dans un fichier distinct de celui du site.
+ *
+ * Le filigrane du site n'est pas repris, et c'est un choix. Il faudrait une
+ * image de fond, que Outlook n'affiche qu'au prix de balises VML proprietaires
+ * — et un filigrane a vingt pour cent d'opacite qui se dessine chez les uns et
+ * pas chez les autres ne ressemble pas a un decor, mais a un defaut
+ * d'affichage.
+ *
+ * Les couleurs sont celles du theme creme : le papier, l'encre, le vert des
+ * boutons et l'ambre des accents. Elles sont ecrites en clair et non par des
+ * variables, pour la raison 1.
+ */
+
+// Le papier, l'encre et les accents du theme creme. En clair : un courriel n'a
+// pas de variables CSS, et de toute facon il n'a qu'un seul theme.
+const C = {
+  fond: '#f0ece0',       // le pourtour, plus soutenu que la carte
+  papier: '#fbf8ec',     // la carte
+  bord: '#e3dcc6',
+  encre: '#1c1917',
+  encreDouce: '#6b6357',
+  encrePale: '#9a9184',
+  vert: '#14532d',
+  ambre: '#b4863b',
+};
+
 function wrap(title, intro, buttonLabel, link, footer) {
+  const base = (process.env.APP_URL || '').replace(/\/$/, '');
+  const bandeau = base ? `${base}/pub-mail.jpg` : null;
+
   return `<!doctype html>
-<html lang="fr"><body style="margin:0;padding:24px;background:#f4f1ea;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1f2933">
-  <div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:12px;padding:28px;border:1px solid #e3ded2">
-    <p style="margin:0 0 4px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#8a7f6d">🏉 Top 14 Pronos</p>
-    <h1 style="margin:0 0 16px;font-size:20px;line-height:1.3">${title}</h1>
-    <p style="margin:0 0 20px;font-size:15px;line-height:1.6">${intro}</p>
-    <p style="margin:0 0 24px">
-      <a href="${link}" style="display:inline-block;background:#14532d;color:#f4f1ea;text-decoration:none;padding:12px 22px;border-radius:8px;font-weight:700;font-size:15px">${buttonLabel}</a>
-    </p>
-    <p style="margin:0 0 6px;font-size:13px;color:#6b7280;line-height:1.6">Si le bouton ne fonctionne pas, copie ce lien dans ton navigateur :</p>
-    <p style="margin:0 0 20px;font-size:12px;color:#6b7280;word-break:break-all">${link}</p>
-    <hr style="border:0;border-top:1px solid #e5e7eb;margin:20px 0">
-    <p style="margin:0;font-size:12px;color:#9ca3af;line-height:1.6">${footer}</p>
-  </div>
+<html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light only">
+<meta name="supported-color-schemes" content="light only">
+<title>${title}</title>
+</head>
+<body style="margin:0;padding:0;background:${C.fond};">
+  <!-- Texte d'apercu : ce que la boite de reception montre a cote de l'objet.
+       Masque dans le message lui-meme par une taille nulle. -->
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${title}</div>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${C.fond};">
+    <tr><td align="center" style="padding:24px 12px;">
+
+      <table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0"
+             style="width:560px;max-width:100%;background:${C.papier};border:1px solid ${C.bord};border-radius:14px;overflow:hidden;">
+
+        ${bandeau ? `
+        <tr><td style="padding:0;line-height:0;font-size:0;">
+          <a href="${link}" style="text-decoration:none;">
+            <!-- alt vide, et c'est voulu : le bandeau est purement decoratif.
+                 Un texte de remplacement s'affiche en toutes lettres quand les
+                 images sont bloquees — ce qui est le cas par defaut dans la
+                 plupart des logiciels de courrier — et l'on se retrouve avec une
+                 ligne de texte orpheline au-dessus du message. Rien a dire vaut
+                 mieux que dire le nom d'un pub. -->
+            <img src="${bandeau}" width="560" alt="" role="presentation"
+                 style="display:block;width:100%;max-width:560px;height:auto;border:0;outline:none;text-decoration:none;">
+          </a>
+        </td></tr>` : ''}
+
+        <tr><td style="padding:26px 30px 30px;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:${C.encre};">
+
+          <p style="margin:0 0 6px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:${C.ambre};font-weight:700;">🏉 Top 14 Pronos</p>
+          <h1 style="margin:0 0 18px;font-size:22px;line-height:1.25;font-weight:800;color:${C.encre};">${title}</h1>
+
+          <div style="margin:0 0 24px;font-size:15px;line-height:1.65;color:${C.encre};">${intro}</div>
+
+          <!-- Le bouton en tableau : c'est la seule forme qu'Outlook remplit
+               entierement. Un lien avec du remplissage y perd sa couleur de
+               fond sur les bords. -->
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 26px;">
+            <tr><td bgcolor="${C.vert}" style="border-radius:8px;">
+              <a href="${link}" style="display:inline-block;padding:13px 26px;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:15px;font-weight:700;color:#f7f4e9;text-decoration:none;border-radius:8px;">${buttonLabel}</a>
+            </td></tr>
+          </table>
+
+          <p style="margin:0 0 4px;font-size:12.5px;color:${C.encreDouce};line-height:1.6;">Si le bouton ne fonctionne pas, copie ce lien dans ton navigateur :</p>
+          <p style="margin:0 0 22px;font-size:12px;color:${C.encreDouce};word-break:break-all;">${link}</p>
+
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr><td style="border-top:1px solid ${C.bord};font-size:0;line-height:0;">&nbsp;</td></tr>
+          </table>
+
+          <p style="margin:18px 0 0;font-size:12px;color:${C.encrePale};line-height:1.65;">${footer}</p>
+
+        </td></tr>
+      </table>
+
+    </td></tr>
+  </table>
 </body></html>`;
 }
 
