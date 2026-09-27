@@ -135,12 +135,23 @@ function classer(lignes) {
     .map((l, i) => ({ ...l, rank: i + 1 }));
 }
 
-/** En clair, pour l'afficher quelque part un jour. */
-const CRITERES = [
-  'les points',
+/**
+ * Les criteres de **departage**, en clair, pour les afficher.
+ *
+ * Les points n'y figurent pas, et c'est tout l'objet de cette liste. Le tri
+ * complet commence par eux, mais un joueur qui lit « en cas d'egalite » a deja
+ * une egalite de points sous les yeux : lui annoncer que les points departagent
+ * ne repond pas a sa question, ca la lui repose.
+ *
+ * La liste decrit donc ce qui se passe **apres** les points, dans l'ordre ou
+ * `comparer` les applique. Le nom en dernier recours n'y est pas non plus : il
+ * ne sert jamais, et l'annoncer ferait croire qu'un classement peut dependre de
+ * l'alphabet.
+ */
+const DEPARTAGES = [
   'le plus de scores exacts',
   'le plus de pronostics à 5 points près',
   'la plus petite somme d\'écarts',
 ];
 
-module.exports = { ecart, stats, comparer, classer, CRITERES, DEPUIS, retenuAuClassement };
+module.exports = { ecart, stats, comparer, classer, DEPARTAGES, DEPUIS, retenuAuClassement };

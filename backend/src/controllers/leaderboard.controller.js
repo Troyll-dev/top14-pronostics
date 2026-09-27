@@ -1,5 +1,5 @@
 const { PrismaClient } = require('@prisma/client');
-const { stats, classer, retenuAuClassement, DEPUIS, CRITERES } = require('../services/ranking');
+const { stats, classer, retenuAuClassement, DEPUIS, DEPARTAGES } = require('../services/ranking');
 
 const prisma = new PrismaClient();
 
@@ -66,7 +66,7 @@ exports.getLeaderboard = async (req, res) => {
     // regle de son cote. Un tableau ne pouvait pas le porter — JSON ignore les
     // proprietes non indicees d'un tableau, et la valeur disparaissait
     // silencieusement a la serialisation.
-    res.json({ classement: classer(leaderboard), depuis: DEPUIS, criteres: CRITERES });
+    res.json({ classement: classer(leaderboard), depuis: DEPUIS, departages: DEPARTAGES });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erreur serveur' });

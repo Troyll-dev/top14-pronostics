@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { ecart, stats, comparer, classer, CRITERES, DEPUIS, retenuAuClassement } = require('../src/services/ranking');
+const { ecart, stats, comparer, classer, DEPARTAGES, DEPUIS, retenuAuClassement } = require('../src/services/ranking');
 
 /** Un pronostic note, tel qu'il sort de la base. */
 const P = (ph, pa, rh, ra, base, points = base, joker = false) => ({
@@ -80,8 +80,18 @@ test('une liste vide ne casse pas', () => {
   assert.deepEqual(classer([]), []);
 });
 
-test('les criteres sont enonces en clair, dans l\'ordre du tri', () => {
-  assert.equal(CRITERES.length, 4);
+/**
+ * La liste affichee decrit le departage, pas le tri complet.
+ *
+ * Les points n'y figurent pas : un joueur qui lit « en cas d'egalite » a deja
+ * une egalite de points sous les yeux, et la premiere version de cette liste
+ * les annoncait quand meme en tete — ce qui reposait la question au lieu d'y
+ * repondre.
+ */
+test('la liste affichee ne contient que le departage, sans les points', () => {
+  assert.equal(DEPARTAGES.length, 3, 'trois criteres apres les points');
+  assert.ok(!DEPARTAGES.some((c) => /^les points$/.test(c)), 'les points n\'y sont pas');
+  assert.ok(!DEPARTAGES.some((c) => /alphab|nom/i.test(c)), 'ni le nom, qui ne sert jamais');
 });
 
 /* ------------------------------------------------------------------------ */

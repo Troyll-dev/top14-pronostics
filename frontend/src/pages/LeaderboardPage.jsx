@@ -75,7 +75,7 @@ export default function LeaderboardPage() {
   // Le seuil et les critères viennent du serveur : c'est lui qui les applique,
   // et deux énoncés d'une même règle finissent toujours par diverger.
   const [depuis, setDepuis] = useState(null);
-  const [criteres, setCriteres] = useState([]);
+  const [departages, setDepartages] = useState([]);
   const [roundBoard, setRoundBoard] = useState([]);
   const [roundMatches, setRoundMatches] = useState([]);
   const [loadingRound, setLoadingRound] = useState(false);
@@ -89,7 +89,7 @@ export default function LeaderboardPage() {
         // forme, ou l'inverse.
         const d = res.data;
         setGeneral(Array.isArray(d) ? d : d.classement || []);
-        if (!Array.isArray(d)) { setDepuis(d.depuis ?? null); setCriteres(d.criteres || []); }
+        if (!Array.isArray(d)) { setDepuis(d.depuis ?? null); setDepartages(d.departages || []); }
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -273,11 +273,11 @@ export default function LeaderboardPage() {
             vient du serveur plutôt que d'être réécrite ici : c'est lui qui
             l'applique, et deux énoncés d'une même règle finissent toujours par
             diverger. */}
-        {criteres.length > 0 && (
+        {departages.length > 0 && (
           <div className="mt-5 pt-4 border-t border-slate-800">
-            <h4 className="rule-label mb-2.5">En cas d'égalité</h4>
+            <h4 className="rule-label mb-2.5">En cas d'égalité de points</h4>
             <ol className="text-[13px] text-slate-400 space-y-1 list-decimal list-inside marker:text-slate-600">
-              {criteres.map((c) => <li key={c}>{c}</li>)}
+              {departages.map((c) => <li key={c}>{c}</li>)}
             </ol>
             <p className="text-[12px] text-slate-500 mt-2.5 leading-relaxed">
               La somme des écarts additionne, sur chaque pronostic, l'erreur commise
