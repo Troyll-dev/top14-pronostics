@@ -295,7 +295,20 @@ async function envoyerRecap({ dryRun = false, force = false, round = null } = {}
   const suivant = await prochaineJournee();
 
   for (const moi of b.classement) {
-    if (dryRun) { rapport.envoyes.push(`${moi.username} (simulation)`); continue; }
+    if (dryRun) {
+      // La simulation rend le message reel, et pas seulement le calcul.
+      //
+      // Le rapport JSON dit ce que le service a trouve ; il ne dit pas ce que
+      // les gens vont lire. Or c'est la seule chose qu'on ne peut plus corriger
+      // une fois le courriel parti. On rend donc la version texte de chaque
+      // message — le HTML serait illisible dans un terminal, et les deux
+      // portent le meme contenu.
+      const msg = corps(moi, b, suivant, lien);
+      rapport.envoyes.push(`${moi.username} (simulation)`);
+      rapport.apercus = rapport.apercus || [];
+      rapport.apercus.push({ pour: moi.username, sujet: msg.subject, texte: msg.text });
+      continue;
+    }
 
     // Enregistre AVANT l'envoi : c'est la base qui garantit qu'un seul bilan
     // part par joueur et par journee, et non la regularite du planificateur.
