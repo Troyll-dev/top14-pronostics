@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
+import Avatar from '../components/Avatar';
 
 function MedalIcon({ rank }) {
   if (rank === 1) return <span className="text-2xl">🥇</span>;
@@ -25,16 +26,24 @@ function PlayerRow({ rank, player, points, stats, isMe }) {
         <MedalIcon rank={rank} />
       </div>
 
-      <div
-        className="w-10 h-10 rounded-full flex items-center justify-center font-display font-bold text-lg shrink-0"
-        style={{
-          backgroundColor: player.avatarColor,
-          color: '#fff',
-          boxShadow: '0 0 0 2px rgb(var(--a-500) / .45)',
-        }}
-      >
-        {player.username[0].toUpperCase()}
-      </div>
+      {/* La pastille de profil, par le composant partage.
+
+          Cette page dessinait la sienne : un rond de la couleur du joueur avec
+          la premiere lettre de son pseudo. Elle ne pouvait donc afficher ni les
+          photos, ni les initiales choisies, ni le lisere personnalise — trois
+          reglages que les joueurs peuvent modifier dans leur profil et qui
+          restaient sans effet ici. Ce n'etait pas une panne : la page ne
+          demandait tout simplement pas l'image.
+
+          L'initiale y etait aussi ecrite en blanc en dur, donc invisible des
+          qu'un joueur choisissait un fond clair. `Avatar` retient l'encre qui
+          contraste le mieux avec le fond, sombre ou claire.
+
+          Toute pastille de profil passe desormais par ce composant. Les points
+          de couleur de sept pixels — dans la carte d'un match, dans le tableau
+          de tous les pronos — sont autre chose : des reperes, pas des portraits.
+          Ils restent en l'etat. */}
+      <Avatar user={player} size={40} />
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
