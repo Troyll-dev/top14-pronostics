@@ -1,6 +1,7 @@
 const { PrismaClient } = require('@prisma/client');
 const { pointsFor } = require('../services/scoring');
 const { multiplicateur, afficheDeLaJournee, journeeCommencee } = require('../services/rules');
+const { forme } = require('../services/team-stats.service');
 
 const prisma = new PrismaClient();
 
@@ -32,7 +33,44 @@ exports.getMatches = async (req, res) => {
       orderBy: [{ round: 'asc' }, { kickoff: 'asc' }],
     });
 
-    res.json(matches);
+    // La forme des clubs accompagne les matchs d'une journee.
+    //
+    // Elle est attachee a chaque rencontre plutot que servie par un appel a part,
+    // pour que la carte de match n'ait rien de plus a demander : une requete de
+    // page, une reponse. Le cumul s'arrete a la journee **precedente**, sans quoi
+    // la page de la J5 annoncerait une forme qui contient deja la J5.
+    //
+    // Sans journee demandee, on ne calcule rien : le calendrier general n'affiche
+    // pas la forme, et une saison entiere multiplierait le travail par vingt-six
+    // pour rien.
+    let f = null;
+    if (round) {
+      try {
+        f = await forme({ season, avantRound: parseInt(round) });
+      } catch (err) {
+        // La forme est un agrement, pas la page : si elle echoue, les matchs
+        // partent quand meme. Une rubrique manquante vaut mieux qu'une page
+        // blanche.
+        console.error('[matches] forme indisponible :', err.message);
+      }
+    }
+
+    const avecForme = (m) =>
+      f ? { ...m, forme: { home: f[m.homeTeamId] || null, away: f[m.awayTeamId] || null } } : m;
+
+    // Les compositions ne partent que si l'on a demande une journee.
+    //
+    // Une composition, c'est quarante-six joueurs ; sur une journee c'est
+    // negligeable, sur une saison entiere ce serait la plus grosse part de la
+    // reponse — pour quelque chose que personne ne regarde, l'appel sans journee
+    // servant au calendrier general ou les quinze ne s'affichent pas.
+    // `compositionAt` reste dans les deux cas : il suffit a dire qu'une
+    // composition est annoncee.
+    res.json(
+      round
+        ? matches.map(avecForme)
+        : matches.map(({ composition, ...m }) => m)
+    );
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erreur serveur' });
