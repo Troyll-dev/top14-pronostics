@@ -24,6 +24,7 @@
 
 const { PrismaClient } = require('@prisma/client');
 const mailer = require('./mailer.service');
+const { stats, classer } = require('./ranking');
 
 const prisma = new PrismaClient();
 
@@ -93,34 +94,37 @@ async function bilan(round) {
   const parJoueur = new Map(users.map((u) => [u.id, []]));
   for (const p of pronos) if (parJoueur.has(p.userId)) parJoueur.get(p.userId).push(p);
 
-  const lignes = users.map((u) => {
-    const mes = parJoueur.get(u.id) || [];
-    return {
-      id: u.id,
-      username: u.username,
-      email: u.email,
-      journee: totalSur(mes, (p) => p.match.round === round),
-      total: totalSur(mes, () => true),
-      avant: totalSur(mes, (p) => p.match.round < round),
-      exacts: mes.filter((p) => p.match.round === round && (p.basePoints ?? p.points) === 3).length,
-    };
-  });
+  /**
+   * Le departage passe par `ranking`, la meme fonction que le site.
+   *
+   * C'est la seule facon de garantir que le mail et la page rendent le meme
+   * ordre. Mon premier jet triait ici par points puis par ordre alphabetique,
+   * alors que le site triait par points puis par scores exacts : sur la J3 de
+   * cette saison les deux regles donnaient le meme premier par coincidence, et
+   * la coincidence n'allait pas tenir.
+   *
+   * Chaque joueur est donc decrit deux fois — avec la journee et sans elle —
+   * et classe deux fois par la meme fonction. La difference des rangs donne les
+   * places gagnees et perdues, que la base ne garde nulle part.
+   */
+  const ligne = (u, pronos) => ({ id: u.id, username: u.username, email: u.email, ...stats(pronos) });
 
-  const rangs = (cle) => {
-    const tri = [...lignes].sort((a, b) => b[cle] - a[cle] || a.username.localeCompare(b.username));
-    return new Map(tri.map((l, i) => [l.id, i + 1]));
-  };
-  const rangApres = rangs('total');
-  const rangAvant = rangs('avant');
+  const apres = classer(users.map((u) => ligne(u, parJoueur.get(u.id) || [])));
+  const avant = classer(users.map((u) => ligne(u, (parJoueur.get(u.id) || []).filter((p) => p.match.round < round))));
 
-  for (const l of lignes) {
-    l.rang = rangApres.get(l.id);
-    // Un rang qui diminue est une progression : on inverse pour que le signe
-    // se lise comme on l'attend, « +1 » voulant dire une place gagnee.
-    l.mouvement = rangAvant.get(l.id) - l.rang;
-  }
+  const rangAvant = new Map(avant.map((l) => [l.id, l.rank]));
 
-  const classement = [...lignes].sort((a, b) => a.rang - b.rang);
+  const classement = apres.map((l) => ({
+    ...l,
+    rang: l.rank,
+    total: l.points,
+    journee: totalSur(parJoueur.get(l.id) || [], (p) => p.match.round === round),
+    // Un rang qui diminue est une progression : on inverse pour que le signe se
+    // lise comme on l'attend, « +1 » voulant dire une place gagnee.
+    mouvement: rangAvant.get(l.id) - l.rank,
+  }));
+
+  const lignes = classement;
   const meilleurs = [...lignes].sort((a, b) => b.journee - a.journee || a.username.localeCompare(b.username));
   const top = meilleurs[0]?.journee ?? 0;
   // Une egalite en tete se dit, elle ne se tranche pas en silence.

@@ -1,4 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
+const { stats, classer } = require('../services/ranking');
+
 const prisma = new PrismaClient();
 
 // GET /api/leaderboard — classement général
@@ -15,7 +17,9 @@ exports.getLeaderboard = async (req, res) => {
           select: {
             points: true, basePoints: true, joker: true,
             homeScorePred: true, awayScorePred: true,
-            match: { select: { status: true } },
+            // Les scores reels servent au quatrieme critere de departage, la
+            // somme des ecarts.
+            match: { select: { status: true, homeScore: true, awayScore: true } },
           },
         },
       },
@@ -23,17 +27,14 @@ exports.getLeaderboard = async (req, res) => {
 
     const leaderboard = users.map((u) => {
       const played = u.predictions.filter((p) => p.match.status === 'FINISHED');
-      const totalPoints = played.reduce((sum, p) => sum + (p.points || 0), 0);
 
-      // Les statistiques se comptent sur le bareme (`basePoints`), jamais sur
-      // le total : un score exact joue en joker vaut 6 points et ne serait plus
-      // reconnu comme un score exact si on testait `points === 3`.
-      //
-      // Le repli sur `points` couvre les pronostics d'avant l'introduction des
-      // multiplicateurs, dont `basePoints` est nul : a cette epoque les deux
-      // valeurs etaient egales, la lecture reste donc juste.
+      // Les quatre nombres du departage sont calcules par `ranking`, qui sert
+      // aussi au classement d'une journee et au bilan du lundi. C'est la seule
+      // facon de garantir que les trois rendent le meme ordre : le mail
+      // triait autrement que le site, et personne ne l'avait vu.
+      const s = stats(played);
+
       const base = (p) => (p.basePoints ?? p.points);
-      const exactScores = played.filter((p) => base(p) === 3).length;
       const correctWinners = played.filter((p) => base(p) !== null && base(p) > 0).length;
       const jokers = played.filter((p) => p.joker).length;
 
@@ -43,17 +44,20 @@ exports.getLeaderboard = async (req, res) => {
         avatarColor: u.avatarColor,
         initials: u.initials,
         avatarRing: u.avatarRing,
-        totalPoints,
+        totalPoints: s.points,
         played: played.length,
-        exactScores,
+        exactScores: s.exacts,
         correctWinners,
         jokers,
         accuracy: played.length ? Math.round((correctWinners / played.length) * 100) : 0,
+        // Ce que le tri consomme. `ecarts` est aussi renvoye : l'ecran peut
+        // vouloir expliquer une egalite, et il vaut mieux le lui donner que
+        // le laisser deviner.
+        ...s,
       };
     });
 
-    leaderboard.sort((a, b) => b.totalPoints - a.totalPoints || b.exactScores - a.exactScores);
-    res.json(leaderboard);
+    res.json(classer(leaderboard));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erreur serveur' });
@@ -69,26 +73,30 @@ exports.getRoundLeaderboard = async (req, res) => {
       where: { match: { round: parseInt(round), status: 'FINISHED' } },
       include: {
         user: { select: { id: true, username: true, avatarColor: true, initials: true, avatarRing: true } },
-        match: { select: { id: true, featured: true } },
+        match: { select: { id: true, featured: true, homeScore: true, awayScore: true } },
       },
     });
 
-    const byUser = {};
+    const parJoueur = new Map();
     for (const pred of predictions) {
-      if (!byUser[pred.userId]) {
-        byUser[pred.userId] = { ...pred.user, points: 0, exactScores: 0, correctWinners: 0, joker: null };
-      }
-      // Comme au general : le total se somme sur `points`, les statistiques se
-      // comptent sur le bareme.
-      const base = pred.basePoints ?? pred.points;
-      byUser[pred.userId].points += pred.points || 0;
-      if (base === 3) byUser[pred.userId].exactScores++;
-      if (base > 0) byUser[pred.userId].correctWinners++;
-      if (pred.joker) byUser[pred.userId].joker = pred.matchId;
+      if (!parJoueur.has(pred.userId)) parJoueur.set(pred.userId, { user: pred.user, pronos: [] });
+      parJoueur.get(pred.userId).pronos.push(pred);
     }
 
-    const ranking = Object.values(byUser).sort((a, b) => b.points - a.points);
-    res.json(ranking);
+    // Meme departage qu'au general, par la meme fonction.
+    const lignes = [...parJoueur.values()].map(({ user, pronos }) => {
+      const s = stats(pronos);
+      const base = (p) => (p.basePoints ?? p.points);
+      return {
+        ...user,
+        ...s,
+        exactScores: s.exacts,
+        correctWinners: pronos.filter((p) => base(p) > 0).length,
+        joker: pronos.find((p) => p.joker)?.matchId ?? null,
+      };
+    });
+
+    res.json(classer(lignes));
   } catch (err) {
     res.status(500).json({ error: 'Erreur serveur' });
   }
