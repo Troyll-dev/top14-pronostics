@@ -215,27 +215,32 @@ function analyserBloc({ html: bloc, jour }) {
   const diffuseurs = lireDiffuseurs(bloc);
 
   // Un score affiche pendant la rencontre n'est pas un score homologue : il
-  // faut donc un delai avant de dire « termine ».
+  // faut donc un delai avant de dire « termine ». Deux heures trente apres le
+  // coup d'envoi, une rencontre de rugby est finie — le meme seuil que celui
+  // de l'orchestrateur, pour que les deux ne se contredisent pas.
   //
-  // Ce delai se comptait a partir de minuit du jour du match, faute de mieux :
-  // la page ne donnait pas l'heure, et il fallait couvrir aussi bien un match
-  // de 14h30 qu'un match de 21h05, d'ou trente-six heures. C'etait large au
-  // point d'etre nuisible — les rencontres du samedi restaient « en cours »
-  // jusqu'au dimanche apres-midi, et les points des pronostics avec elles.
+  // Trois reponses possibles, et la troisieme est la plus importante :
   //
-  // L'heure exacte permet la vraie regle : deux heures trente apres le coup
-  // d'envoi, une rencontre de rugby est finie. Le meme seuil que celui de
-  // l'orchestrateur, pour que les deux ne se contredisent pas.
+  //   pas de score            -> false, la rencontre n'est pas jouee ;
+  //   score et heure connue   -> la regle des 2 h 30 ;
+  //   score mais pas d'heure  -> **null**, c'est-a-dire « je ne sais pas ».
   //
-  // Le calcul par le jour reste en secours, pour une page qui n'annoncerait
-  // pas l'heure.
+  // Ce dernier cas est celui d'une rencontre deja jouee : la page remplace
+  // alors l'heure par le score, et `match-line__time` disparait. Repondre
+  // `false` reviendrait a affirmer qu'elle n'est pas terminee, ce qui est
+  // faux — et surtout ce qui exclut la LNR de l'arbitrage, puisqu'une source
+  // qui se dit non definitive ne peut pas trancher. La source qui fait
+  // autorite se trouvait ainsi mise de cote au profit des deux autres,
+  // exactement l'inverse de ce qu'on voulait.
+  //
+  // `null` laisse l'orchestrateur decider a l'heure, avec le coup d'envoi
+  // enregistre en base — lequel est desormais l'horaire officiel.
   const FIN_MS = 2.5 * 3600 * 1000;
-  const fin = kickoff
-    ? kickoff.getTime() + FIN_MS
-    : jour
-    ? jour.getTime() + 36 * 3600 * 1000
+  const final = !score
+    ? false
+    : kickoff
+    ? Date.now() > kickoff.getTime() + FIN_MS
     : null;
-  const final = !score ? false : fin ? Date.now() > fin : null;
 
   return {
     jour,

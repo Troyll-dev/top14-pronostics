@@ -277,16 +277,24 @@ async function syncResults({ dryRun = false, rounds = null } = {}) {
         continue;
       }
 
-      if (verdict.conflict) {
-        report.conflicts.push(`J${match.round} ${ev.home}–${ev.away} : ${verdict.conflict}`);
-        console.warn(`[sync] desaccord ${ev.home}–${ev.away} : ${verdict.conflict}`);
-      }
-
       // Un match deja termine n'est jamais rouvert par un score provisoire.
       // Sans cette regle, une source figee sur un score de 60e minute — ou une
       // correction saisie a la main — serait ecrasee au passage suivant.
+      //
+      // Ce test passe AVANT le signalement des desaccords, et c'est tout
+      // l'objet du deplacement. Une rencontre homologuee reste relue pendant
+      // douze heures, et deux sources qui se contredisent sur un score qu'on
+      // n'ecrira de toute facon pas produisaient la meme ligne d'alerte toutes
+      // les trois minutes, des centaines de fois. Une alerte repetee sans fin
+      // n'est plus une alerte : on apprend a ne plus la lire, et on manquera
+      // celle qui compte.
       if (!verdict.final && match.status === 'FINISHED') {
         report.skipped++; continue;
+      }
+
+      if (verdict.conflict) {
+        report.conflicts.push(`J${match.round} ${ev.home}–${ev.away} : ${verdict.conflict}`);
+        console.warn(`[sync] desaccord ${ev.home}–${ev.away} : ${verdict.conflict}`);
       }
 
       const status = verdict.final ? 'FINISHED' : 'LIVE';

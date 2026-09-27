@@ -153,6 +153,32 @@ test('sans heure sur la page, le coup d\'envoi reste nul plutot que minuit', () 
 });
 
 /**
+ * Le cas d'une rencontre deja jouee : la page remplace l'heure par le score,
+ * donc `match-line__time` disparait.
+ *
+ * Il faut alors repondre `null` — « je ne sais pas » — et non `false`. Une
+ * source qui se declare non definitive est ecartee de l'arbitrage : repondre
+ * `false` revenait a mettre la LNR de cote au profit d'ESPN et de
+ * TheSportsDB, c'est-a-dire l'inverse de ce qu'on veut. C'est exactement ce
+ * qui s'est produit sur la J4 2026-2027, ou les deux autres sources se
+ * contredisaient pendant que la seule qui fasse autorite etait ignoree.
+ */
+test('score sans heure : l\'etat est inconnu, pas « pas termine »', () => {
+  const x = lnr.normalize(seul(page('samedi 19 septembre', [
+    rencontre({ dom: USAP, ext: UBB, score: '23 - 29' }),
+  ])));
+  assert.equal(x.final, null, 'false exclurait la LNR de l\'arbitrage');
+  assert.notEqual(x.final, false);
+});
+
+test('pas de score : la rencontre n\'est pas jouee, et on l\'affirme', () => {
+  const x = lnr.normalize(seul(page('samedi 26 septembre', [
+    rencontre({ dom: USAP, ext: UBB, heure: '14h30' }),
+  ])));
+  assert.equal(x.final, false, 'la, on sait : sans score il n\'y a rien de definitif');
+});
+
+/**
  * Le moment ou un score devient definitif. Deux heures trente apres le coup
  * d'envoi — la regle qui remplace les trente-six heures comptees depuis
  * minuit, lesquelles laissaient les matchs du samedi « en cours » jusqu'au
