@@ -13,6 +13,7 @@ const userRoutes = require('./routes/user.routes');
 const backupRoutes = require('./routes/backup.routes');
 const reminderRoutes = require('./routes/reminder.routes');
 const recapRoutes = require('./routes/recap.routes');
+const desinscriptionRoutes = require('./routes/desinscription.routes');
 
 const { startResultsCron } = require('./cron/results.cron');
 const { startBackupCron } = require('./cron/backup.cron');
@@ -49,6 +50,22 @@ app.use('/api/admin/backup', backupRoutes);
 app.use('/api/admin/reminders', reminderRoutes);
 app.use('/api/admin/recap', recapRoutes);
 
+/**
+ * La desinscription, seule route publique a rendre du HTML.
+ *
+ * Elle est ouverte a dessein : son lien arrive par courriel, chez quelqu'un qui
+ * ne se connecte plus et n'a peut-etre plus son mot de passe. Ce qui la protege
+ * n'est donc pas une authentification mais une signature — l'adresse porte
+ * l'identifiant du joueur et une empreinte calculee avec un secret du serveur,
+ * et une adresse trafiquee est refusee.
+ *
+ * Elle est aussi la seule a repondre autre chose que du JSON : c'est une page,
+ * avec un bouton, servie sans passer par le frontend. Ainsi elle continue de
+ * fonctionner meme si le site est indisponible — et un lien de desinscription
+ * qui ne repond pas est exactement ce qu'on ne veut pas.
+ */
+app.use('/api/desinscription', desinscriptionRoutes);
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -72,6 +89,17 @@ app.listen(PORT, () => {
   startRecapCron();
   startCompositionCron();
   startStatsCron();
+
+  // Les liens de desinscription ont besoin d'un secret pour etre signes et de
+  // l'adresse publique de l'API pour etre absolus. S'il en manque un, les
+  // courriels partent sans ces liens — ce qui se voit tres mal. On le dit donc
+  // ici, au demarrage, a cote des autres taches.
+  const { disponible } = require('./services/desinscription.service');
+  console.log(
+    disponible()
+      ? 'Liens de desinscription actifs'
+      : 'Liens de desinscription INACTIFS (il manque API_URL ou JWT_SECRET/UNSUBSCRIBE_SECRET)'
+  );
 });
 
 module.exports = app;

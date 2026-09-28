@@ -17,6 +17,25 @@ model User {
   initials     String?       @db.VarChar(3)   // pastille : "NBO" plutot que "N"
   avatarRing   String?       @db.VarChar(7)   // null = liseré d'accent, "none" = aucun, sinon #RRGGBB
   createdAt    DateTime      @default(now())
+
+  /// Ce que le joueur accepte de recevoir, et s'il joue encore.
+  ///
+  /// Les deux premiers sont vrais par defaut : on s'inscrit pour jouer, donc on
+  /// accepte d'etre prevenu. Ils se coupent depuis un lien au bas de chaque
+  /// courriel, sans connexion — quelqu'un qui ne revient plus ne se connectera
+  /// pas pour aller decocher une case, et c'est justement lui qu'il faut
+  /// pouvoir servir.
+  ///
+  /// `enPause` est plus large : plus aucun courriel, et le joueur sort du
+  /// classement et du jeu. Rien n'est efface pour autant — ses pronostics, ses
+  /// points et son compte restent, et il suffit de remettre ce champ a faux
+  /// pour que tout revienne. C'est la difference entre partir et effacer son
+  /// passage, et seule la premiere se fait en un clic.
+  mailRappels  Boolean       @default(true)    // le rappel du vendredi
+  mailBilan    Boolean       @default(true)    // le bilan du lundi
+  enPause      Boolean       @default(false)
+  pauseAt      DateTime?                       // quand, pour pouvoir le dire
+
   predictions  Prediction[]
   messages     Message[]
   avatar       UserAvatar?

@@ -145,7 +145,43 @@ const C = {
   ambre: '#b4863b',
 };
 
-function wrap(title, intro, buttonLabel, link, footer) {
+/**
+ * Les liens de reglage, tout en bas du message.
+ *
+ * Un envoi automatique doit dire comment le faire cesser, et le dire dans le
+ * message lui-meme : quelqu'un qui ne joue plus ne se connectera pas pour aller
+ * chercher un reglage. Ils sont volontairement discrets — plus petits et plus
+ * pales que le reste — parce qu'ils servent une fois et ne doivent pas
+ * concurrencer le contenu les autres fois.
+ *
+ * `liens` est une liste de { libelle, url }. Vide ou absente, rien ne s'affiche :
+ * c'est le cas quand le serveur n'a pas de quoi signer les adresses. Un pied de
+ * message sans lien vaut mieux qu'un lien qui ne marche pas.
+ */
+function piedLiens(liens) {
+  if (!Array.isArray(liens) || !liens.length) return '';
+  const morceaux = liens
+    .filter((l) => l && l.url && l.libelle)
+    .map(
+      (l) =>
+        `<a href="${l.url}" style="color:${C.encrePale};text-decoration:underline;">${l.libelle}</a>`
+    );
+  if (!morceaux.length) return '';
+  return `<p style="margin:10px 0 0;font-size:11.5px;color:${C.encrePale};line-height:1.7;">${morceaux.join(
+    ' &nbsp;·&nbsp; '
+  )}</p>`;
+}
+
+/** La meme chose pour la version texte du message. */
+function piedLiensTexte(liens) {
+  if (!Array.isArray(liens) || !liens.length) return '';
+  const lignes = liens
+    .filter((l) => l && l.url && l.libelle)
+    .map((l) => `${l.libelle} : ${l.url}`);
+  return lignes.length ? `\n\n--\n${lignes.join('\n')}\n` : '';
+}
+
+function wrap(title, intro, buttonLabel, link, footer, liens = []) {
   const base = (process.env.APP_URL || '').replace(/\/$/, '');
   const bandeau = base ? `${base}/pub-mail.jpg` : null;
 
@@ -205,6 +241,7 @@ function wrap(title, intro, buttonLabel, link, footer) {
           </table>
 
           <p style="margin:18px 0 0;font-size:12px;color:${C.encrePale};line-height:1.65;">${footer}</p>
+          ${piedLiens(liens)}
 
         </td></tr>
       </table>
@@ -389,4 +426,4 @@ async function sendPasswordReset(to, username, token) {
   });
 }
 
-module.exports = { isConfigured, provider, send, wrap, sendPasswordReset };
+module.exports = { isConfigured, provider, send, wrap, piedLiensTexte, sendPasswordReset };

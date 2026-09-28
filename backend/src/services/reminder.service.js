@@ -7,15 +7,18 @@
  * vendredi soir suffit a regler ca, et rend le jeu independant du fait que
  * chacun y songe de lui-meme.
  *
- * Trois precautions, parce qu'un rappel mal calibre agace plus qu'il n'aide :
+ * Quatre precautions, parce qu'un rappel mal calibre agace plus qu'il n'aide :
  *   - on n'ecrit qu'a ceux a qui il manque vraiment quelque chose ;
  *   - on n'ecrit qu'une fois par journee et par personne, garanti par la base
  *     et non par la bonne tenue du planificateur ;
- *   - on n'ecrit pas s'il n'y a pas de match dans les jours qui viennent.
+ *   - on n'ecrit pas s'il n'y a pas de match dans les jours qui viennent ;
+ *   - on n'ecrit pas a qui a demande qu'on cesse, et chaque message dit
+ *     comment le demander.
  */
 
 const { PrismaClient } = require('@prisma/client');
 const mailer = require('./mailer.service');
+const desinscription = require('./desinscription.service');
 
 const prisma = new PrismaClient();
 
@@ -44,14 +47,19 @@ async function prochaineJournee(now = new Date()) {
   return { round, matchs: matchs.filter((m) => m.round === round) };
 }
 
-function corps(username, round, manquants, lien) {
+function corps(user, round, manquants, lien) {
   const n = manquants.length;
   const liste = manquants
     .map((m) => `${m.homeTeam.shortName} – ${m.awayTeam.shortName} (${dateFr.format(m.kickoff)})`);
 
   const intro =
-    `Salut ${username}, il te manque <b>${n} prono${n > 1 ? 's' : ''}</b> pour la journée ${round}.` +
+    `Salut ${user.username}, il te manque <b>${n} prono${n > 1 ? 's' : ''}</b> pour la journée ${round}.` +
     `<br><br>` + liste.map((l) => `· ${l}`).join('<br>');
+
+  // Deux liens, et jamais trois : couper ce rappel-ci, ou tout arreter. Proposer
+  // en plus de couper le bilan du lundi depuis un message qui ne le concerne pas
+  // ne ferait qu'embrouiller.
+  const liens = desinscription.liensPour(user.id, 'rappels');
 
   return {
     subject: `J${round} : il te manque ${n} prono${n > 1 ? 's' : ''}`,
@@ -61,12 +69,14 @@ function corps(username, round, manquants, lien) {
       'Poser mes pronos',
       lien,
       `Tu reçois ce message parce qu'il te manque des pronostics avant le coup d'envoi. ` +
-      `Un seul rappel par journée, jamais davantage.`
+      `Un seul rappel par journée, jamais davantage.`,
+      liens
     ),
     text:
-      `Salut ${username}, il te manque ${n} prono${n > 1 ? 's' : ''} pour la journee ${round}.\n\n` +
+      `Salut ${user.username}, il te manque ${n} prono${n > 1 ? 's' : ''} pour la journee ${round}.\n\n` +
       liste.map((l) => `- ${l}`).join('\n') +
-      `\n\n${lien}\n`,
+      `\n\n${lien}\n` +
+      mailer.piedLiensTexte(liens),
   };
 }
 
@@ -93,7 +103,18 @@ async function envoyerRappels({ dryRun = false, force = false } = {}) {
   const lien = `${(process.env.APP_URL || '').replace(/\/$/, '')}/pronostics`;
   const idsMatchs = journee.matchs.map((m) => m.id);
 
-  const users = await prisma.user.findMany({ orderBy: { id: 'asc' } });
+  /**
+   * Le filtre est pose dans la requete, pas dans la boucle.
+   *
+   * Ainsi un joueur en pause ou desinscrit n'apparait meme pas dans les
+   * candidats : il ne risque donc pas d'etre compte quelque part, ni de laisser
+   * une ligne dans le rapport qui ferait croire qu'on a failli lui ecrire. Ce
+   * qu'on ne veut pas faire, autant ne pas le preparer.
+   */
+  const users = await prisma.user.findMany({
+    where: { enPause: false, mailRappels: true },
+    orderBy: { id: 'asc' },
+  });
 
   for (const u of users) {
     const posees = await prisma.prediction.findMany({
@@ -126,7 +147,7 @@ async function envoyerRappels({ dryRun = false, force = false } = {}) {
     }
 
     try {
-      const msg = corps(u.username, journee.round, manquants, lien);
+      const msg = corps(u, journee.round, manquants, lien);
       await mailer.send({ to: u.email, ...msg });
       rapport.envoyes.push(u.username);
     } catch (err) {

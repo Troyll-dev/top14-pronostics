@@ -25,6 +25,7 @@
 const { PrismaClient } = require('@prisma/client');
 const mailer = require('./mailer.service');
 const journal = require('./job-log.service');
+const desinscription = require('./desinscription.service');
 const { stats, classer, retenuAuClassement } = require('./ranking');
 
 const prisma = new PrismaClient();
@@ -90,7 +91,18 @@ function totalSur(pronos, filtre) {
  * deduire autrement, puisque la base ne garde aucun historique du classement.
  */
 async function bilan(round) {
-  const users = await prisma.user.findMany({ orderBy: { id: 'asc' } });
+  /**
+   * Les joueurs en pause ne figurent pas au bilan.
+   *
+   * Ni dans le tableau, ni parmi les destinataires, et c'est la meme decision :
+   * quelqu'un qui a dit ne plus jouer n'a pas a occuper une ligne du classement
+   * de la semaine. Ses pronostics et ses points restent en base, intacts ; il
+   * suffit qu'il reprenne pour qu'ils reviennent.
+   */
+  const users = await prisma.user.findMany({
+    where: { enPause: false },
+    orderBy: { id: 'asc' },
+  });
 
   const pronos = await prisma.prediction.findMany({
     where: { match: { season: SEASON, status: 'FINISHED' } },
@@ -120,7 +132,7 @@ async function bilan(round) {
   // au cumul. Sans cela le mail annoncerait un total et un rang que la page
   // contredirait.
   const ligne = (u, pronos) => ({
-    id: u.id, username: u.username, email: u.email,
+    id: u.id, username: u.username, email: u.email, mailBilan: u.mailBilan,
     ...stats(pronos.filter(retenuAuClassement)),
   });
 
@@ -307,12 +319,16 @@ function corps(moi, b, suivant, lien, sauvegarde) {
     `Un seul par journée, jamais davantage.` +
     (etat ? `<br><br>${etat.alerte ? '⚠ ' : ''}${etat.texte}` : '');
 
+  // Deux liens seulement : couper ce bilan-ci, ou tout arreter.
+  const liens = desinscription.liensPour(moi.id, 'bilan');
+
   const texte =
     `${titreVainqueur}\n\n` +
     `Toi : ${moi.journee} point(s) ce week-end, ${moi.rang}e au general.\n\n` +
     b.classement.map((l) => `${l.rang}. ${l.username}  +${l.journee} ce week-end, ${l.total} pts au total (${fleche(l.mouvement)})`).join('\n') +
     (etat ? `\n\n${etat.alerte ? '/!\\ ' : ''}${etat.texte}` : '') +
-    `\n\n${lien}\n`;
+    `\n\n${lien}\n` +
+    mailer.piedLiensTexte(liens);
 
   return {
     subject: `J${b.round} — ${titreVainqueur}`,
@@ -321,7 +337,8 @@ function corps(moi, b, suivant, lien, sauvegarde) {
       intro,
       'Voir le classement',
       lien,
-      pied
+      pied,
+      liens
     ),
     text: texte,
   };
@@ -363,6 +380,13 @@ async function envoyerRecap({ dryRun = false, force = false, round = null } = {}
   rapport.sauvegarde = etatSauvegarde(sauvegarde).texte;
 
   for (const moi of b.classement) {
+    // Celui qui a coupe le bilan ne le recoit pas, mais reste au tableau : il
+    // joue toujours, il a seulement demande qu'on ne lui ecrive plus le lundi.
+    if (moi.mailBilan === false) {
+      rapport.ignores.push(`${moi.username} : bilan desactive`);
+      continue;
+    }
+
     if (dryRun) {
       // La simulation rend le message reel, et pas seulement le calcul.
       //
