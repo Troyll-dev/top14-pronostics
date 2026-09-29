@@ -4,48 +4,35 @@ import { useAuth } from '../contexts/AuthContext';
 import ChampMotDePasse from '../components/ChampMotDePasse';
 
 /**
- * Le bandeau de la page de connexion.
+ * La bande, en haut de la page de connexion.
  *
- * Les memes images que le reste du site — celles que `JoueursDecor` pose sur
- * l'accueil et le classement — mais dessinees ici plutot que la-bas. C'est
- * volontaire : `JoueursDecor` choisit ses pages par une liste de routes, et
- * cette page n'a pas besoin de cette mecanique pour afficher une image. Elle
- * reste ainsi autonome, sans dependre d'un composant monte plus haut dans
- * l'arbre — ce qui n'est pas garanti avant l'authentification.
+ * Les quatre joueurs en maillots de clubs differents, plutot que la photo du
+ * groupe : c'est eux qu'on vient retrouver en se connectant, et les maillots
+ * varies disent le championnat sans nommer aucun club.
  *
- * Le cadrage reprend exactement celui de `JoueursDecor.css`, et pour les memes
- * raisons, rappelees ici pour que personne n'ait a aller les chercher :
+ * L'image est detouree, donc elle se pose directement sur le fond de la page et
+ * suit le theme sans rien faire — ni masque en degrade, ni fond a assortir. Son
+ * halo clair d'origine a ete retire : il se voyait nettement sur le theme nuit.
  *
- *   - un rapport de 1,86 plutot qu'une hauteur en pixels, pour que le cadrage
- *     soit identique du telephone au grand ecran ;
- *   - un recadrage a 8 % du haut, et pas davantage : le joueur du fond a la
- *     tete au ras du bord superieur, tout decalage plus grand la coupe ;
- *   - un masque en degrade sur le bas, pour que l'image se fonde dans la page
- *     au lieu de s'arreter sur un bord net.
+ * `aspect-ratio` reserve la place avant que l'image arrive, pour que le
+ * formulaire ne saute pas sous le doigt au moment ou elle finit de charger.
  *
- * L'image est purement decorative : `alt` vide et `aria-hidden`, pour qu'un
- * lecteur d'ecran n'annonce pas une photo qui n'apporte aucune information.
+ * Purement decorative : `alt` vide et `aria-hidden`, pour qu'un lecteur d'ecran
+ * n'annonce pas une illustration qui n'apprend rien.
  */
 function Bandeau() {
   return (
-    <div
-      aria-hidden="true"
-      className="rounded-xl overflow-hidden mb-1"
-      style={{
-        WebkitMaskImage: 'linear-gradient(#000 72%, transparent 100%)',
-        maskImage: 'linear-gradient(#000 72%, transparent 100%)',
-      }}
-    >
+    <div aria-hidden="true" className="text-center mb-1">
       <img
-        src="/equipe-600.webp"
-        srcSet="/equipe-400.webp 400w, /equipe-600.webp 600w, /equipe-900.webp 900w"
-        sizes="(min-width: 480px) 448px, 100vw"
+        src="/clubs-600.webp"
+        srcSet="/clubs-400.webp 400w, /clubs-600.webp 600w, /clubs-900.webp 900w"
+        sizes="(min-width: 480px) 320px, 80vw"
         alt=""
-        width={600}
-        height={323}
+        width={320}
+        height={298}
         decoding="async"
-        className="block w-full h-auto object-cover"
-        style={{ aspectRatio: '1.86', objectPosition: 'center 8%' }}
+        className="inline-block w-full max-w-[320px] h-auto"
+        style={{ aspectRatio: '1.074' }}
       />
     </div>
   );

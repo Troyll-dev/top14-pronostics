@@ -9,6 +9,51 @@ function Rule({ points, children }) {
   );
 }
 
+/**
+ * Le bandeau du pub.
+ *
+ * Une photo, donc opaque : c'est le seul element des trois pages de demarrage
+ * qui ne bascule pas avec le theme. C'est assume — une enseigne eclaire pareil
+ * de jour comme de nuit — et ca evite le piege inverse, une image detouree sur
+ * fond sombre dont les noirs se fondraient dans la page.
+ *
+ * Le bas se fond dans le fond par un masque en degrade, pour qu'il n'y ait pas
+ * de bord net entre la photo et la page. Meme principe que le bandeau des
+ * joueurs ailleurs sur le site.
+ *
+ * Bord a bord sur telephone, arrondi des qu'il y a de la place : une photo qui
+ * touche les deux cotes de l'ecran a de l'ampleur, la meme photo avec seize
+ * pixels de marge de chaque cote a l'air d'avoir rate son cadre.
+ *
+ * `aspect-ratio` plutot qu'une hauteur : le cadrage reste identique partout, et
+ * la place est reservee avant meme que l'image arrive — donc rien ne saute quand
+ * elle finit de charger.
+ */
+function BandeauPub() {
+  return (
+    <div
+      aria-hidden="true"
+      className="-mx-4 sm:mx-0 sm:rounded-xl overflow-hidden mb-2"
+      style={{
+        WebkitMaskImage: 'linear-gradient(#000 74%, transparent 100%)',
+        maskImage: 'linear-gradient(#000 74%, transparent 100%)',
+      }}
+    >
+      <img
+        src="/pub-accueil-1008.webp"
+        srcSet="/pub-accueil-672.webp 672w, /pub-accueil-1008.webp 1008w, /pub-accueil-1344.webp 1344w"
+        sizes="(min-width: 768px) 768px, 100vw"
+        alt=""
+        width={1008}
+        height={567}
+        decoding="async"
+        className="block w-full h-auto object-cover"
+        style={{ aspectRatio: '1.78', objectPosition: 'center 42%' }}
+      />
+    </div>
+  );
+}
+
 export default function WelcomePage() {
   return (
     <div className="min-h-screen">
@@ -26,10 +71,13 @@ export default function WelcomePage() {
 
       <main className="max-w-3xl mx-auto px-4">
         {/* Accroche */}
-        <section className="text-center pt-14 pb-12 relative">
-          <div className="text-[64px] leading-none mb-5 select-none">🏉</div>
+        <section className="text-center pt-4 pb-12 relative">
+          {/* L'emoji ballon de 64 pixels a disparu d'ici : il tenait lieu
+              d'identite faute de mieux, et une photo du pub dit la meme chose
+              en mieux. Il reste dans la barre du haut, ou il sert de marque. */}
+          <BandeauPub />
 
-          <h1 className="font-display text-4xl sm:text-5xl font-extrabold leading-[1.05] mb-4">
+          <h1 className="font-display text-4xl sm:text-5xl font-extrabold leading-[1.05] mb-4 mt-6">
             Rugby.<br />
             <span className="text-amber-500">Amis.</span><br />
             Bière.

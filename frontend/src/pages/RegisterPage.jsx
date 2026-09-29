@@ -4,6 +4,35 @@ import { useAuth } from '../contexts/AuthContext';
 import ChampMotDePasse from '../components/ChampMotDePasse';
 
 /**
+ * Le joueur qui tend la main.
+ *
+ * L'image de l'inscription n'est pas celle de la connexion, et ce n'est pas
+ * pour faire joli : une page ou l'on cree son compte est une invitation, une
+ * page ou l'on revient est des retrouvailles. Un seul joueur, la main tendue,
+ * dit la premiere ; la bande au complet dit la seconde.
+ *
+ * Detouree comme l'autre, donc posee sur le fond de la page et juste sur les
+ * deux themes, halo retire.
+ */
+function Bandeau() {
+  return (
+    <div aria-hidden="true" className="text-center">
+      <img
+        src="/joueur-400.webp"
+        srcSet="/joueur-400.webp 400w, /joueur-600.webp 600w, /joueur-900.webp 900w"
+        sizes="(min-width: 480px) 260px, 70vw"
+        alt=""
+        width={260}
+        height={307}
+        decoding="async"
+        className="inline-block w-[70%] max-w-[260px] h-auto"
+        style={{ aspectRatio: '0.848' }}
+      />
+    </div>
+  );
+}
+
+/**
  * Huit caracteres, comme partout ailleurs.
  *
  * Cette page en exigeait six, alors que le changement de mot de passe depuis le
@@ -37,33 +66,35 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
+    <div className="min-h-screen flex items-center justify-center px-4 py-8">
       <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="text-6xl mb-3">🏉</div>
-          <h1 className="text-3xl font-bold text-amber-400">Top 14 Pronos</h1>
-          <p className="text-slate-400 mt-1">Rejoins le groupe !</p>
+        <Bandeau />
+
+        <div className="text-center mb-5">
+          <h1 className="font-display text-[30px] font-extrabold leading-none">Rejoins la bande</h1>
+          <p className="text-[13px] text-slate-400 mt-1.5">
+            Une adresse, un pseudo, et tu pronostiques dès la prochaine journée.
+          </p>
         </div>
 
         <div className="card">
-          <h2 className="text-xl font-semibold mb-6 text-center">Créer un compte</h2>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label htmlFor="pseudo" className="block text-sm text-slate-400 mb-1">Pseudo</label>
+              <label htmlFor="pseudo" className="block text-sm text-slate-400 mb-1">Ton pseudo</label>
               <input
                 id="pseudo"
                 type="text"
                 name="username"
                 autoComplete="username"
                 className="input"
-                placeholder="TonPseudo"
+                placeholder="Comment on t'appelle"
                 value={form.username}
                 onChange={(e) => setForm({ ...form, username: e.target.value })}
                 required minLength={3} maxLength={20}
               />
             </div>
             <div>
-              <label htmlFor="courriel" className="block text-sm text-slate-400 mb-1">Email</label>
+              <label htmlFor="courriel" className="block text-sm text-slate-400 mb-1">Ton adresse</label>
               {/*
                 `autoComplete` et `inputMode` declenchent le remplissage
                 automatique et, sur telephone, le clavier qui porte l'arobase.
@@ -76,7 +107,7 @@ export default function RegisterPage() {
                 autoComplete="email"
                 inputMode="email"
                 className="input"
-                placeholder="ton@email.com"
+                placeholder="prenom@exemple.fr"
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
                 required
@@ -87,7 +118,7 @@ export default function RegisterPage() {
               </p>
             </div>
             <div>
-              <label htmlFor="motdepasse" className="block text-sm text-slate-400 mb-1">Mot de passe</label>
+              <label htmlFor="motdepasse" className="block text-sm text-slate-400 mb-1">Ton mot de passe</label>
               {/*
                 L'oeil plutot qu'un second champ « repete ton mot de passe » :
                 taper deux fois ne prouve rien sur ce qu'on a tape, voir ce qu'on
@@ -108,7 +139,7 @@ export default function RegisterPage() {
               <p role="alert" className="text-red-400 text-sm">{error}</p>
             )}
             <button type="submit" className="btn-primary w-full" disabled={loading}>
-              {loading ? 'Inscription...' : "S'inscrire"}
+              {loading ? 'Un instant…' : 'Créer mon compte'}
             </button>
           </form>
           <p className="text-center text-slate-400 text-sm mt-4">
