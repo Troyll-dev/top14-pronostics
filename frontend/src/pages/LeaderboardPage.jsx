@@ -89,6 +89,16 @@ function PlayerRow({ rank, player, points, stats, isMe }) {
         <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-[11.5px] text-slate-500">
           {stats}
         </div>
+
+        {/* La serie en cours, sous les statistiques.
+ 
+            Une seule phrase, et la premiere : c'est la plus interessante des
+            deux que le serveur renvoie, et empiler serie et ecart sur chacune
+            des cinq lignes rendrait le classement illisible. Rien ne s'affiche
+            quand il n'y a rien a dire. */}
+        {!enPause && player.phrases?.length > 0 && (
+          <p className="mt-1 text-[11.5px] text-slate-600 truncate">{player.phrases[0]}</p>
+        )}
       </div>
 
       <div className="text-right shrink-0">

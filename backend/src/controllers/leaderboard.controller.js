@@ -2,6 +2,7 @@ const { PrismaClient } = require('@prisma/client');
 const {
   stats, classerAvecPauses, retenuAuClassement, DEPUIS, DEPARTAGES,
 } = require('../services/ranking');
+const series = require('../services/series.service');
 
 const prisma = new PrismaClient();
 
@@ -73,8 +74,37 @@ exports.getLeaderboard = async (req, res) => {
     // regle de son cote. Un tableau ne pouvait pas le porter — JSON ignore les
     // proprietes non indicees d'un tableau, et la valeur disparaissait
     // silencieusement a la serialisation.
+    /**
+     * Les series et les ecarts s'ajoutent apres le classement, pas avant.
+     *
+     * L'ecart se lit sur des rangs : tant qu'ils ne sont pas attribues, il n'y
+     * a pas de voisin du dessus. Et la serie ne change pas l'ordre, elle le
+     * commente — la calculer plus tot ne servirait qu'a brouiller la lecture.
+     *
+     * Deux formulations accompagnent chaque ligne. `phrases` parle du joueur a
+     * la troisieme personne, pour le classement ou on lit les autres.
+     * `phrasesPourToi` tutoie, et n'est posee que sur la ligne de celui qui
+     * demande — l'accueil et le bilan du lundi s'adressent a lui.
+     *
+     * Elles sont fabriquees au meme endroit que les nombres qu'elles decrivent.
+     * Trois ecrans qui reformuleraient chacun les memes chiffres finiraient par
+     * se contredire, comme l'ont fait le site et le bilan sur le departage.
+     */
+    const classe = classerAvecPauses(leaderboard);
+    const parSerie = await series.pourTous();
+
+    const enrichi = series.avecEcarts(
+      classe.map((l) => ({ ...l, serie: parSerie.get(l.id) || null }))
+    ).map((l) => ({
+      ...l,
+      phrases: series.phrases(l, { pourSoi: false }),
+      ...(req.user && req.user.id === l.id
+        ? { phrasesPourToi: series.phrases(l, { pourSoi: true }) }
+        : {}),
+    }));
+
     res.json({
-      classement: classerAvecPauses(leaderboard),
+      classement: enrichi,
       depuis: DEPUIS,
       departages: DEPARTAGES,
     });

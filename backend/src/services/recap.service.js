@@ -26,6 +26,7 @@ const { PrismaClient } = require('@prisma/client');
 const mailer = require('./mailer.service');
 const journal = require('./job-log.service');
 const desinscription = require('./desinscription.service');
+const series = require('./series.service');
 const { stats, classer, retenuAuClassement } = require('./ranking');
 
 const prisma = new PrismaClient();
@@ -157,9 +158,23 @@ async function bilan(round) {
   // Une egalite en tete se dit, elle ne se tranche pas en silence.
   const vainqueurs = meilleurs.filter((l) => l.journee === top && top > 0);
 
+  /**
+   * Les series et les ecarts, calcules par le meme service que le site.
+   *
+   * Le bilan et la page doivent dire la meme chose des memes chiffres. Les
+   * reformuler ici, avec les pronostics deja charges plus haut, serait plus
+   * rapide d'une requete et strictement equivalent — jusqu'au jour ou l'une des
+   * deux versions evoluerait sans l'autre. On a deja paye ce prix-la sur le
+   * departage.
+   */
+  const parSerie = await series.pourTous({ season: SEASON });
+  const commente = series.avecEcarts(
+    classement.map((l) => ({ ...l, serie: parSerie.get(l.id) || null }))
+  );
+
   return {
     round,
-    classement,
+    classement: commente,
     vainqueurs,
     fait: faitMarquant(pronos.filter((p) => p.match.round === round)),
   };
@@ -254,6 +269,7 @@ function etatSauvegarde(etat, now = new Date()) {
 
 function corps(moi, b, suivant, lien, sauvegarde) {
   const vainq = b.vainqueurs;
+  const phrasesPerso = series.phrases(moi, { pourSoi: true });
   const titreVainqueur = !vainq.length
     ? `Journée ${b.round} : personne n'a marqué`
     : vainq.length === 1
@@ -285,6 +301,10 @@ function corps(moi, b, suivant, lien, sauvegarde) {
       : moi.mouvement < 0
       ? `, en baisse de ${-moi.mouvement} place${-moi.mouvement > 1 ? 's' : ''}.`
       : `, sans changement.`) +
+    // Ce qui est vrai pour ce lecteur-la, et pour lui seul : sa serie, son
+    // ecart avec le voisin. C'est la seule partie du bilan qui differe d'un
+    // destinataire a l'autre, et c'est celle qui fait ouvrir le site.
+    (phrasesPerso.length ? `<br><br>${phrasesPerso.join(' ')}` : '') +
     (b.fait ? `<br><br>${b.fait}` : '') +
     // Trois colonnes de chiffres, et chacune repond a une question differente :
     // ce que la journee a rapporte, ou l'on en est, et si l'on monte ou l'on
@@ -324,7 +344,9 @@ function corps(moi, b, suivant, lien, sauvegarde) {
 
   const texte =
     `${titreVainqueur}\n\n` +
-    `Toi : ${moi.journee} point(s) ce week-end, ${moi.rang}e au general.\n\n` +
+    `Toi : ${moi.journee} point(s) ce week-end, ${moi.rang}e au general.\n` +
+    (phrasesPerso.length ? `${phrasesPerso.join(' ')}\n` : '') +
+    `\n` +
     b.classement.map((l) => `${l.rang}. ${l.username}  +${l.journee} ce week-end, ${l.total} pts au total (${fleche(l.mouvement)})`).join('\n') +
     (etat ? `\n\n${etat.alerte ? '/!\\ ' : ''}${etat.texte}` : '') +
     `\n\n${lien}\n` +
