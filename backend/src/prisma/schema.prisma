@@ -41,8 +41,6 @@ model User {
   avatar       UserAvatar?
   authTokens   AuthToken[]
   reminders    Reminder[]
-  invitations  Invitation[] @relation("InvitationsEnvoyees")
-  invitationRecue Invitation? @relation("InvitationUtilisee")
 
   @@map("users")
 }
@@ -225,43 +223,4 @@ model JobRun {
   updatedAt     DateTime  @updatedAt
 
   @@map("job_runs")
-}
-
-/// Invitations a rejoindre la bande.
-///
-/// L'inscription n'est plus ouverte a qui connait l'adresse du site : il faut un
-/// lien. Cela regle deux choses d'un coup. Personne n'entre par hasard, et
-/// l'adresse de chacun est prouvee par construction — une invitation envoyee a
-/// une adresse qui n'existe pas n'arrive jamais, donc le compte ne se cree pas.
-/// C'est ce qui rend inutile une confirmation d'adresse apres coup.
-///
-/// Comme pour les jetons de mot de passe, seule l'empreinte SHA-256 est
-/// stockee : une fuite de la base ne donne aucun lien utilisable.
-///
-/// `email` est facultatif. Une invitation peut etre envoyee par courriel — et
-/// l'adresse est alors connue d'avance — ou simplement copiee dans une
-/// conversation, auquel cas l'invite saisit la sienne. Quand l'adresse est
-/// connue, l'inscription verifie qu'elle correspond : sinon un lien transmis a
-/// un tiers ouvrirait la porte a n'importe qui.
-///
-/// `usedById` est unique : un lien ne cree qu'un compte. Sans cette contrainte,
-/// deux personnes cliquant en meme temps passeraient toutes les deux.
-model Invitation {
-  id          Int       @id @default(autoincrement())
-  tokenHash   String    @unique
-  email       String?                        // connue si l'invitation est partie par courriel
-  message     String?   @db.VarChar(280)     // un mot de l'hote, affiche a l'arrivee
-
-  invitedBy   User      @relation("InvitationsEnvoyees", fields: [invitedById], references: [id], onDelete: Cascade)
-  invitedById Int
-
-  usedBy      User?     @relation("InvitationUtilisee", fields: [usedById], references: [id], onDelete: SetNull)
-  usedById    Int?      @unique
-
-  createdAt   DateTime  @default(now())
-  expiresAt   DateTime
-  usedAt      DateTime?
-
-  @@index([invitedById])
-  @@map("invitations")
 }

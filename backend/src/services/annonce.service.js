@@ -35,7 +35,7 @@ const NOUVEAUTE_VENDREDI =
 /**
  * Ce qu'on annonce, du plus utile au moins.
  *
- * Six entrees, et pas une de plus : au-dela, un courriel d'annonce se parcourt
+ * Cinq entrees, et pas une de plus : au-dela, un courriel d'annonce se parcourt
  * au lieu de se lire. Rien sur les sauvegardes, le journal des taches ni la
  * table de classement — ce sont des choses qui interessent celui qui maintient,
  * pas celui qui joue.
@@ -67,12 +67,6 @@ const NOUVEAUTES = [
       'Sur l\'accueil et au classement : combien de bons pronostics tu enchaînes, ' +
       'et combien de points te séparent de celui qui te précède. Le classement dit ' +
       'qui gagne, ça dit ce qui se passe.',
-  },
-  {
-    titre: 'Inviter un ami',
-    texte:
-      'Chacun peut agrandir la bande : un bouton sur l\'accueil, un lien à coller ' +
-      'ou un courriel que l\'appli envoie pour toi.',
   },
   {
     titre: 'Tu choisis ce que tu reçois',

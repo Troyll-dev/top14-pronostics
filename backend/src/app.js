@@ -14,7 +14,6 @@ const backupRoutes = require('./routes/backup.routes');
 const reminderRoutes = require('./routes/reminder.routes');
 const recapRoutes = require('./routes/recap.routes');
 const desinscriptionRoutes = require('./routes/desinscription.routes');
-const invitationRoutes = require('./routes/invitation.routes');
 
 const { startResultsCron } = require('./cron/results.cron');
 const { startBackupCron } = require('./cron/backup.cron');
@@ -50,7 +49,6 @@ app.use('/api/users', userRoutes);
 app.use('/api/admin/backup', backupRoutes);
 app.use('/api/admin/reminders', reminderRoutes);
 app.use('/api/admin/recap', recapRoutes);
-app.use('/api/invitations', invitationRoutes);
 
 /**
  * La desinscription, seule route publique a rendre du HTML.
@@ -96,13 +94,6 @@ app.listen(PORT, () => {
   // l'adresse publique de l'API pour etre absolus. S'il en manque un, les
   // courriels partent sans ces liens — ce qui se voit tres mal. On le dit donc
   // ici, au demarrage, a cote des autres taches.
-  const { surInvitation } = require('./services/invitation.service');
-  console.log(
-    surInvitation()
-      ? 'Inscription sur invitation seulement'
-      : 'Inscription OUVERTE a qui connait l adresse du site (INSCRIPTION=ouverte)'
-  );
-
   const { disponible } = require('./services/desinscription.service');
   console.log(
     disponible()
