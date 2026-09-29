@@ -19,6 +19,7 @@
 const { PrismaClient } = require('@prisma/client');
 const mailer = require('./mailer.service');
 const desinscription = require('./desinscription.service');
+const { NOUVEAUTE_VENDREDI } = require('./annonce.service');
 
 const prisma = new PrismaClient();
 
@@ -54,7 +55,14 @@ function corps(user, round, manquants, lien) {
 
   const intro =
     `Salut ${user.username}, il te manque <b>${n} prono${n > 1 ? 's' : ''}</b> pour la journée ${round}.` +
-    `<br><br>` + liste.map((l) => `· ${l}`).join('<br>');
+    `<br><br>` + liste.map((l) => `· ${l}`).join('<br>') +
+    // Une seule nouveaute a la fois, et seulement s'il y en a une. La constante
+    // se change a la main dans `annonce.service`, et se vide le reste du temps :
+    // un rappel qui porterait en permanence une rubrique « nouveautes »
+    // deviendrait un bulletin, et on ne lit pas un bulletin.
+    (NOUVEAUTE_VENDREDI
+      ? `<br><br><span style="color:#b4863b;">✦</span> <i>${NOUVEAUTE_VENDREDI}</i>`
+      : '');
 
   // Deux liens, et jamais trois : couper ce rappel-ci, ou tout arreter. Proposer
   // en plus de couper le bilan du lundi depuis un message qui ne le concerne pas
@@ -75,6 +83,7 @@ function corps(user, round, manquants, lien) {
     text:
       `Salut ${user.username}, il te manque ${n} prono${n > 1 ? 's' : ''} pour la journee ${round}.\n\n` +
       liste.map((l) => `- ${l}`).join('\n') +
+      (NOUVEAUTE_VENDREDI ? `\n\n${NOUVEAUTE_VENDREDI}` : '') +
       `\n\n${lien}\n` +
       mailer.piedLiensTexte(liens),
   };
