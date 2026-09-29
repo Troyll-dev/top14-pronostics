@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import api from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 import Avatar, { bumpAvatarVersion, inkOn, initialsOf, ringShadow } from '../components/Avatar';
+import ChampMotDePasse from '../components/ChampMotDePasse';
 
 const AVATAR_SIZE = 128;
 const MAX_UPLOAD = 8 * 1024 * 1024;   // garde-fou avant lecture, 8 Mo
@@ -563,22 +564,27 @@ function SecuritySection() {
           « Mot de passe oublié ? » : un lien te sera envoyé par e-mail.
         </p>
         <div className="space-y-2">
-          <input
-            type="password"
+          <ChampMotDePasse
+            autoComplete="current-password"
             value={current}
             onChange={(e) => setCurrent(e.target.value)}
             placeholder="Mot de passe actuel"
             className={field}
           />
-          <input
-            type="password"
+          <ChampMotDePasse
+            autoComplete="new-password"
             value={next}
             onChange={(e) => setNext(e.target.value)}
             placeholder="Nouveau mot de passe"
             className={field}
           />
-          <input
-            type="password"
+          {/* Ici on garde le second champ, et ce n'est pas contradictoire avec
+              l'oeil de l'inscription : changer son mot de passe se fait sur un
+              compte deja ouvert, ou la friction ne coute pas une inscription
+              perdue — et ou une faute de frappe se paie d'une deconnexion de
+              tous ses appareils. */}
+          <ChampMotDePasse
+            autoComplete="new-password"
             value={confirm}
             onChange={(e) => setConfirm(e.target.value)}
             placeholder="Répète le nouveau"

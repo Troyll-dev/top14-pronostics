@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import ChampMotDePasse from '../components/ChampMotDePasse';
 
 /**
  * Le bandeau de la page de connexion.
@@ -138,12 +139,12 @@ export default function LoginPage() {
               <label htmlFor="motdepasse" className="block text-sm text-slate-400 mb-1">
                 Ton mot de passe
               </label>
-              <input
+              {/* L'oeil, le meme qu'a l'inscription et dans le profil : un seul
+                  composant, donc un seul comportement a retenir. */}
+              <ChampMotDePasse
                 id="motdepasse"
-                type="password"
                 name="password"
                 autoComplete="current-password"
-                className="input"
                 placeholder="••••••••"
                 value={form.password}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
