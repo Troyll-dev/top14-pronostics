@@ -136,6 +136,37 @@ function classer(lignes) {
 }
 
 /**
+ * Le meme classement, mais les joueurs en pause hors concours.
+ *
+ * Un joueur qui a demande a ne plus jouer ne prend la place de personne : les
+ * rangs 1 a n sont attribues aux seuls actifs, puis les joueurs en pause sont
+ * ajoutes en fin de liste avec `rank: null`.
+ *
+ * Trois choix a expliquer, parce qu'aucun n'est evident.
+ *
+ * Ils restent presents, et ne disparaissent pas de la page. Effacer quelqu'un
+ * de la liste pose la question « ou est passe Christian ? » sans y repondre,
+ * alors qu'une ligne grisee portant « en pause » y repond d'elle-meme. Et ca
+ * laisse la porte ouverte : une absence est definitive, une pause ne l'est pas.
+ *
+ * Leurs points restent affiches. Ils les ont marques, ces journees se sont
+ * jouees, et les retirer reecrirait l'histoire de la saison — ce qu'on s'est
+ * refuse a faire par ailleurs en gardant les journees 1 et 2 visibles.
+ *
+ * Mais `rank` vaut `null` et non un numero apres les autres. Un rang, meme
+ * dernier, est une position dans une competition a laquelle ils ne participent
+ * plus. L'ecran affichera un tiret, ce qui est la seule chose vraie.
+ */
+function classerAvecPauses(lignes) {
+  const actifs = classer(lignes.filter((l) => !l.enPause));
+  const enPause = [...lignes.filter((l) => l.enPause)]
+    .sort(comparer)
+    .map((l) => ({ ...l, rank: null }));
+
+  return [...actifs, ...enPause];
+}
+
+/**
  * Les criteres de **departage**, en clair, pour les afficher.
  *
  * Les points n'y figurent pas, et c'est tout l'objet de cette liste. Le tri
@@ -154,4 +185,7 @@ const DEPARTAGES = [
   'la plus petite somme d\'écarts',
 ];
 
-module.exports = { ecart, stats, comparer, classer, DEPARTAGES, DEPUIS, retenuAuClassement };
+module.exports = {
+  ecart, stats, comparer, classer, classerAvecPauses,
+  DEPARTAGES, DEPUIS, retenuAuClassement,
+};

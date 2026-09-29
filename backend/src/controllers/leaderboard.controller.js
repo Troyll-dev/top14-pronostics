@@ -1,5 +1,7 @@
 const { PrismaClient } = require('@prisma/client');
-const { stats, classer, retenuAuClassement, DEPUIS, DEPARTAGES } = require('../services/ranking');
+const {
+  stats, classerAvecPauses, retenuAuClassement, DEPUIS, DEPARTAGES,
+} = require('../services/ranking');
 
 const prisma = new PrismaClient();
 
@@ -13,6 +15,10 @@ exports.getLeaderboard = async (req, res) => {
         avatarColor: true,
         initials: true,
         avatarRing: true,
+        // Un joueur en pause reste dans la liste mais hors du classement. On lit
+        // donc l'etat ici plutot que de filtrer dans la requete : il faut
+        // pouvoir l'afficher grise, ce qu'une absence ne permettrait pas.
+        enPause: true,
         predictions: {
           select: {
             points: true, basePoints: true, joker: true,
@@ -48,6 +54,7 @@ exports.getLeaderboard = async (req, res) => {
         avatarColor: u.avatarColor,
         initials: u.initials,
         avatarRing: u.avatarRing,
+        enPause: u.enPause,
         totalPoints: s.points,
         played: played.length,
         exactScores: s.exacts,
@@ -66,7 +73,11 @@ exports.getLeaderboard = async (req, res) => {
     // regle de son cote. Un tableau ne pouvait pas le porter — JSON ignore les
     // proprietes non indicees d'un tableau, et la valeur disparaissait
     // silencieusement a la serialisation.
-    res.json({ classement: classer(leaderboard), depuis: DEPUIS, departages: DEPARTAGES });
+    res.json({
+      classement: classerAvecPauses(leaderboard),
+      depuis: DEPUIS,
+      departages: DEPARTAGES,
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erreur serveur' });
@@ -81,7 +92,12 @@ exports.getRoundLeaderboard = async (req, res) => {
     const predictions = await prisma.prediction.findMany({
       where: { match: { round: parseInt(round), status: 'FINISHED' } },
       include: {
-        user: { select: { id: true, username: true, avatarColor: true, initials: true, avatarRing: true } },
+        user: {
+          select: {
+            id: true, username: true, avatarColor: true,
+            initials: true, avatarRing: true, enPause: true,
+          },
+        },
         match: { select: { id: true, featured: true, homeScore: true, awayScore: true } },
       },
     });
@@ -92,7 +108,10 @@ exports.getRoundLeaderboard = async (req, res) => {
       parJoueur.get(pred.userId).pronos.push(pred);
     }
 
-    // Meme departage qu'au general, par la meme fonction.
+    // Meme departage qu'au general, par la meme fonction — et meme traitement
+    // des joueurs en pause, qui figurent en bas de liste sans rang. Un joueur
+    // qui s'est mis en pause en cours de saison a pu pronostiquer cette
+    // journee-la : ses points sont donc reels et restent affiches.
     const lignes = [...parJoueur.values()].map(({ user, pronos }) => {
       const s = stats(pronos);
       const base = (p) => (p.basePoints ?? p.points);
@@ -105,7 +124,7 @@ exports.getRoundLeaderboard = async (req, res) => {
       };
     });
 
-    res.json(classer(lignes));
+    res.json(classerAvecPauses(lignes));
   } catch (err) {
     res.status(500).json({ error: 'Erreur serveur' });
   }

@@ -4,6 +4,12 @@ import { useAuth } from '../contexts/AuthContext';
 import Avatar from '../components/Avatar';
 
 function MedalIcon({ rank }) {
+  // Pas de rang : un joueur en pause. Un tiret, et surtout pas un numero apres
+  // les autres — un rang, meme dernier, est une place dans une competition a
+  // laquelle il ne participe plus.
+  if (rank === null || rank === undefined) {
+    return <span className="font-display text-slate-600 font-bold w-8 text-center">—</span>;
+  }
   if (rank === 1) return <span className="text-2xl">🥇</span>;
   if (rank === 2) return <span className="text-2xl">🥈</span>;
   if (rank === 3) return <span className="text-2xl">🥉</span>;
@@ -16,11 +22,27 @@ function MedalIcon({ rank }) {
  * general et la journee, le reste est identique.
  */
 function PlayerRow({ rank, player, points, stats, isMe }) {
+  /**
+   * Le joueur en pause : present, mais visiblement hors jeu.
+   *
+   * Grise plutot qu'efface. Retirer quelqu'un de la liste pose la question
+   * « ou est passe Christian ? » sans y repondre ; une ligne pale portant
+   * « en pause » y repond d'elle-meme, et dit du meme coup que ce n'est pas
+   * definitif.
+   *
+   * L'attenuation porte sur la carte entiere et non sur le seul nom : c'est ce
+   * qui la fait lire comme une categorie a part plutot que comme une ligne
+   * ordinaire ou l'on aurait oublie une couleur.
+   */
+  const enPause = Boolean(player.enPause);
+
   return (
     <div
       className={`card flex items-center gap-3.5 transition-all ${
-        isMe ? 'border-amber-500/55 bg-amber-500/[.07]' : ''
-      } ${rank === 1 ? 'border-l-4 border-l-amber-500' : ''}`}
+        isMe && !enPause ? 'border-amber-500/55 bg-amber-500/[.07]' : ''
+      } ${rank === 1 ? 'border-l-4 border-l-amber-500' : ''} ${
+        enPause ? 'opacity-60 grayscale' : ''
+      }`}
     >
       <div className="w-10 text-center shrink-0">
         <MedalIcon rank={rank} />
@@ -47,10 +69,18 @@ function PlayerRow({ rank, player, points, stats, isMe }) {
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <span className={`font-display font-bold truncate ${isMe ? 'text-amber-500' : ''}`}>
+          <span className={`font-display font-bold truncate ${
+            enPause ? 'text-slate-500' : isMe ? 'text-amber-500' : ''
+          }`}>
             {player.username}
           </span>
-          {isMe && (
+          {enPause && (
+            <span className="font-display text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wide
+                             bg-slate-700/40 text-slate-400 border border-slate-700 whitespace-nowrap">
+              en pause
+            </span>
+          )}
+          {isMe && !enPause && (
             <span className="font-display text-[10px] chip-accent px-1.5 py-0.5 rounded font-bold uppercase tracking-wide">
               toi
             </span>
@@ -62,7 +92,9 @@ function PlayerRow({ rank, player, points, stats, isMe }) {
       </div>
 
       <div className="text-right shrink-0">
-        <p className="font-display text-[26px] font-extrabold leading-none tabular-nums text-amber-500">
+        <p className={`font-display text-[26px] font-extrabold leading-none tabular-nums ${
+          enPause ? 'text-slate-500' : 'text-amber-500'
+        }`}>
           {points}
         </p>
         <p className="text-[10.5px] uppercase tracking-wide text-slate-500 mt-1">pts</p>
@@ -170,7 +202,10 @@ export default function LeaderboardPage() {
             {general.map((player, idx) => (
               <PlayerRow
                 key={player.id}
-                rank={idx + 1}
+                /* Le rang vient du serveur, qui seul sait qui est hors concours.
+                   Le repli sur la position dans la liste couvre le temps d'un
+                   deploiement, ou l'ancienne reponse ne le porte pas encore. */
+                rank={player.rank ?? idx + 1}
                 player={player}
                 points={player.totalPoints}
                 isMe={player.id === user?.id}
@@ -231,7 +266,7 @@ export default function LeaderboardPage() {
                 {roundBoard.map((player, idx) => (
                   <PlayerRow
                     key={player.id}
-                    rank={idx + 1}
+                    rank={player.rank ?? idx + 1}
                     player={player}
                     points={player.points}
                     isMe={player.id === user?.id}
