@@ -4,6 +4,7 @@ import { fr } from 'date-fns/locale';
 import api from '../api/client';
 import TeamCrest from '../components/TeamCrest';
 import { matchState, STATE, STATE_CHIP, useNow } from '../utils/matchState';
+import SelecteurJournee from '../components/SelecteurJournee';
 
 function ResultDot({ res }) {
   const cls = {
@@ -163,23 +164,7 @@ export default function Top14Page() {
     <>
       <h2 className="rule-label mt-8 mb-3">Les matchs journée par journée</h2>
 
-      {rounds.length > 0 && (
-        <div className="flex gap-1.5 overflow-x-auto pb-1.5 mb-3 scrollbar-none">
-          {rounds.map((r) => (
-            <button
-              key={r}
-              onClick={() => setRound(r)}
-              className={`shrink-0 font-display text-[13.5px] font-semibold px-3.5 py-1.5 rounded border transition-colors ${
-                round === r
-                  ? 'chip-on'
-                  : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-amber-500 hover:text-white'
-              }`}
-            >
-              J{r}
-            </button>
-          ))}
-        </div>
-      )}
+      <SelecteurJournee rounds={rounds} valeur={round} onChange={setRound} className="mb-3" />
 
       {/* Filtre par état */}
       <div className="flex gap-1.5 overflow-x-auto pb-1.5 mb-4 scrollbar-none">

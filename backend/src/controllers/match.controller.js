@@ -77,11 +77,25 @@ exports.getMatches = async (req, res) => {
   }
 };
 
-// GET /api/matches/rounds — liste des journées disponibles
+/**
+ * GET /api/matches/rounds            — toutes les journees du calendrier
+ * GET /api/matches/rounds?jouees=1   — seulement celles qui ont un resultat
+ *
+ * Le second sert au classement par journee : celui de la J20 en octobre est une
+ * page vide, et proposer d'aller voir ce qui n'existe pas encore fait surtout
+ * se demander si quelque chose est casse. Ailleurs — le calendrier, la saisie
+ * des pronos — les vingt-six gardent tout leur sens, puisqu'on y va justement
+ * pour ce qui n'a pas encore eu lieu.
+ *
+ * « Jouee » veut dire : au moins une rencontre terminee. Une journee etalee sur
+ * deux week-ends apparait donc des le premier match homologue, ce qui est juste :
+ * son classement partiel existe et se lit.
+ */
 exports.getRounds = async (req, res) => {
   try {
     const rounds = await prisma.match.groupBy({
       by: ['round'],
+      where: req.query.jouees === '1' ? { status: 'FINISHED' } : undefined,
       orderBy: { round: 'asc' },
     });
     res.json(rounds.map((r) => r.round));

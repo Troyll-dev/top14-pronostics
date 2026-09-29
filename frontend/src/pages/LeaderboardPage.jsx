@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import api from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 import Avatar from '../components/Avatar';
+import SelecteurJournee from '../components/SelecteurJournee';
 
 function MedalIcon({ rank }) {
   // Pas de rang : un joueur en pause. Un tiret, et surtout pas un numero apres
@@ -169,7 +170,10 @@ export default function LeaderboardPage() {
       .catch(console.error)
       .finally(() => setLoading(false));
 
-    api.get('/matches/rounds').then((res) => setRounds(res.data)).catch(console.error);
+    // Seules les journees deja jouees : voir plus haut, au selecteur.
+    api.get('/matches/rounds', { params: { jouees: 1 } })
+      .then((res) => setRounds(res.data))
+      .catch(console.error);
 
     // Journee en cours ou derniere jouee : c'est celle qu'on veut voir par defaut.
     api.get('/matches/next-round')
@@ -220,16 +224,22 @@ export default function LeaderboardPage() {
       <div className="flex gap-1.5 mb-5">
         {[
           { key: 'general', label: 'Général' },
-          ...(depuisTous ? [{ key: 'tous', label: `Depuis la J${depuisTous}` }] : []),
+          ...(depuisTous ? [{ key: 'tous', label: `Général depuis J${depuisTous}` }] : []),
           { key: 'journee', label: round ? `Journée ${round}` : 'Journée' },
         ].map((t) => (
           <button
             key={t.key}
             onClick={() => setView(t.key)}
+            /* Les deux classements generaux partagent la meme famille de
+               couleur, le second en plus pale : ce sont deux facons de voir la
+               meme chose, pas deux choses differentes. L'onglet d'une journee,
+               lui, garde le style d'origine — il montre autre chose. */
             className={`font-display text-[13.5px] font-semibold px-4 py-1.5 rounded-full border transition-colors ${
-              view === t.key
-                ? 'chip-accent border-transparent'
-                : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-amber-500 hover:text-white'
+              view !== t.key
+                ? 'bg-slate-900 border-slate-800 text-slate-400 hover:border-amber-500 hover:text-white'
+                : t.key === 'tous'
+                ? 'bg-amber-500/15 border-amber-500/50 text-amber-500'
+                : 'chip-accent border-transparent'
             }`}
           >
             {t.label}
@@ -301,23 +311,11 @@ export default function LeaderboardPage() {
       ) : (
         <>
           {/* Sélecteur de journée */}
-          {rounds.length > 0 && (
-            <div className="flex gap-1.5 overflow-x-auto pb-1.5 mb-4 scrollbar-none">
-              {rounds.map((r) => (
-                <button
-                  key={r}
-                  onClick={() => setRound(r)}
-                  className={`shrink-0 font-display text-[13.5px] font-semibold px-3.5 py-1.5 rounded border transition-colors ${
-                    round === r
-                      ? 'chip-on'
-                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-amber-500 hover:text-white'
-                  }`}
-                >
-                  J{r}
-                </button>
-              ))}
-            </div>
-          )}
+          {/* Seules les journees jouees : un classement de la J20 en octobre est
+              une page vide, et proposer d'aller voir ce qui n'existe pas encore
+              fait surtout se demander si quelque chose est casse. La liste
+              grandit d'elle-meme au fil de la saison. */}
+          <SelecteurJournee rounds={rounds} valeur={round} onChange={setRound} className="mb-4" />
 
           {loadingRound ? (
             <div className="text-center py-12 text-slate-500 animate-pulse">Chargement…</div>

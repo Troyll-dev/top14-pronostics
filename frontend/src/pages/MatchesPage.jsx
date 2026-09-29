@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import api from '../api/client';
 import MatchCard from '../components/MatchCard';
 import { matchState, useNow } from '../utils/matchState';
+import SelecteurJournee from '../components/SelecteurJournee';
 
 const DRAFT_KEY = 't14-brouillons';
 const DRAFT_TTL = 30 * 24 * 3600 * 1000; // un mois
@@ -290,23 +291,7 @@ export default function MatchesPage() {
       <p className="text-xs italic text-slate-500 mb-5">Saison 2026-2027 · Championnat de France</p>
 
       {/* Sélecteur de journée */}
-      {rounds.length > 0 && (
-        <div className="flex gap-1.5 overflow-x-auto pb-1.5 mb-5 scrollbar-none">
-          {rounds.map((r) => (
-            <button
-              key={r}
-              onClick={() => setCurrentRound(r)}
-              className={`shrink-0 font-display text-[13.5px] font-semibold px-3.5 py-1.5 rounded border transition-colors ${
-                currentRound === r
-                  ? 'chip-on'
-                  : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-amber-500 hover:text-white'
-              }`}
-            >
-              J{r}
-            </button>
-          ))}
-        </div>
-      )}
+      <SelecteurJournee rounds={rounds} valeur={currentRound} onChange={setCurrentRound} className="mb-5" />
 
       {/* Récapitulatif */}
       {!loading && matches.length > 0 && (
