@@ -41,6 +41,32 @@ async function toSquareDataUrl(file, size = AVATAR_SIZE) {
   return canvas.toDataURL('image/png');
 }
 
+/**
+ * Un interrupteur, pour les réglages qui s'appliquent tout de suite.
+ *
+ * Volontairement différent des champs du haut de page : ceux-là attendent le
+ * bouton « Enregistrer », celui-ci agit au clic. La distinction se justifie par
+ * l'enjeu — couper un courriel est une décision isolée, qu'on ne veut pas voir
+ * dépendre du fait qu'on pense ensuite à enregistrer une couleur de pastille.
+ */
+function Interrupteur({ actif, onChange, occupe, titre, detail }) {
+  return (
+    <label className="flex items-start gap-3 py-2 cursor-pointer select-none">
+      <input
+        type="checkbox"
+        checked={actif}
+        disabled={occupe}
+        onChange={(e) => onChange(e.target.checked)}
+        className="mt-1 w-4 h-4 shrink-0 accent-amber-500 cursor-pointer disabled:cursor-wait"
+      />
+      <span className="min-w-0">
+        <span className="block text-[13.5px] font-display font-semibold">{titre}</span>
+        <span className="block text-[11.5px] text-slate-500 leading-relaxed">{detail}</span>
+      </span>
+    </label>
+  );
+}
+
 export default function ProfilePage() {
   const auth = useAuth();
   const { user } = auth;
@@ -345,6 +371,8 @@ export default function ProfilePage() {
         </div>
       </div>
 
+      <CourrielsSection />
+
       <SecuritySection />
     </div>
   );
@@ -354,6 +382,144 @@ const field =
   'w-full bg-slate-950 border-[1.5px] border-slate-800 rounded-md px-3 py-2 ' +
   'text-[14px] text-white placeholder:text-slate-600 ' +
   'focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/25 transition-colors';
+
+/**
+ * Courriels et participation.
+ *
+ * Les memes reglages que les liens au bas de chaque courriel, du cote du site
+ * cette fois. Les deux voies existent parce qu'elles servent deux moments : le
+ * lien sert a partir, sans se connecter, quand on ne revient plus ; cette
+ * page-ci sert a revenir, ou a doser.
+ *
+ * Tout s'applique au clic, sans bouton « Enregistrer ». Ces reglages n'ont rien
+ * a voir avec la couleur d'une pastille : couper un courriel est une decision
+ * isolee, et la faire dependre du fait qu'on pense ensuite a enregistrer serait
+ * une facon de ne pas la respecter.
+ *
+ * Le repli sur `true` couvre le temps d'un deploiement, ou le serveur ne
+ * renvoie pas encore ces champs : on montre alors l'etat par defaut, qui est
+ * celui de tout le monde avant d'y avoir touche.
+ */
+function CourrielsSection() {
+  const auth = useAuth();
+  const { user } = auth;
+
+  const [occupe, setOccupe] = useState(false);
+  const [erreur, setErreur] = useState('');
+  const [confirmePause, setConfirmePause] = useState(false);
+
+  const rappels = user?.mailRappels !== false;
+  const bilan = user?.mailBilan !== false;
+  const enPause = user?.enPause === true;
+
+  const enregistrer = async (corps) => {
+    setOccupe(true);
+    setErreur('');
+    try {
+      await api.patch('/users/me', corps);
+      if (auth.refreshUser) await auth.refreshUser();
+      else window.location.reload();
+    } catch (err) {
+      setErreur(err.response?.data?.error || 'Changement impossible');
+    } finally {
+      setOccupe(false);
+      setConfirmePause(false);
+    }
+  };
+
+  return (
+    <>
+      <h2 className="rule-label mt-8 mb-3">Courriels et participation</h2>
+
+      <div className="card">
+        {enPause ? (
+          /*
+            L'etat de pause prend toute la carte, et les cases disparaissent.
+            Proposer de regler des courriels a quelqu'un qui n'en recoit aucun
+            n'a pas de sens : la seule chose a decider ici est s'il revient.
+          */
+          <>
+            <p className="text-[13.5px] font-display font-semibold mb-1">Tu es en pause</p>
+            <p className="text-[12.5px] text-slate-500 leading-relaxed mb-4">
+              Tu ne reçois plus aucun courriel et tu n’apparais plus au classement.
+              Rien n’a été effacé : tes pronostics et tes points t’attendent.
+            </p>
+            <button
+              onClick={() => enregistrer({ enPause: false, mailRappels: true, mailBilan: true })}
+              disabled={occupe}
+              className="btn-primary text-[13px] py-2"
+            >
+              {occupe ? '…' : 'Reprendre le jeu'}
+            </button>
+            <p className="text-[11.5px] text-slate-500 mt-2.5">
+              Les deux courriels seront réactivés en même temps ; tu pourras les couper
+              séparément juste après.
+            </p>
+          </>
+        ) : (
+          <>
+            <Interrupteur
+              actif={rappels}
+              occupe={occupe}
+              onChange={(v) => enregistrer({ mailRappels: v })}
+              titre="Le rappel du vendredi"
+              detail="Envoyé à 17 h, seulement s’il te manque des pronostics pour la journée qui vient."
+            />
+            <Interrupteur
+              actif={bilan}
+              occupe={occupe}
+              onChange={(v) => enregistrer({ mailBilan: v })}
+              titre="Le bilan du lundi"
+              detail="Le vainqueur du week-end, le classement et le fait marquant de la journée."
+            />
+
+            <div className="mt-4 pt-3.5 border-t border-slate-800">
+              {confirmePause ? (
+                <>
+                  <p className="text-[12.5px] text-slate-400 mb-3 leading-relaxed">
+                    Tu ne recevras plus aucun courriel et tu sortiras du classement.
+                    Tes pronostics et tes points restent en place, et tu peux revenir
+                    quand tu veux depuis cette page.
+                  </p>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <button
+                      onClick={() => enregistrer({ enPause: true })}
+                      disabled={occupe}
+                      className="font-display text-[13px] font-semibold px-3.5 py-2 rounded border
+                                 border-red-400/40 text-red-400 hover:bg-red-400/10 transition-colors"
+                    >
+                      {occupe ? '…' : 'Oui, me mettre en pause'}
+                    </button>
+                    <button
+                      onClick={() => setConfirmePause(false)}
+                      className="text-[13px] text-slate-500 hover:text-amber-500 transition-colors"
+                    >
+                      Annuler
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <button
+                  onClick={() => setConfirmePause(true)}
+                  className="text-[13px] text-slate-500 hover:text-red-400 transition-colors"
+                >
+                  Ne plus jouer cette saison
+                </button>
+              )}
+            </div>
+          </>
+        )}
+
+        {erreur && <p className="text-[12.5px] text-red-400 mt-3">{erreur}</p>}
+
+        <p className="text-[11px] italic text-slate-600 mt-4">
+          Ces mêmes réglages se trouvent aussi au bas de chaque courriel, accessibles sans
+          se connecter. Aucun n’efface quoi que ce soit.
+        </p>
+      </div>
+    </>
+  );
+}
 
 /**
  * Mot de passe.

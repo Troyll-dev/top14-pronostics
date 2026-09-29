@@ -51,8 +51,19 @@ async function tooManyTokens(userId, kind) {
   return count >= MAX_TOKENS_PER_HOUR;
 }
 
+/**
+ * Ce qu'on renvoie d'un utilisateur.
+ *
+ * Les trois reglages de courriel en font partie : la page de profil affiche des
+ * cases a cocher, et une case ne peut pas montrer un etat qu'on ne lui a pas
+ * donne. Sans eux elle afficherait « tout activé » a quelqu'un qui vient
+ * justement de tout couper — l'ecran contredirait la base, ce qui est pire que
+ * de ne rien afficher.
+ */
 const PUBLIC = {
-  id: true, username: true, email: true, avatarColor: true, initials: true, avatarRing: true, createdAt: true,
+  id: true, username: true, email: true, avatarColor: true, initials: true, avatarRing: true,
+  mailRappels: true, mailBilan: true, enPause: true, pauseAt: true,
+  createdAt: true,
 };
 
 /**
@@ -102,13 +113,17 @@ function decodeDataUrl(dataUrl) {
 
 /**
  * PATCH /api/users/me
- * { username?, avatarColor?, initials?, avatarRing?, avatar? }
+ * { username?, avatarColor?, initials?, avatarRing?, avatar?,
+ *   mailRappels?, mailBilan?, enPause? }
  *
  * `avatar` vaut une data URL pour remplacer la photo, ou null pour la retirer.
  * Champ absent = on n'y touche pas.
  */
 exports.updateMe = async (req, res) => {
-  const { username, avatarColor, avatar, initials, avatarRing } = req.body;
+  const {
+    username, avatarColor, avatar, initials, avatarRing,
+    mailRappels, mailBilan, enPause,
+  } = req.body;
   const data = {};
 
   if (username !== undefined) {
@@ -148,6 +163,47 @@ exports.updateMe = async (req, res) => {
       const value = String(avatarRing).trim().toLowerCase();
       if (!RING_RE.test(value)) return res.status(400).json({ error: 'Liseré invalide' });
       data.avatarRing = value;
+    }
+  }
+
+  /**
+   * Les reglages de courriel.
+   *
+   * On exige un vrai booleen plutot que d'accepter ce qui ressemble a vrai :
+   * une chaine vide, la chaine « false » ou un zero venus d'un formulaire mal
+   * cable produiraient sinon l'inverse de ce que la personne a demande. Sur un
+   * reglage qui decide d'envoyer ou non des courriels, on prefere refuser
+   * bruyamment.
+   */
+  for (const [champ, valeur] of [['mailRappels', mailRappels], ['mailBilan', mailBilan]]) {
+    if (valeur === undefined) continue;
+    if (typeof valeur !== 'boolean') {
+      return res.status(400).json({ error: `${champ} doit valoir vrai ou faux` });
+    }
+    data[champ] = valeur;
+  }
+
+  /**
+   * La pause, et la reprise.
+   *
+   * Mettre en pause coupe aussi les deux courriels : c'est le sens meme du
+   * geste, et laisser des rappels partir a quelqu'un qui vient de dire qu'il ne
+   * joue plus serait absurde.
+   *
+   * Reprendre ne les rallume pas d'office. Quelqu'un peut vouloir rejouer sans
+   * pour autant vouloir etre relance le vendredi : ce sont deux decisions, et
+   * une seule a ete prise. La page de profil propose les deux cases juste a
+   * cote, il n'y a donc rien a deviner a sa place.
+   */
+  if (enPause !== undefined) {
+    if (typeof enPause !== 'boolean') {
+      return res.status(400).json({ error: 'enPause doit valoir vrai ou faux' });
+    }
+    data.enPause = enPause;
+    data.pauseAt = enPause ? new Date() : null;
+    if (enPause) {
+      data.mailRappels = false;
+      data.mailBilan = false;
     }
   }
 
