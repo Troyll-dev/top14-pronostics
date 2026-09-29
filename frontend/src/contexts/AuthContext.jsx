@@ -26,8 +26,17 @@ export function AuthProvider({ children }) {
     return data.user;
   };
 
-  const register = async (username, email, password) => {
-    const { data } = await api.post('/auth/register', { username, email, password });
+  /**
+   * L'inscription porte desormais le jeton d'invitation.
+   *
+   * Il est passe en quatrieme argument et non glisse dans un objet d'options :
+   * les trois premiers restent ce qu'ils etaient, donc un appel ecrit avant
+   * cette modification continue de compiler. Il echouera cote serveur, ce qui
+   * est exactement ce qu'on veut — l'inscription sans invitation doit etre
+   * refusee, pas contournee par un appel qui aurait oublie le jeton.
+   */
+  const register = async (username, email, password, invitation = null) => {
+    const { data } = await api.post('/auth/register', { username, email, password, invitation });
     localStorage.setItem('token', data.token);
     setUser(data.user);
     return data.user;

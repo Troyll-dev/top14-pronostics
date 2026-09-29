@@ -3,6 +3,7 @@ import api from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 import Avatar, { bumpAvatarVersion, inkOn, initialsOf, ringShadow } from '../components/Avatar';
 import ChampMotDePasse from '../components/ChampMotDePasse';
+import InviterUnAmi from '../components/InviterUnAmi';
 
 const AVATAR_SIZE = 128;
 const MAX_UPLOAD = 8 * 1024 * 1024;   // garde-fou avant lecture, 8 Mo
@@ -373,6 +374,8 @@ export default function ProfilePage() {
       </div>
 
       <CourrielsSection />
+
+      <InviterUnAmi />
 
       <SecuritySection />
     </div>

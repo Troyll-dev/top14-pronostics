@@ -6,6 +6,7 @@ import api from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 import TeamCrest from '../components/TeamCrest';
 import { matchState, STATE, STATE_CHIP, useNow } from '../utils/matchState';
+import InviterUnAmi from '../components/InviterUnAmi';
 
 function pointsTone(points) {
   return {
@@ -312,6 +313,13 @@ export default function HomePage() {
           </div>
         </Link>
       )}
+
+      {/* Inviter un ami.
+
+          Sur l'accueil et pas seulement dans le profil : on pense a inviter
+          quelqu'un en regardant le jeu, jamais en reglant la couleur de sa
+          pastille. */}
+      <InviterUnAmi compact />
 
       {/* Aperçu du championnat */}
       {topFive.length > 0 && (
