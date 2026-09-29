@@ -1,13 +1,25 @@
 const { PrismaClient } = require('@prisma/client');
 const {
-  stats, classerAvecPauses, retenuAuClassement, DEPUIS, DEPARTAGES,
+  stats, classerAvecPauses, retenuDepuis, DEPUIS, DEPUIS_TOUS, DEPARTAGES,
 } = require('../services/ranking');
 const series = require('../services/series.service');
 
 const prisma = new PrismaClient();
 
-// GET /api/leaderboard — classement général
+/**
+ * GET /api/leaderboard          — le general, depuis la J3
+ * GET /api/leaderboard?depuis=5 — depuis que tout le monde est inscrit
+ *
+ * Un seul calcul, deux seuils. Le parametre est borne a un entier raisonnable :
+ * il vient de l'adresse, donc de n'importe qui, et un seuil absurde ne doit pas
+ * rendre un classement absurde — il rendrait surtout un classement vide, que
+ * personne ne saurait expliquer.
+ */
 exports.getLeaderboard = async (req, res) => {
+  const demande = parseInt(req.query.depuis, 10);
+  const seuil = Number.isInteger(demande) && demande >= 1 && demande <= 26 ? demande : DEPUIS;
+  const retenu = retenuDepuis(seuil);
+
   try {
     const users = await prisma.user.findMany({
       select: {
@@ -36,7 +48,7 @@ exports.getLeaderboard = async (req, res) => {
       // Les journees anterieures a `DEPUIS` ne comptent pas : un seul joueur y
       // avait un compte, et son avance n'aurait pas pu etre disputee.
       const played = u.predictions.filter(
-        (p) => p.match.status === 'FINISHED' && retenuAuClassement(p)
+        (p) => p.match.status === 'FINISHED' && retenu(p)
       );
 
       // Les quatre nombres du departage sont calcules par `ranking`, qui sert
@@ -105,7 +117,10 @@ exports.getLeaderboard = async (req, res) => {
 
     res.json({
       classement: enrichi,
-      depuis: DEPUIS,
+      depuis: seuil,
+      // La journee ou tout le monde etait la, pour que l'ecran sache proposer
+      // le second onglet sans avoir a la connaitre de son cote.
+      depuisTous: DEPUIS_TOUS,
       departages: DEPARTAGES,
     });
   } catch (err) {

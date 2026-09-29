@@ -121,6 +121,23 @@ export default function LeaderboardPage() {
   const [general, setGeneral] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  /**
+   * Le classement « depuis que tout le monde est la ».
+   *
+   * Les derniers arrives ont rejoint la bande en cours de saison : le cumul
+   * general les place derriere quoi qu'ils fassent pendant des semaines. Cet
+   * onglet compare tout le monde sur les memes journees — sans inventer de
+   * points pour les journees manquees, ce qui placerait un absent devant ceux
+   * qui ont joue et fait moins bien que la moyenne.
+   *
+   * Il n'est charge qu'a son ouverture, et une seule fois : c'est le meme calcul
+   * que le general a un seuil pres, inutile de le demander a chaque visite de la
+   * page pour un onglet que personne n'ouvrira peut-etre.
+   */
+  const [tous, setTous] = useState(null);
+  const [depuisTous, setDepuisTous] = useState(null);
+  const [loadingTous, setLoadingTous] = useState(false);
+
   const [rounds, setRounds] = useState([]);
   const [round, setRound] = useState(null);
   // Le seuil et les critères viennent du serveur : c'est lui qui les applique,
@@ -140,7 +157,14 @@ export default function LeaderboardPage() {
         // forme, ou l'inverse.
         const d = res.data;
         setGeneral(Array.isArray(d) ? d : d.classement || []);
-        if (!Array.isArray(d)) { setDepuis(d.depuis ?? null); setDepartages(d.departages || []); }
+        if (!Array.isArray(d)) {
+          setDepuis(d.depuis ?? null);
+          setDepartages(d.departages || []);
+          // Le seuil du second onglet vient du serveur : c'est lui qui sait a
+          // partir de quand tout le monde etait inscrit, et deux endroits qui
+          // porteraient ce nombre finiraient par ne plus dire le meme.
+          setDepuisTous(d.depuisTous ?? null);
+        }
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -152,6 +176,15 @@ export default function LeaderboardPage() {
       .then((res) => setRound(res.data.currentRound ?? Math.max(1, res.data.round - 1)))
       .catch(() => setRound(1));
   }, []);
+
+  useEffect(() => {
+    if (view !== 'tous' || !depuisTous || tous) return;
+    setLoadingTous(true);
+    api.get('/leaderboard', { params: { depuis: depuisTous } })
+      .then((res) => setTous(res.data.classement || []))
+      .catch(console.error)
+      .finally(() => setLoadingTous(false));
+  }, [view, depuisTous, tous]);
 
   // Le classement d'une journee n'est charge qu'a l'ouverture de l'onglet.
   useEffect(() => {
@@ -178,6 +211,8 @@ export default function LeaderboardPage() {
       <p className="text-xs italic text-slate-500 mb-4">
         {view === 'general'
           ? `Saison 2026-2027 · ${depuis && depuis > 1 ? `à partir de la journée ${depuis}` : 'toutes journées confondues'}`
+          : view === 'tous'
+          ? `Saison 2026-2027 · à partir de la journée ${depuisTous}, quand tout le monde était inscrit`
           : `Saison 2026-2027 · journée ${round ?? '—'} seule`}
       </p>
 
@@ -185,6 +220,7 @@ export default function LeaderboardPage() {
       <div className="flex gap-1.5 mb-5">
         {[
           { key: 'general', label: 'Général' },
+          ...(depuisTous ? [{ key: 'tous', label: `Depuis la J${depuisTous}` }] : []),
           { key: 'journee', label: round ? `Journée ${round}` : 'Journée' },
         ].map((t) => (
           <button
@@ -230,6 +266,37 @@ export default function LeaderboardPage() {
               />
             ))}
           </div>
+        )
+      ) : view === 'tous' ? (
+        loadingTous || !tous ? (
+          <div className="text-center py-12 text-slate-500 animate-pulse">Chargement…</div>
+        ) : (
+          <>
+            <p className="text-[12.5px] text-slate-500 mb-3 leading-relaxed">
+              Tout le monde est comparé sur les mêmes journées, à partir de la J{depuisTous}.
+              Aucun point n'est inventé pour les journées manquées : ce classement ne compte
+              que des pronostics réellement posés.
+            </p>
+            <div className="space-y-2">
+              {tous.map((player, idx) => (
+                <PlayerRow
+                  key={player.id}
+                  rank={player.rank ?? idx + 1}
+                  player={player}
+                  points={player.totalPoints}
+                  isMe={player.id === user?.id}
+                  stats={
+                    <>
+                      <span>{player.played} joués</span>
+                      <span className="text-green-400">🎯 {player.exactScores} exacts</span>
+                      <span className="text-blue-400">✅ {player.correctWinners} bons</span>
+                      <span>{player.accuracy}% précision</span>
+                    </>
+                  }
+                />
+              ))}
+            </div>
+          </>
         )
       ) : (
         <>

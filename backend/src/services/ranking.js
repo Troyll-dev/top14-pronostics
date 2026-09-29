@@ -59,16 +59,42 @@
 const DEPUIS = Number(process.env.CLASSEMENT_DEPUIS || 3);
 
 /**
- * Ce pronostic compte-t-il au classement general ?
+ * La journee a partir de laquelle tout le monde etait inscrit.
+ *
+ * Elle sert un second classement, a cote du general : les derniers arrives ont
+ * rejoint la bande en cours de saison, et le cumul depuis la J3 les place
+ * derriere quoi qu'ils fassent pendant des semaines.
+ *
+ * On ne leur attribue surtout pas une moyenne pour les journees manquees. Ce
+ * serait placer un absent au milieu du classement par construction, donc devant
+ * ceux qui ont joue ces journees-la et fait moins bien que la moyenne — on
+ * recompenserait l'absence mieux que la participation ratee. Et le classement
+ * cesserait d'etre un compte rendu : un point sans pronostic derriere n'est
+ * verifiable par personne, et nos quatre criteres de departage, qui se lisent
+ * sur des pronostics reels, n'auraient plus rien a lire.
+ *
+ * Comparer tout le monde sur les memes journees ne fabrique aucun chiffre. Le
+ * general reste le compte rendu fidele de la saison, et celui-ci dit qui joue
+ * le mieux depuis que tout le monde est la.
+ */
+const DEPUIS_TOUS = Number(process.env.CLASSEMENT_TOUS || 5);
+
+/**
+ * Ce pronostic compte-t-il, a partir d'un seuil donne ?
  *
  * Exportee plutot qu'appliquee dans `stats`, parce que le classement d'une
  * journee doit pouvoir compter la J1 et la J2 : sur ces pages-la, la question
  * n'est pas l'equite du cumul mais ce qui s'est passe ce week-end-la.
  */
-function retenuAuClassement(prono) {
-  const round = prono?.match?.round;
-  return !Number.isFinite(round) || round >= DEPUIS;
+function retenuDepuis(seuil) {
+  return (prono) => {
+    const round = prono?.match?.round;
+    return !Number.isFinite(round) || round >= seuil;
+  };
 }
+
+/** Le filtre du classement general, au seuil par defaut. */
+const retenuAuClassement = retenuDepuis(DEPUIS);
 
 /**
  * L'ecart total d'un pronostic : la somme des erreurs sur les deux equipes.
@@ -187,5 +213,5 @@ const DEPARTAGES = [
 
 module.exports = {
   ecart, stats, comparer, classer, classerAvecPauses,
-  DEPARTAGES, DEPUIS, retenuAuClassement,
+  DEPARTAGES, DEPUIS, DEPUIS_TOUS, retenuAuClassement, retenuDepuis,
 };
