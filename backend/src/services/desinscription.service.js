@@ -83,9 +83,23 @@ function secret() {
  * serveur ne peut pas la deviner depuis une tache planifiee, ou il n'y a
  * aucune requete entrante pour la lui apprendre. Elle vient donc de
  * l'environnement.
+ *
+ * Deux sources, dans cet ordre. `API_URL` d'abord, qui permet de forcer une
+ * adresse — un nom de domaine a soi, par exemple. A defaut, le domaine public
+ * que l'hebergeur pose lui-meme dans l'environnement : la premiere version ne
+ * lisait que `API_URL`, et faute de l'avoir posee les liens ne se
+ * construisaient pas du tout, alors que l'adresse etait la, a portee de main.
+ *
+ * Un reglage qu'on peut deduire ne devrait pas avoir a etre saisi : chaque
+ * variable a poser est une occasion de l'oublier, et un oubli qui se traduit
+ * par une absence silencieuse est le pire des deux.
  */
 function baseApi() {
-  return (process.env.API_URL || '').replace(/\/$/, '');
+  const explicite = (process.env.API_URL || '').trim();
+  if (explicite) return explicite.replace(/\/$/, '');
+
+  const hebergeur = (process.env.RAILWAY_PUBLIC_DOMAIN || '').trim();
+  return hebergeur ? `https://${hebergeur.replace(/\/$/, '')}` : '';
 }
 
 /** Peut-on fabriquer des liens ? Sinon, les courriels partent sans. */
