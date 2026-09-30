@@ -91,19 +91,27 @@ export default function RoundPredictionsPage() {
     api.get('/matches/rounds').then((res) => setRounds(res.data)).catch(console.error);
 
     /**
-     * Cette page regarde en arrière : elle montre qui a vu juste. Elle s'ouvre
-     * donc sur la journée en cours ou la dernière jouée — `currentRound` — et
-     * non sur `round`, qui désigne la journée à pronostiquer.
+     * La journée ouverte par défaut bascule le mercredi.
      *
-     * Elle lisait `round`. Sur une journée pas encore jouée il n'y a ni score ni
-     * point : le tableau s'ouvrait sur la seule journée où il n'a rien à
-     * montrer, quand il ne tombait pas sur « Aucun pronostic pour la journée 5 ».
+     * Cette page sert deux usages, parce que les pronostics sont visibles en
+     * permanence : avant le week-end on vient voir ce que les autres ont osé,
+     * après on vient voir qui avait raison. Le mercredi on bascule sur la
+     * journée suivante, et on y reste jusqu'au mercredi d'après.
      *
-     * Le repli sur `round - 1` couvre le temps d'un déploiement, où le
-     * navigateur peut avoir la nouvelle page et le serveur l'ancienne réponse.
+     * Le calcul est fait par le serveur et arrive tout fait dans `roundSemaine`.
+     * Il l'était auparavant ici, à partir du jour de la semaine lu dans le
+     * navigateur ; deux raisons l'ont fait déménager, et elles sont écrites au
+     * long dans `backend/src/services/semaine.js` : l'horloge d'un joueur n'a
+     * pas à décider de ce que voient les autres, et le jour de la semaine ne
+     * suffisait pas à traiter une journée jouée intégralement le samedi.
+     *
+     * Les replis couvrent le temps d'un déploiement, où le navigateur peut
+     * avoir la nouvelle page et le serveur l'ancienne réponse.
      */
     api.get('/matches/next-round')
-      .then((res) => setCurrentRound(res.data.currentRound ?? Math.max(1, res.data.round - 1)))
+      .then((res) => {
+        setCurrentRound(res.data.roundSemaine ?? res.data.currentRound ?? res.data.round ?? 1);
+      })
       .catch(() => setCurrentRound(1));
   }, []);
 

@@ -2,6 +2,7 @@ const { PrismaClient } = require('@prisma/client');
 const { pointsFor } = require('../services/scoring');
 const { multiplicateur, afficheDeLaJournee, journeeCommencee } = require('../services/rules');
 const { forme } = require('../services/team-stats.service');
+const { debutSemaine, choisirJournee, JOUR_MS } = require('../services/semaine');
 
 const prisma = new PrismaClient();
 
@@ -227,6 +228,12 @@ async function estLAffiche(match) {
  *                le coup d'envoi est passé. C'est ce qu'il faut afficher par défaut
  *                dans les résultats : le samedi soir on veut voir la journée du jour,
  *                pas la précédente.
+ * roundSemaine : la journée de la semaine en cours, la semaine commençant le
+ *                mercredi à 0 h (heure de Paris). C'est la valeur qu'ouvre la page
+ *                « Tous les pronos ». Voir `services/semaine.js` pour le pourquoi :
+ *                elle remplace un calcul qui se faisait dans le navigateur, à partir
+ *                du jour de la semaine, et qui se trompait d'une soirée sur une
+ *                journée jouée intégralement le samedi.
  */
 exports.getNextRound = async (req, res) => {
   try {
@@ -244,9 +251,24 @@ exports.getNextRound = async (req, res) => {
       select: { round: true },
     });
 
+    // Le premier match programmé dans la fenêtre mercredi → mercredi. On lit le
+    // premier et non le dernier : si une journée déborde sur le lundi suivant,
+    // c'est bien elle qu'on veut, pas la moitié de la suivante.
+    const debut = debutSemaine(now);
+    const semaine = await prisma.match.findFirst({
+      where: { kickoff: { gte: debut, lt: new Date(debut.getTime() + 7 * JOUR_MS) } },
+      orderBy: { kickoff: 'asc' },
+      select: { round: true },
+    });
+
     res.json({
       round: next?.round ?? started?.round ?? 1,
       currentRound: started?.round ?? next?.round ?? 1,
+      roundSemaine: choisirJournee({
+        semaine: semaine?.round,
+        derniere: started?.round,
+        prochaine: next?.round,
+      }),
     });
   } catch (err) {
     console.error(err);
