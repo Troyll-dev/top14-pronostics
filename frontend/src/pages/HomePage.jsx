@@ -309,14 +309,14 @@ export default function HomePage() {
               )}
               {myIndex === 0 && <p className="text-green-400 mt-0.5">Tu mènes la danse 🥇</p>}
 
-              {/* Les series et l'ecart avec le voisin.
+              {/* La journee gagnee, ou la serie en cours.
  
                   C'est ce qui donne une raison de revenir quand l'ordre du
-                  classement s'est fige : le rang bouge peu, la serie change
-                  presque chaque semaine. Rien ne s'affiche s'il n'y a rien a
-                  dire — une serie de deux n'est pas une serie. */}
-              {(me.phrasesPourToi || me.phrases || []).slice(0, 2).map((ph, i) => (
-                <p key={i} className="text-slate-500 mt-0.5">{ph}</p>
+                  classement s'est fige : le rang bouge peu, le vainqueur de la
+                  journee change presque chaque semaine. Rien ne s'affiche quand
+                  il n'y a rien a dire. */}
+              {(me.phrasesPourToi || me.phrases || []).map((ph, i) => (
+                <p key={i} className="text-amber-500/90 mt-0.5">{ph}</p>
               ))}
             </div>
           </div>

@@ -159,18 +159,16 @@ async function bilan(round) {
   const vainqueurs = meilleurs.filter((l) => l.journee === top && top > 0);
 
   /**
-   * Les series et les ecarts, calcules par le meme service que le site.
+   * La serie de journees gagnees, calculee par le meme service que le site.
    *
-   * Le bilan et la page doivent dire la meme chose des memes chiffres. Les
-   * reformuler ici, avec les pronostics deja charges plus haut, serait plus
+   * Le bilan et la page doivent dire la meme chose des memes chiffres. La
+   * recalculer ici, avec les pronostics deja charges plus haut, serait plus
    * rapide d'une requete et strictement equivalent — jusqu'au jour ou l'une des
    * deux versions evoluerait sans l'autre. On a deja paye ce prix-la sur le
    * departage.
    */
   const parSerie = await series.pourTous({ season: SEASON });
-  const commente = series.avecEcarts(
-    classement.map((l) => ({ ...l, serie: parSerie.get(l.id) || null }))
-  );
+  const commente = classement.map((l) => ({ ...l, serie: parSerie.get(l.id) || null }));
 
   return {
     round,

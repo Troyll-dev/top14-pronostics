@@ -87,11 +87,8 @@ exports.getLeaderboard = async (req, res) => {
     // proprietes non indicees d'un tableau, et la valeur disparaissait
     // silencieusement a la serialisation.
     /**
-     * Les series et les ecarts s'ajoutent apres le classement, pas avant.
-     *
-     * L'ecart se lit sur des rangs : tant qu'ils ne sont pas attribues, il n'y
-     * a pas de voisin du dessus. Et la serie ne change pas l'ordre, elle le
-     * commente — la calculer plus tot ne servirait qu'a brouiller la lecture.
+     * La serie de journees gagnees s'ajoute apres le classement : elle ne change
+     * pas l'ordre, elle le commente.
      *
      * Deux formulations accompagnent chaque ligne. `phrases` parle du joueur a
      * la troisieme personne, pour le classement ou on lit les autres.
@@ -105,15 +102,16 @@ exports.getLeaderboard = async (req, res) => {
     const classe = classerAvecPauses(leaderboard);
     const parSerie = await series.pourTous();
 
-    const enrichi = series.avecEcarts(
-      classe.map((l) => ({ ...l, serie: parSerie.get(l.id) || null }))
-    ).map((l) => ({
-      ...l,
-      phrases: series.phrases(l, { pourSoi: false }),
-      ...(req.user && req.user.id === l.id
-        ? { phrasesPourToi: series.phrases(l, { pourSoi: true }) }
-        : {}),
-    }));
+    const enrichi = classe.map((l) => {
+      const avecSerie = { ...l, serie: parSerie.get(l.id) || null };
+      return {
+        ...avecSerie,
+        phrases: series.phrases(avecSerie, { pourSoi: false }),
+        ...(req.user && req.user.id === l.id
+          ? { phrasesPourToi: series.phrases(avecSerie, { pourSoi: true }) }
+          : {}),
+      };
+    });
 
     res.json({
       classement: enrichi,

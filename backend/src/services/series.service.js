@@ -1,208 +1,158 @@
 /**
- * Les series et les ecarts.
+ * Les series de journees gagnees.
  *
- * Le classement general dit qui gagne. Il ne dit pas ce qui se passe — qu'un
- * joueur reste sur quatre bons pronostics d'affilee, ou qu'il ne lui manque que
- * deux points pour doubler son voisin. Or c'est cela qui donne envie de revenir
- * la semaine suivante, surtout quand l'ordre du classement s'est fige.
+ * Le classement general dit qui mene. Il ne dit pas ce qui se passe — qu'un
+ * joueur vient de rafler la journee, ou qu'il en gagne trois d'affilee. Or
+ * c'est cela qui donne envie de revenir la semaine suivante, surtout quand
+ * l'ordre du classement s'est fige.
  *
- * Deux notions, et elles ne se ressemblent pas.
+ * ---------------------------------------------------------------------------
+ * Pourquoi la journee, et non le pronostic
+ * ---------------------------------------------------------------------------
  *
- * La serie regarde en arriere : combien de pronostics de suite ont rapporte
- * quelque chose, ou combien sont tombes a cote. Elle se lit sur les pronostics
- * d'un seul joueur, dans l'ordre ou les matchs ont ete joues.
+ * La premiere version comptait les bons pronostics d'affilee, a partir de
+ * trois. C'etait une fausse bonne idee, et le calcul le montre : un bon
+ * vainqueur rapporte des qu'on trouve le bon gagnant, ce qui arrive environ
+ * deux fois sur trois. Avec sept matchs par journee, enchainer trois bons
+ * pronostics n'est pas une performance, c'est ce qui se produit presque toutes
+ * les semaines. On annoncait donc comme un exploit quelque chose d'automatique,
+ * et une rubrique qui dit une banalite cesse d'etre lue en deux semaines.
  *
- * L'ecart regarde de cote : combien de points separent de celui qui precede et
- * de celui qui suit. Il se lit sur le classement, pas sur les pronostics.
+ * L'erreur etait dans l'unite choisie, pas seulement dans le seuil. L'unite de
+ * ce jeu est la journee : on la gagne ou on ne la gagne pas, une fois par
+ * semaine, contre les autres. Une serie de journees gagnees est rare sans etre
+ * exceptionnelle, et elle se raconte au comptoir.
  *
- * Tout ce qui compte ici est ecrit en fonctions pures, testables sans base :
- * `serieDe` prend une liste de pronostics et rend deux nombres, `avecEcarts`
- * prend un classement et rend le meme avec deux champs de plus. Le reste n'est
- * que lecture en base.
+ * L'ecart avec le voisin de classement a disparu avec elle. « Deux points te
+ * separent de Christian » ne disait pas dans quel sens, et le classement, lui,
+ * le montre d'un coup d'oeil — c'est son travail, pas celui d'une phrase.
  */
 
 const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
 
-/** Seuil a partir duquel une serie merite d'etre annoncee. */
-const SERIE_MINI = 3;
-
 /**
- * Le bareme seul, de 0 a 3, jamais le total multiplie.
+ * Les vainqueurs de chaque journee terminee, dans l'ordre des journees.
  *
- * Une serie compte des pronostics reussis, pas des points : un bon vainqueur
- * joue en joker vaut quatre points et reste un seul bon pronostic. Le repli sur
- * `points` couvre les pronostics d'avant les multiplicateurs, dont `basePoints`
- * est nul.
+ * Fonction pure : elle prend des pronostics deja notes et rend un tableau. Elle
+ * ne lit rien, ne suppose rien de la base, et se teste avec cinq lignes.
+ *
+ * Deux choix qui meritent d'etre dits. Une egalite en tete fait plusieurs
+ * vainqueurs, comme dans le bilan du lundi : on ne tranche pas en silence ce
+ * que le jeu n'a pas tranche. Et une journee ou personne n'a marque n'a aucun
+ * vainqueur — elle casse donc les series en cours, ce qui est juste : personne
+ * ne l'a gagnee.
+ *
+ * On somme `points`, le total multiplie, et non le bareme : le joker fait
+ * partie du jeu, et celui qui l'a bien place a gagne sa journee pour de bon.
  */
-const bareme = (p) => (p.basePoints ?? p.points);
-
-/**
- * La serie en cours et le record de la saison.
- *
- * `pronos` doit arriver dans l'ordre ou les matchs ont ete joues — c'est a
- * l'appelant de le garantir, une serie etant par definition une question
- * d'ordre. La fonction ne trie pas elle-meme : elle n'a pas les dates, et lui
- * demander de deviner l'ordre serait lui demander de deviner la reponse.
- *
- * Un pronostic non note (match reporte, points pas encore calcules) est ignore
- * plutot que de casser la serie : il n'apprend rien, et le compter comme un
- * echec punirait quelqu'un pour un match qui ne s'est pas joue.
- *
- * Rend `{ type, longueur, record }` ou `type` vaut 'bon' ou 'rate'. Sur une
- * liste vide, longueur zero et type nul — et surtout pas 'rate', qui annoncerait
- * une serie de defaites a quelqu'un qui n'a simplement pas encore joue.
- */
-function serieDe(pronos) {
-  let type = null;
-  let longueur = 0;
-  let record = 0;
-  let courante = 0;
-  let typeCourant = null;
+function vainqueursParJournee(pronos) {
+  const parRonde = new Map();
 
   for (const p of pronos) {
-    const b = bareme(p);
-    if (b === null || b === undefined) continue;
-
-    const t = b > 0 ? 'bon' : 'rate';
-    if (t === typeCourant) courante += 1;
-    else { typeCourant = t; courante = 1; }
-
-    if (t === 'bon' && courante > record) record = courante;
-
-    type = typeCourant;
-    longueur = courante;
+    const round = p.round ?? p.match?.round;
+    if (!Number.isFinite(round)) continue;
+    if (!parRonde.has(round)) parRonde.set(round, new Map());
+    const total = parRonde.get(round);
+    total.set(p.userId, (total.get(p.userId) || 0) + (p.points || 0));
   }
 
-  return { type, longueur, record };
+  return [...parRonde.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([round, totaux]) => {
+      let meilleur = 0;
+      for (const v of totaux.values()) if (v > meilleur) meilleur = v;
+
+      const gagnants = meilleur > 0
+        ? [...totaux.entries()].filter(([, v]) => v === meilleur).map(([id]) => id)
+        : [];
+
+      return { round, meilleur, gagnants };
+    });
 }
 
 /**
- * Les ecarts avec le voisin du dessus et celui du dessous.
+ * La serie de journees gagnees d'un joueur, en remontant depuis la derniere.
  *
- * Les joueurs en pause sont ignores : ils n'ont pas de rang, donc ni voisin ni
- * ecart. Les compter reviendrait a dire « tu devances Christian de 2 points »
- * a propos de quelqu'un qui ne joue plus.
+ * Zero des qu'il n'a pas gagne la derniere journee terminee : une serie est en
+ * cours ou elle n'existe pas. Celle de la semaine derniere, interrompue depuis,
+ * n'interesse personne — et surtout pas celui a qui on la rappellerait.
  *
- * `devant` est celui qu'on peut doubler, `derriere` celui qui peut nous
- * doubler. Le premier du classement n'a pas de `devant`, le dernier pas de
- * `derriere` — et les champs valent alors `null` plutot que zero, qui voudrait
- * dire « a egalite ».
+ * Rend `{ longueur, derniereJournee }`. La journee sert a l'affichage : « tu as
+ * gagne la J4 » est plus concret que « tu as gagne la derniere journee ».
  */
-function avecEcarts(classement) {
-  const classes = classement.filter((l) => !l.enPause && Number.isFinite(l.rank));
-  const parRang = [...classes].sort((a, b) => a.rank - b.rank);
-  const index = new Map(parRang.map((l, i) => [l.id, i]));
+function serieDe(journees, userId) {
+  let longueur = 0;
+  let derniereJournee = null;
 
-  const points = (l) => l.totalPoints ?? l.points ?? 0;
+  for (let i = journees.length - 1; i >= 0; i--) {
+    const j = journees[i];
+    if (!j.gagnants.includes(userId)) break;
+    if (longueur === 0) derniereJournee = j.round;
+    longueur += 1;
+  }
 
-  return classement.map((l) => {
-    const i = index.get(l.id);
-    if (i === undefined) return { ...l, devant: null, derriere: null };
-
-    const dessus = parRang[i - 1];
-    const dessous = parRang[i + 1];
-
-    return {
-      ...l,
-      devant: dessus
-        ? { username: dessus.username, ecart: points(dessus) - points(l) }
-        : null,
-      derriere: dessous
-        ? { username: dessous.username, ecart: points(l) - points(dessous) }
-        : null,
-    };
-  });
+  return { longueur, derniereJournee };
 }
 
 /**
- * Les phrases a afficher, de la plus interessante a la moins.
+ * Ce qu'on affiche, de la phrase la plus forte a rien du tout.
  *
- * Elles sont fabriquees ici, une seule fois, et non dans chaque ecran : la page
- * d'accueil, le classement et le bilan du lundi doivent dire la meme chose des
- * memes chiffres. Trois formulations d'une meme regle finissent toujours par
- * diverger — on l'a deja vu avec le departage.
+ * Fabriquee ici, une seule fois : la page d'accueil, le classement et le bilan
+ * du lundi doivent dire la meme chose des memes chiffres. Trois formulations
+ * d'une meme regle finissent toujours par diverger — on l'a deja vu avec le
+ * departage.
  *
- * On ne dit rien plutot que de dire une banalite. Une serie de deux n'est pas
- * une serie, un ecart avec personne n'est pas un ecart, et une rubrique remplie
- * de force avec du vide se demasque en deux semaines et n'est plus lue.
+ * Rien ne s'affiche quand il n'y a rien a dire. C'est le point le plus
+ * important de cette fonction : une rubrique remplie de force avec une banalite
+ * se demasque en deux semaines et n'est plus lue, ce qui coute aussi les fois
+ * ou elle avait quelque chose a dire.
  */
 function phrases(ligne, { pourSoi = true } = {}) {
-  const tu = pourSoi;
-  const sortie = [];
-  const s = ligne.serie;
+  const s = ligne?.serie;
+  if (!s || !s.longueur) return [];
 
-  if (s && s.longueur >= SERIE_MINI) {
-    if (s.type === 'bon') {
-      sortie.push(
-        tu
-          ? `${s.longueur} bons pronostics de suite — ne change rien.`
-          : `${s.longueur} bons pronostics de suite`
-      );
-    } else {
-      sortie.push(
-        tu
-          ? `${s.longueur} pronostics ratés d'affilée. Ça va finir par tourner.`
-          : `${s.longueur} pronostics ratés d'affilée`
-      );
-    }
+  if (s.longueur === 1) {
+    return [
+      pourSoi
+        ? `Tu as gagné la journée ${s.derniereJournee}.`
+        : `Vainqueur de la journée ${s.derniereJournee}`,
+    ];
   }
 
-  if (ligne.devant) {
-    const e = ligne.devant.ecart;
-    sortie.push(
-      e === 0
-        ? (tu ? `Tu es à égalité avec ${ligne.devant.username}.` : `à égalité avec ${ligne.devant.username}`)
-        : (tu
-          ? `${e} point${e > 1 ? 's' : ''} te sépare${e > 1 ? 'nt' : ''} de ${ligne.devant.username}.`
-          : `${e} point${e > 1 ? 's' : ''} derrière ${ligne.devant.username}`)
-    );
-  } else if (ligne.derriere && ligne.derriere.ecart > 0) {
-    const e = ligne.derriere.ecart;
-    sortie.push(
-      tu
-        ? `Tu mènes, avec ${e} point${e > 1 ? 's' : ''} d'avance sur ${ligne.derriere.username}.`
-        : `${e} point${e > 1 ? 's' : ''} d'avance`
-    );
-  }
-
-  return sortie;
+  return [
+    pourSoi
+      ? `${s.longueur} journées gagnées d'affilée. Ça commence à se voir.`
+      : `${s.longueur} journées gagnées d'affilée`,
+  ];
 }
 
 /**
  * Les series de tous les joueurs, lues en base.
  *
- * Une seule requete pour tout le monde plutot qu'une par joueur : a cinq c'est
+ * Une seule requete pour tout le monde plutot qu'une par joueur : a huit c'est
  * sans importance, mais la requete par joueur dans une boucle est la facon la
  * plus sure de rendre une page lente sans s'en apercevoir tant qu'on est peu
  * nombreux.
  *
- * L'ordre est celui des coups d'envoi, pas celui des journees : quand une
- * rencontre est reportee, elle se joue a sa vraie date et la serie doit suivre
- * ce qui s'est passe, pas le calendrier prevu.
+ * Seules les rencontres terminees comptent : une journee en cours n'a pas
+ * encore de vainqueur, et l'annoncer a la mi-temps du dernier match serait le
+ * meilleur moyen de se dedire une heure plus tard.
  */
 async function pourTous({ season = process.env.SPORTSDB_SEASON || '2026-2027' } = {}) {
   const pronos = await prisma.prediction.findMany({
     where: { match: { season, status: 'FINISHED' } },
-    select: {
-      userId: true,
-      points: true,
-      basePoints: true,
-      match: { select: { kickoff: true } },
-    },
-    orderBy: { match: { kickoff: 'asc' } },
+    select: { userId: true, points: true, match: { select: { round: true } } },
   });
 
-  const parJoueur = new Map();
-  for (const p of pronos) {
-    if (!parJoueur.has(p.userId)) parJoueur.set(p.userId, []);
-    parJoueur.get(p.userId).push(p);
-  }
+  const journees = vainqueursParJournee(pronos);
 
   const sortie = new Map();
-  for (const [userId, liste] of parJoueur) sortie.set(userId, serieDe(liste));
+  for (const userId of new Set(pronos.map((p) => p.userId))) {
+    sortie.set(userId, serieDe(journees, userId));
+  }
   return sortie;
 }
 
-module.exports = { SERIE_MINI, serieDe, avecEcarts, phrases, pourTous };
+module.exports = { vainqueursParJournee, serieDe, phrases, pourTous };
