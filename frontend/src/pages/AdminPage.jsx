@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../api/client';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function AdminPage() {
+  const { user } = useAuth();
   const [teams, setTeams] = useState([]);
   const [matches, setMatches] = useState([]);
   const [form, setForm] = useState({ homeTeamId: '', awayTeamId: '', kickoff: '', round: '', venue: '' });
@@ -41,6 +44,33 @@ export default function AdminPage() {
   };
 
   const pendingResults = matches.filter((m) => m.status !== 'FINISHED' && new Date() >= new Date(m.kickoff));
+
+  /**
+   * L'ecran refuse aussi, mais ce n'est pas lui qui protege.
+   *
+   * La page etait derriere `PrivateRoute`, qui verifie seulement qu'on est
+   * connecte — pas qui on est. N'importe lequel des joueurs pouvait donc y
+   * entrer et saisir un resultat, ce qui distribue les points de tout le monde.
+   *
+   * La vraie fermeture est cote serveur : `requireAdmin` sur les deux routes.
+   * Ce garde-ci evite seulement de proposer des formulaires qui seraient
+   * refuses a l'envoi — c'est de la politesse, pas de la securite. Le cacher
+   * sans fermer l'API n'aurait rien protege du tout.
+   */
+  if (user && user.admin === false) {
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-16 text-center">
+        <h1 className="font-display text-[26px] font-extrabold leading-none mb-2">Réservé à l'administration</h1>
+        <p className="text-[14px] text-slate-400 leading-relaxed">
+          Cette page sert à créer des matchs et à saisir des résultats. Les scores
+          arrivent tout seuls, personne n'a besoin d'y toucher.
+        </p>
+        <p className="mt-6">
+          <Link to="/" className="text-amber-500 hover:underline text-[14px]">Retour au jeu</Link>
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">

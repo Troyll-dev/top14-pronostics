@@ -30,7 +30,7 @@ const prisma = new PrismaClient();
  * a deja un travail a faire, et qui ne doit pas devenir un bulletin.
  */
 const NOUVEAUTE_VENDREDI =
-  'Nouveau : les compositions et la forme des clubs s\'affichent sous chaque match.';
+  '';
 
 /**
  * Ce qu'on annonce, du plus utile au moins.

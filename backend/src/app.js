@@ -94,6 +94,17 @@ app.listen(PORT, () => {
   // l'adresse publique de l'API pour etre absolus. S'il en manque un, les
   // courriels partent sans ces liens — ce qui se voit tres mal. On le dit donc
   // ici, au demarrage, a cote des autres taches.
+  // Une porte fermee par defaut doit dire qu'elle l'est : sans ADMIN_EMAILS,
+  // personne n'administre, et il vaut mieux l'apprendre ici que devant une page
+  // qui refuse sans expliquer.
+  const { combien } = require('./middleware/admin.middleware');
+  const nbAdmins = combien();
+  console.log(
+    nbAdmins
+      ? `Administration : ${nbAdmins} adresse(s) autorisee(s)`
+      : 'Administration FERMEE a tous (ADMIN_EMAILS absente)'
+  );
+
   const { disponible } = require('./services/desinscription.service');
   console.log(
     disponible()

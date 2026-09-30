@@ -2,6 +2,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { PrismaClient } = require('@prisma/client');
 const { validationResult } = require('express-validator');
+const { estAdmin } = require('../middleware/admin.middleware');
 
 const prisma = new PrismaClient();
 
@@ -34,6 +35,11 @@ const profilPublic = (user) => ({
   mailRappels: user.mailRappels,
   mailBilan: user.mailBilan,
   enPause: user.enPause,
+  // Calcule, jamais stocke : la liste des administrateurs vit dans
+  // l'environnement. L'ecran s'en sert pour ne pas proposer une page qui lui
+  // sera refusee — la vraie porte est cote serveur, celle-ci n'est que de la
+  // politesse.
+  admin: estAdmin(user),
 });
 
 const generateToken = (userId) =>
@@ -96,5 +102,5 @@ exports.login = async (req, res) => {
  */
 exports.me = async (req, res) => {
   const { password, ...user } = req.user;
-  res.json(user);
+  res.json({ ...user, admin: estAdmin(req.user) });
 };
