@@ -256,7 +256,14 @@
     box-shadow: 0 1px 2px rgb(0 0 0 / .1), 0 3px 12px rgb(0 0 0 / .08);
   }
 
-  /* Couture interieure — reservee aux cartes de match */
+  /* Couture interieure.
+     Le lacet de ballon qui l'accompagnait a ete retire : ancre au milieu de la
+     carte, il tombait sur les statistiques depuis que les cartes de match ont
+     grandi, et sans ovale autour il se lisait comme un rateau. Aucun coin
+     n'etait libre pour le deplacer — les valeurs de droite touchent le bord.
+     La couture, elle, suffit a dire le cuir, et elle tient dans les deux
+     themes parce qu'elle s'appuie sur --stitch et non sur l'echelle de gris,
+     qui s'inverse d'un theme a l'autre. */
   .stitched::before {
     content: '';
     position: absolute;
@@ -264,26 +271,6 @@
     border: 1px dashed rgb(var(--stitch) / var(--stitch-a));
     border-radius: 6px;
     pointer-events: none;
-  }
-
-  /* Lacet de ballon en filigrane */
-  .laced::after {
-    content: '';
-    position: absolute;
-    right: 14px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 56px;
-    height: 76px;
-    opacity: .07;
-    pointer-events: none;
-    border-radius: 50% / 40%;
-    background:
-      linear-gradient(90deg, transparent 26px, rgb(var(--s-600)) 26px 30px, transparent 30px),
-      repeating-linear-gradient(180deg, transparent 0 10px, rgb(var(--s-600)) 10px 13px, transparent 13px 20px);
-    background-size: 100% 100%, 44px 100%;
-    background-position: center, center;
-    background-repeat: no-repeat;
   }
 
   .input {
