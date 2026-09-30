@@ -7,3 +7,9 @@ build/
 .DS_Store
 
 mdpgmailtop14.txt
+
+# Sauvegardes : elles portent les adresses e-mail et les photos des joueurs.
+# Une fois commitees, elles restent dans l'historique meme effacees ensuite.
+top14-*.json
+top14-*.json.gz
+top14-*.json.gz.txt
