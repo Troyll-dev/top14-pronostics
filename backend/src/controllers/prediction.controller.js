@@ -6,6 +6,43 @@ const prisma = new PrismaClient();
 const SEASON = process.env.SPORTSDB_SEASON || '2026-2027';
 
 /**
+ * Le plus haut score qu'on accepte.
+ *
+ * Deux cents n'a rien d'une regle du rugby : c'est une borne de bon sens. Le
+ * record du Top 14 tourne autour de quatre-vingts points, et un pronostic a
+ * 9 999 n'est pas une opinion sur un match, c'est un doigt qui a glisse ou
+ * quelqu'un qui essaie l'API.
+ */
+const SCORE_MAX = 200;
+
+/**
+ * Lit un score, ou rend `null` s'il n'en est pas un.
+ *
+ * L'ancienne verification laissait passer trop de choses. « abc » n'est ni
+ * `undefined` ni inferieur a zero : il franchissait les deux tests, arrivait a
+ * `parseInt` sous la forme `NaN`, et c'est Prisma qui finissait par lever — le
+ * joueur recevait une erreur serveur 500 pour une faute de saisie. Une valeur
+ * qu'on ne comprend pas merite un refus lisible, pas une panne.
+ *
+ * `Number` plutot que `parseInt` : `parseInt('12abc')` rend 12, ce qui accepte
+ * une saisie a moitie fausse en faisant semblant de l'avoir comprise. `Number`
+ * rend `NaN` et refuse franchement. Et `Number.isInteger` ecarte 12.5, qu'aucun
+ * score de rugby ne justifie.
+ *
+ * Le controle de type en tete n'est pas de la coquetterie : `Number(true)` vaut
+ * 1, `Number([])` vaut 0 et `Number([5])` vaut 5. Sans lui, envoyer `true`
+ * enregistrerait un pronostic a 1 point, et un tableau vide un 0-0. Ce sont des
+ * valeurs qu'aucun ecran n'envoie, mais une API accepte ce qu'on lui donne, pas
+ * ce qu'on avait prevu de lui donner.
+ */
+function lireScore(v) {
+  if (typeof v !== 'number' && typeof v !== 'string') return null;
+  if (v === '') return null;
+  const n = Number(v);
+  return Number.isInteger(n) && n >= 0 && n <= SCORE_MAX ? n : null;
+}
+
+/**
  * Le match de la semaine d'une journée.
  *
  * Il n'est pas désigné à la main : c'est la rencontre qui commence le plus
@@ -37,8 +74,13 @@ exports.upsertPrediction = async (req, res) => {
   if (homeScorePred === undefined || awayScorePred === undefined || !matchId) {
     return res.status(400).json({ error: 'matchId, homeScorePred et awayScorePred requis' });
   }
-  if (homeScorePred < 0 || awayScorePred < 0) {
-    return res.status(400).json({ error: 'Les scores ne peuvent pas être négatifs' });
+
+  const home = lireScore(homeScorePred);
+  const away = lireScore(awayScorePred);
+  if (home === null || away === null) {
+    return res.status(400).json({
+      error: `Les scores doivent être des nombres entiers, entre 0 et ${SCORE_MAX}`,
+    });
   }
 
   try {
@@ -54,12 +96,12 @@ exports.upsertPrediction = async (req, res) => {
 
     const prediction = await prisma.prediction.upsert({
       where: { userId_matchId: { userId, matchId: parseInt(matchId) } },
-      update: { homeScorePred: parseInt(homeScorePred), awayScorePred: parseInt(awayScorePred) },
+      update: { homeScorePred: home, awayScorePred: away },
       create: {
         userId,
         matchId: parseInt(matchId),
-        homeScorePred: parseInt(homeScorePred),
-        awayScorePred: parseInt(awayScorePred),
+        homeScorePred: home,
+        awayScorePred: away,
       },
     });
 
