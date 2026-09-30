@@ -101,17 +101,84 @@ async function exportGzip(options) {
 }
 
 /**
+ * Ou ecrit-on, exactement ?
+ *
+ * Rendu par `restore` et affiche par le script avant toute chose. Ce n'est pas
+ * du confort : une restauration se lance dans un moment de panique, la commande
+ * est la meme pour la base locale et pour la production, et seule l'adresse
+ * change. Un outil qui ne dit pas sur quoi il travaille finit par travailler
+ * sur autre chose que ce qu'on croyait.
+ *
+ * Le mot de passe est retire : cette sortie se colle dans une conversation.
+ */
+function cible() {
+  const url = process.env.DATABASE_URL || '';
+  if (!url) return 'DATABASE_URL absente';
+  try {
+    const u = new URL(url);
+    const local = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(u.hostname);
+    return `${u.hostname}:${u.port || '5432'}${u.pathname}` +
+           ` — ${local ? 'BASE LOCALE' : 'base DISTANTE (production ?)'}`;
+  } catch {
+    return 'DATABASE_URL illisible';
+  }
+}
+
+/**
+ * Vide les tables restaurables, dans l'ordre inverse des dependances.
+ *
+ * Les jetons d'authentification partent aussi : ils ne sont pas sauvegardes, et
+ * les laisser survivre a un remplacement complet laisserait des liens de
+ * reinitialisation valables pour des comptes qui ne sont plus tout a fait les
+ * memes.
+ *
+ * Le journal des taches n'est pas touche : il decrit la sante de l'installation,
+ * pas le contenu du jeu, et l'effacer ferait croire que les sauvegardes ne
+ * tournent plus.
+ */
+async function vider() {
+  await prisma.prediction.deleteMany();
+  await prisma.message.deleteMany();
+  await prisma.reminder.deleteMany();
+  await prisma.userAvatar.deleteMany();
+  await prisma.authToken.deleteMany();
+  await prisma.match.deleteMany();
+  await prisma.leagueTable.deleteMany();
+  await prisma.user.deleteMany();
+  await prisma.team.deleteMany();
+}
+
+/**
  * Restauration.
  *
  * L'ordre compte : une table ne peut etre remplie qu'apres celles dont elle
  * depend. Equipes, puis utilisateurs, puis matchs, puis pronostics.
  *
  * On utilise `upsert` plutot que `create` pour que la restauration soit
- * rejouable : la lancer deux fois de suite donne le meme resultat que la
- * lancer une fois. C'est ce qui permet de s'en servir sans crainte quand on ne
- * sait pas exactement dans quel etat se trouve la base.
+ * rejouable : la lancer deux fois de suite donne le meme resultat que la lancer
+ * une fois.
+ *
+ * ---------------------------------------------------------------------------
+ * Ajouter ou remplacer : `remplacer`
+ * ---------------------------------------------------------------------------
+ *
+ * L'`upsert` seul ecrit par identifiant. Une ligne dont l'identifiant existe
+ * deja est ecrasee ; une ligne dont l'identifiant est libre s'ajoute a cote de
+ * ce qui s'y trouvait. Sur une base vide — le cas d'un vrai sinistre — le
+ * resultat est exact. Sur une base qui contient deja quelque chose, on obtient
+ * un melange.
+ *
+ * L'exercice de restauration l'a montre sans ambiguite : 182 rencontres
+ * restaurees dans une base locale qui en avait deja 182, avec d'autres
+ * identifiants, ont donne 364 rencontres et quatorze matchs par journee. C'est
+ * exactement ce qui arriverait apres une perte partielle en production.
+ *
+ * `remplacer: true` vide donc les tables avant d'ecrire, et la base devient
+ * identique a la sauvegarde. C'est ce que « restaurer » veut dire. Ce n'est pas
+ * le defaut, parce que c'est destructeur et qu'un defaut destructeur est une
+ * mauvaise idee ; le script l'exige explicitement.
  */
-async function restore(dump, { dryRun = true } = {}) {
+async function restore(dump, { dryRun = true, remplacer = false } = {}) {
   if (!dump || dump.format !== FORMAT) {
     throw new Error(`Format inattendu (${dump && dump.format}) — attendu ${FORMAT}`);
   }
@@ -126,7 +193,26 @@ async function restore(dump, { dryRun = true } = {}) {
     reminders: dump.reminders?.length || 0,
     userAvatars: dump.userAvatars?.length || 0,
   };
-  if (dryRun) return { dryRun: true, plan, passwordsIncluded: !!dump.passwordsIncluded };
+  if (dryRun) {
+    return {
+      dryRun: true, plan, remplacer,
+      cible: cible(),
+      passwordsIncluded: !!dump.passwordsIncluded,
+      // Ce qui serait efface : on le compte avant de rien promettre, pour que la
+      // simulation dise ce que la vraie execution fera.
+      efface: remplacer
+        ? {
+            teams: await prisma.team.count(),
+            users: await prisma.user.count(),
+            matches: await prisma.match.count(),
+            predictions: await prisma.prediction.count(),
+            messages: await prisma.message.count(),
+          }
+        : null,
+    };
+  }
+
+  if (remplacer) await vider();
 
   const d = (x) => (x ? new Date(x) : x);
   const aReinitialiser = [];
@@ -218,7 +304,12 @@ async function restore(dump, { dryRun = true } = {}) {
     );
   }
 
-  return { dryRun: false, plan, passwordsIncluded: !!dump.passwordsIncluded, aReinitialiser };
+  return {
+    dryRun: false, plan, remplacer,
+    cible: cible(),
+    passwordsIncluded: !!dump.passwordsIncluded,
+    aReinitialiser,
+  };
 }
 
 async function parseDump(buf) {
@@ -226,4 +317,4 @@ async function parseDump(buf) {
   return JSON.parse(texte);
 }
 
-module.exports = { exportAll, exportGzip, restore, parseDump, FORMAT };
+module.exports = { exportAll, exportGzip, restore, parseDump, cible, FORMAT };
