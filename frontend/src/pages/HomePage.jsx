@@ -153,7 +153,7 @@ export default function HomePage() {
       </p>
 
       {/* Journée en cours */}
-      <div className={`card stitched laced mb-4 ${todo.length > 0 ? 'border-l-4 border-l-amber-500' : ''}`}>
+      <div className={`card stitched mb-4 ${todo.length > 0 ? 'border-l-4 border-l-amber-500' : ''}`}>
         <div className="relative z-10">
           <h2 className="rule-label mb-3">Journée {round}</h2>
 

@@ -18,7 +18,7 @@ import { useState } from 'react';
  * devinent pas.
  *
  * `relative z-10` sur le bloc. La carte porte un fond décoratif (`stitched
- * laced`), et tous ses blocs le franchissent explicitement. Sans cette classe le
+ * stitched`), et tous ses blocs le franchissent explicitement. Sans cette classe le
  * contenu passerait dessous.
  *
  * Et `text-white` veut dire « encre du thème » : dans la configuration Tailwind

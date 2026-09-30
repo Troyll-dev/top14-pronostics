@@ -245,7 +245,7 @@ export default function MatchCard({
   const awayWon = isFinished && match.awayScore > match.homeScore;
 
   return (
-    <div className={`card stitched laced ${bordure}`}>
+    <div className={`card stitched ${bordure}`}>
       {/* En-tête
 
           Date, heure et diffuseur sur la même ligne, à gauche : ce sont les
