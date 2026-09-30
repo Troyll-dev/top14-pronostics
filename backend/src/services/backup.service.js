@@ -31,9 +31,22 @@ const FORMAT = 1;
  * Les jetons de reinitialisation sont exclus : ils expirent en une heure et ne
  * contiennent que des empreintes. Les restaurer n'aurait aucun sens.
  *
- * Les photos de profil sont exclues par defaut parce qu'elles sont binaires et
- * pesent bien plus que tout le reste reuni. Elles se redeposent en trente
- * secondes ; un pronostic perdu, non. `avatars: true` les inclut si tu y tiens.
+ * Les photos de profil restent facultatives ici, mais la tache hebdomadaire les
+ * demande desormais. Le raisonnement d'origine — binaires, plus lourdes que
+ * tout le reste reuni — valait quand la base pesait 400 ko ; la sauvegarde
+ * compressee en fait dix, et les photos une soixantaine a huit joueurs. La
+ * raison d'exclure a disparu, et une photo, contrairement a ce qu'on croyait,
+ * ne se redepose pas toujours : encore faut-il l'avoir gardee.
+ *
+ * Les rappels deja envoyes sont inclus, et ce n'est pas pour l'archive. Cette
+ * table est ce qui garantit qu'on n'ecrit qu'une fois par joueur et par
+ * journee. Restaurer sans elle ferait repartir les rappels du vendredi et les
+ * bilans du lundi pour toutes les journees deja traitees — huit personnes
+ * recevraient vingt courriels d'un coup, le lendemain d'un sinistre.
+ *
+ * Le journal des taches, lui, reste dehors : il se reconstruit tout seul au
+ * prochain passage de chaque tache, et sauvegarder un indicateur de sante n'a
+ * pas grand sens.
  *
  * Les empreintes de mots de passe sont exclues elles aussi, et c'est le
  * reglage par defaut : ce fichier voyage par courriel, et meme une empreinte
@@ -44,18 +57,19 @@ const FORMAT = 1;
  * `passwords: true` les inclut, pour une copie complete qu'on garde chez soi.
  */
 async function exportAll({ avatars = false, passwords = false } = {}) {
-  const [users, teams, matches, predictions, messages, leagueTable] = await Promise.all([
+  const [users, teams, matches, predictions, messages, leagueTable, reminders] = await Promise.all([
     prisma.user.findMany({ orderBy: { id: 'asc' } }),
     prisma.team.findMany({ orderBy: { id: 'asc' } }),
     prisma.match.findMany({ orderBy: { id: 'asc' } }),
     prisma.prediction.findMany({ orderBy: { id: 'asc' } }),
     prisma.message.findMany({ orderBy: { id: 'asc' } }),
     prisma.leagueTable.findMany(),
+    prisma.reminder.findMany({ orderBy: { id: 'asc' } }),
   ]);
 
   const dump = {
     users: passwords ? users : users.map(({ password, ...reste }) => reste),
-    teams, matches, predictions, messages, leagueTable,
+    teams, matches, predictions, messages, leagueTable, reminders,
   };
 
   if (avatars) {
@@ -109,6 +123,7 @@ async function restore(dump, { dryRun = true } = {}) {
     predictions: dump.predictions?.length || 0,
     messages: dump.messages?.length || 0,
     leagueTable: dump.leagueTable?.length || 0,
+    reminders: dump.reminders?.length || 0,
     userAvatars: dump.userAvatars?.length || 0,
   };
   if (dryRun) return { dryRun: true, plan, passwordsIncluded: !!dump.passwordsIncluded };
@@ -166,6 +181,18 @@ async function restore(dump, { dryRun = true } = {}) {
     const row = { ...l, fetchedAt: d(l.fetchedAt) };
     await prisma.leagueTable.upsert({ where: { id: l.id }, update: row, create: row });
   }
+  /**
+   * Les rappels deja envoyes.
+   *
+   * Restaures apres les comptes, dont ils dependent. Une sauvegarde ancienne
+   * peut en contenir zero — les anciennes versions ne les emportaient pas — et
+   * la boucle ne fait alors rien : on perd la garantie de non-doublon pour ces
+   * journees-la, ce qui est exactement la situation d'avant.
+   */
+  for (const r of dump.reminders || []) {
+    const row = { ...r, sentAt: d(r.sentAt) };
+    await prisma.reminder.upsert({ where: { id: r.id }, update: row, create: row });
+  }
   for (const a of dump.userAvatars || []) {
     const row = {
       userId: a.userId,
@@ -182,6 +209,7 @@ async function restore(dump, { dryRun = true } = {}) {
   const tables = [
     ['users', 'id'], ['teams', 'id'], ['matches', 'id'],
     ['predictions', 'id'], ['messages', 'id'], ['league_table', 'id'],
+    ['reminders', 'id'],
   ];
   for (const [table, col] of tables) {
     await prisma.$executeRawUnsafe(

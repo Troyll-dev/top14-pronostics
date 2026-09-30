@@ -41,7 +41,23 @@ const journal = require('../services/job-log.service');
 const nomFichier = (jour) => `top14-${jour}.json.gz.txt`;
 
 async function envoyer(quand) {
-  const { buf, counts, exportedAt } = await exportGzip();
+  /**
+   * Les photos de profil font partie de la sauvegarde.
+   *
+   * Elles n'y etaient pas, et personne ne s'en serait apercu avant le jour de
+   * la restauration : les comptes, les pronostics et les messages seraient
+   * revenus, et chacun aurait retrouve sa pastille coloree a la place de sa
+   * photo. C'est la seule chose de la base qu'on ne peut pas reconstituer a
+   * partir d'ailleurs.
+   *
+   * Le cout est derisoire : la sauvegarde passe d'une dizaine de kilo-octets a
+   * environ quatre-vingts, tres loin des limites d'une piece jointe.
+   *
+   * Les mots de passe restent dehors, et c'est un autre sujet : ce fichier
+   * voyage par courriel, et meme une empreinte n'a rien a faire dans une boite
+   * mail. Les comptes se rouvrent par « mot de passe oublie ».
+   */
+  const { buf, counts, exportedAt } = await exportGzip({ avatars: true });
   const jour = exportedAt.slice(0, 10);
   const ko = Math.round(buf.length / 1024);
 
