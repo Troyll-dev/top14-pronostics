@@ -65,6 +65,41 @@ const SEASON = process.env.SPORTSDB_SEASON || '2026-2027';
 const PAUSE_MS = 500;
 const dors = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * Le recevant annonce par la page est-il bien celui qu'on attend ?
+ *
+ * Le garde-fou qui utilise cette fonction comparait deux chaines de caracteres.
+ * Il a bloque trois rencontres de Montpellier depuis la premiere journee, sans
+ * que rien ne le signale ailleurs que dans un journal que personne ne lit : le
+ * calendrier de la LNR ecrit « Montpellier HR », sa feuille de statistiques
+ * ecrit « Montpellier Herault Rugby ». Deux orthographes, un seul club, et une
+ * egalite de chaines qui repond non.
+ *
+ * Le cout de ce non etait invisible et durable. Montpellier affichait ses
+ * moyennes sur deux matchs quand les autres en avaient cinq, et ses trois
+ * adversaires a l'exterieur sur quatre : une comparaison de formes faussee pour
+ * huit clubs, sur une carte dont le seul objet est de comparer.
+ *
+ * On compare donc des identites : le nom lu sur la page passe par la meme
+ * resolution que partout ailleurs dans le projet, et le resultat se confronte a
+ * l'identifiant du recevant en base.
+ *
+ * Et quand ce nom ne se resout pas, on laisse passer en le signalant, au lieu de
+ * refuser. C'est un renversement voulu : un garde-fou doit se declencher sur une
+ * preuve, pas sur une ignorance. Refuser faute de reconnaitre un nom, c'est
+ * exactement ce qui vient de couter cinq journees de statistiques — alors que le
+ * risque qu'il couvre, une page appartenant a une autre rencontre, se manifeste
+ * par un nom parfaitement reconnaissable et different.
+ */
+function recevantConforme(nomLu, homeTeamId, teams) {
+  if (!nomLu) return { ok: true };
+
+  const resolu = resolveTeam(nomLu, teams);
+  if (!resolu) return { ok: true, inconnu: true };
+
+  return { ok: resolu.id === homeTeamId };
+}
+
 /** Ce qu'on garde par rencontre. Toutes les barres, pas seulement celles qui servent. */
 function aEcrire(lu) {
   return { url: lu.url || null, barres: lu.barres, cartons: lu.cartons };
@@ -302,12 +337,18 @@ async function syncStats({ dryRun = false, rounds = null, limite = 20 } = {}) {
       // autre recevant que notre base, c'est l'appariement qui est faux, et des
       // essais attribues au mauvais club fausseraient la forme des deux clubs
       // a la fois.
-      if (lu.homeTeam && ev.home && lu.homeTeam !== ev.home) {
+      const recevant = recevantConforme(lu.homeTeam, match.homeTeamId, teams);
+      if (!recevant.ok) {
         rapport.ok = false;
         rapport.unmatched.push(
           `J${round} ${ev.home}–${ev.away} : la page annonce « ${lu.homeTeam} » comme recevant — rien ecrit`
         );
         continue;
+      }
+      if (recevant.inconnu) {
+        rapport.unmatched.push(
+          `J${round} ${ev.home}–${ev.away} : recevant « ${lu.homeTeam} » non reconnu, lecture acceptee sans verification`
+        );
       }
 
       const data = aEcrire(lu);
@@ -335,4 +376,4 @@ async function syncStats({ dryRun = false, rounds = null, limite = 20 } = {}) {
   return rapport;
 }
 
-module.exports = { syncStats, forme, cumuler, aLire, aEcrire, fermer, vide, moyenne };
+module.exports = { syncStats, forme, cumuler, aLire, aEcrire, fermer, vide, moyenne, recevantConforme };
