@@ -4,11 +4,16 @@ import './PhotoCopains.css';
 /**
  * La bande de copains, epinglee a cote du titre.
  *
- * Elle n'apparait que sur les deux pages listees dans PAGES : le classement et
- * le vestiaire. Ailleurs, les en-tetes portent deja des pastilles, des
- * selecteurs de journee ou des liens, et la vignette leur disputait la place.
- * Ces deux pages-la sont celles ou l'on regarde les copains plutot que le
- * championnat, donc la photo y est a sa place.
+ * Elle n'apparait que sur les pages listees dans PAGES. Ailleurs, les en-tetes
+ * portent deja des pastilles, des selecteurs de journee ou des liens, et la
+ * vignette leur disputait la place.
+ *
+ * Elle a longtemps vecu aussi sur le classement, pour la meme raison qu'au
+ * vestiaire : ce sont les pages ou l'on regarde les copains plutot que le
+ * championnat. Le classement porte desormais un bandeau pleine largeur, et deux
+ * photos de la meme bande sur le meme ecran, l'une au-dessus de l'autre, ne
+ * disent pas deux fois plus — elles se font concurrence. La vignette cede donc
+ * la place au bandeau, qui occupe le meme role en plus grand.
  *
  * Le filtre est ici plutot que dans App.jsx pour que le montage reste d'une
  * seule ligne cote routes, et pour que la regle « ou cette vignette a le droit
@@ -28,7 +33,7 @@ import './PhotoCopains.css';
  * la signature du coin inferieur droit hors champ, puisqu'elle se trouve a
  * 97 % de la hauteur.
  */
-const PAGES = ['/classement', '/chat'];
+const PAGES = ['/chat'];
 
 export default function PhotoCopains() {
   const { pathname } = useLocation();
