@@ -129,7 +129,7 @@ function PointsChip({ prediction }) {
  */
 export default function MatchCard({
   match, draft, onDraftChange, onPredictionSaved, now = Date.now(),
-  regles = null,
+  regles = null, onJoker = null, jokerFige = false, jokerErreur = '',
 }) {
   const { user } = useAuth();
   const prediction = match.predictions?.[0];
@@ -146,17 +146,19 @@ export default function MatchCard({
   const estAffiche = reglesActives && regles.afficheMatchId === match.id;
   const estJoker = reglesActives && regles.jokerMatchId === match.id;
 
-  /* Le joker se pose depuis le Récapitulatif, en haut de la page, et non
-     depuis les cartes.
+  /* Le joker se pose depuis la carte du match, avec un bouton radio.
 
-     Il y avait ici une case à cocher par match — sept contrôles pour une
-     décision qui n'est prise qu'une fois par journée. Tout ce qu'il avait
-     fallu ajouter ensuite (la mention « il est posé sur un autre match », le
-     rappel dans le Récapitulatif) ne servait qu'à recoller l'unité qu'on avait
-     cassée en éclatant le contrôle en sept.
+     Il a d'abord vécu ici en case à cocher, puis dans une liste déroulante du
+     Récapitulatif, et il revient dans la carte — mais pas sous la même forme,
+     et c'est toute la différence. Une case à cocher ne dit rien de
+     l'exclusivité : il avait fallu l'expliquer en toutes lettres sur chaque
+     carte, et gérer à la main qu'en cocher une décoche l'autre. Des boutons
+     radio qui partagent le même nom portent la règle dans leur nature — le
+     navigateur décoche l'autre, il n'y a rien à écrire et rien à expliquer.
 
-     La carte se contente donc d'afficher l'étiquette là où le joker est posé :
-     elle montre l'état, elle ne le pilote plus. */
+     Ce que la liste déroulante faisait bien, elle, c'était de montrer le choix
+     sans dérouler la page ; le Récapitulatif garde donc une ligne qui rappelle
+     où le joker est posé, en lecture seule. */
   const state = matchState(match, now);
   const isFinished = state === 'termine';
   const locked = state !== 'avenir';
@@ -239,6 +241,82 @@ export default function MatchCard({
       setSaving(false);
     }
   };
+
+  const [jokerEnCours, setJokerEnCours] = useState(false);
+
+  /**
+   * Le joker se pose en un seul geste, même si le pronostic n'est pas validé.
+   *
+   * Le serveur exige un pronostic enregistré avant d'accepter un joker, et il a
+   * raison : un joker se pose sur un pari, pas sur une case vide. Mais avec le
+   * contrôle dans la carte, le geste naturel devient « je saisis mon score et
+   * je coche le joker » — et refuser ce geste pour une raison d'ordre interne
+   * serait incompréhensible.
+   *
+   * On enregistre donc le pronostic d'abord, puis on pose le joker. Deux
+   * requêtes, un seul clic. Les deux scores doivent être remplis : sans eux il
+   * n'y a rien à enregistrer, et le bouton reste inactif.
+   */
+  const poserJoker = async () => {
+    if (estJoker || !complete || jokerEnCours) return;
+    setJokerEnCours(true);
+    setError('');
+    try {
+      if (dirty || !prediction) {
+        const res = await api.post('/predictions', {
+          matchId: match.id,
+          homeScorePred: home,
+          awayScorePred: away,
+        });
+        onPredictionSaved?.(match.id, res.data);
+      }
+      await onJoker?.(match.id);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Erreur');
+    } finally {
+      setJokerEnCours(false);
+    }
+  };
+
+  /**
+   * Retirer le joker.
+   *
+   * Un bouton radio ne se décoche pas : sans ce lien, un joker posé ne pourrait
+   * plus que se déplacer, jamais disparaître. Le serveur traite la pose et le
+   * retrait avec le même appel — rappeler la bascule sur le match où le joker
+   * se trouve l'enlève.
+   */
+  const retirerJoker = async () => {
+    if (!estJoker || jokerEnCours) return;
+    setJokerEnCours(true);
+    setError('');
+    try {
+      await onJoker?.(match.id);
+    } finally {
+      setJokerEnCours(false);
+    }
+  };
+
+  /**
+   * Pourquoi le bouton ne répond pas.
+   *
+   * Un contrôle grisé qui ne s'explique pas se lit comme une panne, et c'est le
+   * reproche qu'on faisait à l'ancienne case à cocher. Chaque refus a donc sa
+   * phrase, et l'ordre compte : on dit la raison la plus forte d'abord, celle
+   * qui ne se lèvera pas en remplissant un champ.
+   */
+  const jokerBloque =
+    jokerFige ? (estJoker
+      ? 'Cette rencontre a commencé : ton joker y reste.'
+      : 'Ton joker est engagé sur un match commencé : il ne peut plus bouger.')
+    : locked ? 'Cette rencontre a commencé.'
+    : !complete ? 'Saisis les deux scores pour pouvoir y poser ton joker.'
+    : null;
+
+  // La rangée reste affichée sur un match commencé qui porte le joker : sinon
+  // le groupe n'aurait plus aucun bouton coché et l'on ne saurait plus où il
+  // est.
+  const montreJoker = reglesActives && !estAffiche && (!locked || estJoker);
 
   const dateStr = format(new Date(match.kickoff), "EEEE d MMMM · HH'h'mm", { locale: fr });
   const homeWon = isFinished && match.homeScore > match.awayScore;
@@ -430,6 +508,69 @@ export default function MatchCard({
           <b className="font-display text-sm text-white">
             {prediction.homeScorePred} – {prediction.awayScorePred}
           </b>
+        </div>
+      )}
+
+      {/* Le joker, dans la boîte du pronostic.
+
+          Un bouton radio, et tous ceux de la journée partagent le même `name` :
+          l'unicité du joker devient une propriété du navigateur au lieu d'une
+          règle qu'on applique à la main. Le match de l'affiche n'a pas de bouton
+          du tout — le joker y est interdit puisqu'il est déjà multiplié par
+          trois pour tout le monde — et une mention le dit, pour qu'on ne cherche
+          pas un contrôle manquant.
+
+          L'accent violet est celui de la pastille « Joker ×2 » de l'en-tête :
+          le contrôle et son résultat se reconnaissent. */}
+      {montreJoker && (
+        <div className="relative z-10 mt-3 pt-3 border-t border-slate-800">
+          <div className="flex items-center gap-x-3 gap-y-1.5 flex-wrap">
+            <label
+              className={`flex items-center gap-2 text-[12.5px] ${
+                jokerBloque ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
+              }`}
+            >
+              <input
+                type="radio"
+                name={`joker-j${match.round}`}
+                checked={estJoker}
+                disabled={!!jokerBloque || jokerEnCours}
+                onChange={poserJoker}
+                className="w-4 h-4 shrink-0 accent-violet-600 cursor-[inherit]
+                           focus:outline-none focus:ring-2 focus:ring-violet-600/40"
+              />
+              <span className={estJoker ? 'font-semibold' : 'text-slate-400'}>
+                🃏 Mon joker ici <span className="text-slate-500">· points ×2</span>
+              </span>
+            </label>
+
+            {estJoker && !jokerFige && !jokerEnCours && (
+              <button
+                type="button"
+                onClick={retirerJoker}
+                className="text-[11.5px] text-slate-500 underline transition-colors hover:text-amber-400"
+              >
+                retirer
+              </button>
+            )}
+
+            {jokerEnCours && <span className="text-[11.5px] text-slate-500">…</span>}
+          </div>
+
+          {jokerBloque && (
+            <p className="text-[11.5px] text-slate-500 mt-1.5">{jokerBloque}</p>
+          )}
+          {jokerErreur && (
+            <p className="text-[11.5px] text-red-400 mt-1.5">{jokerErreur}</p>
+          )}
+        </div>
+      )}
+
+      {reglesActives && estAffiche && !isFinished && (
+        <div className="relative z-10 mt-3 pt-3 border-t border-slate-800">
+          <p className="text-[11.5px] text-slate-500">
+            ⭐ Affiche de la journée : déjà multipliée par trois pour tout le monde, le joker ne s'y pose pas.
+          </p>
         </div>
       )}
 

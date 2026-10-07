@@ -30,67 +30,41 @@ function loadDrafts() {
 }
 
 /**
- * Le choix du joker de la journée.
+ * Où en est mon joker — en lecture seule.
  *
- * Trois règles de jeu se lisent directement dans la liste, plutôt que d'être
- * rappelées en texte : le match de la semaine n'y figure pas du tout (le joker
- * y est interdit, il est déjà multiplié par trois pour tout le monde), les
- * rencontres commencées sont désactivées, et les matchs sans pronostic
- * enregistré le sont aussi — un joker se pose sur un pari, pas sur une case
- * vide.
+ * Le joker se posait ici, dans une liste déroulante. Il se pose désormais dans
+ * la carte du match, avec un bouton radio : l'exclusivité y est portée par le
+ * contrôle lui-même au lieu d'être une règle à expliquer.
  *
- * Quand le joker est déjà engagé sur une rencontre commencée, c'est le
- * sélecteur entier qui se verrouille : il ne peut plus bouger, et c'est ce qui
- * donne au joker son poids. Sans cette règle on le poserait sur le match de
- * 14h30, on regarderait le score, et on le déplacerait si ça tourne mal.
+ * Ce que la liste faisait bien, en revanche, c'était de montrer le choix sans
+ * dérouler la page. Cette ligne le conserve : elle rappelle où le joker est
+ * posé et ce qu'il reste possible d'en faire, sans rien piloter.
  */
-function SelecteurJoker({ matches, regles, onChange, erreur }) {
+function RappelJoker({ matches, regles }) {
   const pose = matches.find((m) => m.id === regles.jokerMatchId) || null;
   const engage = !!pose && new Date(pose.kickoff) <= new Date();
 
-  const choix = matches
-    .filter((m) => m.id !== regles.afficheMatchId)
-    .map((m) => ({
-      m,
-      commence: new Date(m.kickoff) <= new Date(),
-      sansProno: !m.predictions?.[0],
-    }));
-
   return (
     <div className="mt-4 pt-4 border-t border-slate-800">
-      <label className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <span className="font-display text-[11.5px] font-bold uppercase tracking-wider text-slate-500">
-          🃏 Mon joker de la journée
-        </span>
-
-        <select
-          value={regles.jokerMatchId ?? ''}
-          disabled={engage}
-          onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
-          className="flex-1 min-w-[220px] h-9 px-2 rounded-md text-[13px]
-                     bg-slate-950 border-[1.5px] border-slate-800 text-white
-                     focus:outline-none focus:border-violet-600 focus:ring-2 focus:ring-violet-600/25
-                     disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          <option value="">— aucun —</option>
-          {choix.map(({ m, commence, sansProno }) => (
-            <option key={m.id} value={m.id} disabled={commence || sansProno}>
-              {m.homeTeam.name} – {m.awayTeam.name}
-              {commence ? '  (commencé)' : sansProno ? '  (pronostic à enregistrer)' : ''}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <p className="text-[11.5px] text-slate-500 mt-2">
-        {engage
-          ? `Ton joker est engagé sur ${pose.homeTeam.name} – ${pose.awayTeam.name} : la rencontre a commencé, il n'est plus déplaçable.`
-          : regles.jokerMatchId
-          ? 'Tes points sur cette rencontre seront doublés. Tu peux encore le déplacer jusqu\'au coup d\'envoi.'
-          : 'Un seul joker par journée : il double tes points sur la rencontre choisie.'}
+      <p className="font-display text-[11.5px] font-bold uppercase tracking-wider text-slate-500">
+        🃏 Mon joker de la journée
       </p>
-
-      {erreur && <p className="text-[11.5px] text-red-400 mt-1.5">{erreur}</p>}
+      <p className="text-[12.5px] mt-1.5">
+        {pose ? (
+          <span className="font-display font-bold">
+            {pose.homeTeam.name} – {pose.awayTeam.name}
+          </span>
+        ) : (
+          <span className="text-slate-500">pas encore posé</span>
+        )}
+      </p>
+      <p className="text-[11.5px] text-slate-500 mt-1">
+        {engage
+          ? 'La rencontre a commencé : il n\'est plus déplaçable.'
+          : pose
+          ? 'Tes points y seront doublés. Tu peux le déplacer depuis les cartes, jusqu\'au coup d\'envoi.'
+          : 'Un seul joker par journée : coche-le sur la carte du match de ton choix, il double tes points.'}
+      </p>
     </div>
   );
 }
@@ -120,7 +94,9 @@ export default function MatchesPage() {
    * le calcul en compterait une autre.
    */
   const [regles, setRegles] = useState(null);
-  const [jokerErreur, setJokerErreur] = useState('');
+  // { matchId, message } : l'erreur s'affiche sur la carte où le geste a eu
+  // lieu, et non en haut de page loin du bouton qui vient d'être cliqué.
+  const [jokerErreur, setJokerErreur] = useState(null);
 
   useEffect(() => {
     api.get('/matches/rounds').then((res) => setRounds(res.data)).catch(console.error);
@@ -156,7 +132,7 @@ export default function MatchesPage() {
 
   useEffect(() => { fetchMatches(); }, [fetchMatches]);
   useEffect(() => { fetchRegles(); }, [fetchRegles]);
-  useEffect(() => { setBulkResult(null); setJokerErreur(''); }, [currentRound]);
+  useEffect(() => { setBulkResult(null); setJokerErreur(null); }, [currentRound]);
 
   /**
    * Poser, déplacer ou retirer le joker — un seul geste pour les trois.
@@ -182,13 +158,16 @@ export default function MatchesPage() {
     const cible = matchId ?? regles?.jokerMatchId ?? null;
     if (cible == null) return;
 
-    setJokerErreur('');
+    setJokerErreur(null);
     try {
       await api.post('/predictions/joker', { matchId: cible });
       fetchMatches();
       fetchRegles();
     } catch (err) {
-      setJokerErreur(err.response?.data?.error || 'Impossible de poser le joker');
+      setJokerErreur({
+        matchId: cible,
+        message: err.response?.data?.error || 'Impossible de poser le joker',
+      });
       // L'écran affichait la valeur choisie alors que le serveur l'a refusée :
       // on le remet sur l'état réel.
       fetchRegles();
@@ -234,6 +213,20 @@ export default function MatchesPage() {
       return next;
     });
   }, []);
+
+  /**
+   * Le joker de la journée est-il figé ?
+   *
+   * Il l'est dès que la rencontre sur laquelle il est posé a commencé. C'est la
+   * règle qui lui donne son poids : sans elle on le poserait sur le match de
+   * 14h30, on regarderait le score, et on le déplacerait si ça tourne mal.
+   *
+   * Le serveur applique le même refus — c'est lui qui fait foi. Ce calcul ne
+   * sert qu'à griser les boutons avant le clic, parce qu'un contrôle qui
+   * accepte puis se fait refuser est pire qu'un contrôle inactif qui s'explique.
+   */
+  const jokerPose = matches.find((m) => m.id === regles?.jokerMatchId) || null;
+  const jokerFige = !!jokerPose && new Date(jokerPose.kickoff) <= new Date(now);
 
   const hasPrediction = (m) => m.predictions?.length > 0;
   const isOpen = (m) => matchState(m, now) === 'avenir';
@@ -339,28 +332,17 @@ export default function MatchesPage() {
             </div>
           </div>
 
-          {/* Le joker de la journée : un seul sélecteur, ici.
+          {/* Le joker de la journée : rappelé ici, posé dans les cartes.
 
-              Il y avait une case à cocher sur chacune des sept cartes — sept
-              contrôles pour une décision qui ne se prend qu'une fois par
-              journée. Il fallait alors expliquer partout qu'en cocher un en
-              décochait un autre.
+              Il a d'abord été une case à cocher par match, puis cette liste
+              déroulante, et il revient dans les cartes sous forme de boutons
+              radio. Ce n'est pas un aller-retour pour rien : la case à cocher
+              ne disait rien de l'exclusivité et il fallait l'expliquer partout,
+              là où des boutons radio la portent dans leur nature.
 
-              Une liste déroulante n'a qu'une valeur : l'exclusivité devient
-              structurellement impossible à violer, il n'y a plus rien à
-              expliquer. Le retrait est une entrée comme une autre au lieu d'un
-              geste à deviner. Et c'est visible sans dérouler la page, ce qui
-              était le reproche initial.
-
-              Les rencontres déjà commencées restent dans la liste, désactivées
-              et annotées : la règle se voit, au lieu de se découvrir par un
-              message d'erreur après coup. */}
-          {regles?.actif && <SelecteurJoker
-            matches={matches}
-            regles={regles}
-            onChange={choisirJoker}
-            erreur={jokerErreur}
-          />}
+              Ce que la liste apportait — voir son choix sans dérouler la page —
+              est conservé par cette ligne, qui informe sans rien piloter. */}
+          {regles?.actif && <RappelJoker matches={matches} regles={regles} />}
         </div>
       )}
 
@@ -429,6 +411,9 @@ export default function MatchesPage() {
               onDraftChange={setDraft}
               onPredictionSaved={handleSaved}
               regles={regles}
+              onJoker={choisirJoker}
+              jokerFige={jokerFige}
+              jokerErreur={jokerErreur?.matchId === match.id ? jokerErreur.message : ''}
             />
           ))}
         </div>
