@@ -41,7 +41,7 @@
   position: absolute;
   top: 14px;
   right: 12px;
-  width: 96px;               /* tient a droite de « Salut Nico » des 390 px */
+  width: 96px;               /* tient a droite de Â« Salut Nico Â» des 390 px */
   padding: 5px 5px 17px;     /* la marge basse fait la legende, comme un polaroid */
   background: rgb(var(--card-bg, 251 248 236));
   border-radius: 9px;
@@ -89,11 +89,11 @@
    on borne l'en-tete : le premier element de la colonne, et le paragraphe de
    sous-titre qui suit le titre, s'arretent avant elle. `~ *` designe ce que les
    routes rendent a cote de l'ancre, c'est-a-dire la colonne de la page
-   courante, quelle qu'elle soit — inutile de repeter la regle dans chaque page.
+   courante, quelle qu'elle soit â€” inutile de repeter la regle dans chaque page.
 
    On vise `:first-child` et pas seulement `h1` parce que toutes les pages ne
-   posent pas leur titre de la meme facon : « Mes pronos » l'enveloppe dans une
-   ligne en `justify-between` qui porte aussi le lien « Tous les pronos », lequel
+   posent pas leur titre de la meme facon : Â« Mes pronos Â» l'enveloppe dans une
+   ligne en `justify-between` qui porte aussi le lien Â« Tous les pronos Â», lequel
    se retrouvait donc sous la vignette. Verifie : les six pages commencent par un
    bandeau de titre, jamais par une carte, donc ce padding ne decale aucun
    contenu.
@@ -103,25 +103,32 @@
    du cadre, et le lien restait sous la vignette. Avec le retour a la ligne
    autorise, le groupe de droite descend d'une ligne et s'aligne a gauche,
    loin de l'image. Sur une page dont le premier element n'est pas une boite
-   flex — c'est le cas des cinq autres, qui commencent par un `h1` — la
+   flex â€” c'est le cas des cinq autres, qui commencent par un `h1` â€” la
    propriete n'a aucun effet.
 
    Les valeurs sont la largeur occupee par la vignette : sa largeur, plus ses
    10 px de cadre, plus son decalage droit.
+
+   Le `:not(:has(> .bandeau))` exempte les pages qui portent un bandeau. Sur
+   celles-la, le premier element de la colonne n'est plus le titre mais l'image
+   pleine largeur : la reservation la rognait d'une centaine de pixels a droite,
+   ce qui se voyait aussitot — un bandeau plus etroit que les autres et decale
+   vers la gauche. La vignette, elle, n'a plus rien a eviter : elle s'epingle
+   sur l'image, bien au-dessus du titre, comme un polaroid pose sur une photo.
    --------------------------------------------------------------------------- */
-.photo-copains-ancre ~ * > :first-child,
-.photo-copains-ancre ~ * > h1 + p {
+.photo-copains-ancre ~ *:not(:has(> .bandeau)) > :first-child,
+.photo-copains-ancre ~ *:not(:has(> .bandeau)) > h1 + p {
   padding-right: 118px;      /* 96 + 10 + 12 */
   flex-wrap: wrap;
   row-gap: 6px;
 }
 
 @media (min-width: 640px) {
-  .photo-copains-ancre ~ * > :first-child,
-  .photo-copains-ancre ~ * > h1 + p { padding-right: 150px; }   /* 124 + 10 + 16 */
+  .photo-copains-ancre ~ *:not(:has(> .bandeau)) > :first-child,
+  .photo-copains-ancre ~ *:not(:has(> .bandeau)) > h1 + p { padding-right: 150px; }   /* 124 + 10 + 16 */
 }
 
 @media (min-width: 1100px) {
-  .photo-copains-ancre ~ * > :first-child,
-  .photo-copains-ancre ~ * > h1 + p { padding-right: 176px; }   /* 150 + 10 + 16 */
+  .photo-copains-ancre ~ *:not(:has(> .bandeau)) > :first-child,
+  .photo-copains-ancre ~ *:not(:has(> .bandeau)) > h1 + p { padding-right: 176px; }   /* 150 + 10 + 16 */
 }

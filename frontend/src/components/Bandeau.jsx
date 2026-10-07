@@ -28,6 +28,13 @@
  * éclaire pareil de jour comme de nuit — et ça évite le piège inverse, une
  * image détourée dont les noirs se fondraient dans un fond sombre.
  *
+ * La classe `bandeau` n'habille rien : elle sert de repere à `PhotoCopains.css`,
+ * qui réserve la place de la vignette des copains en rognant le premier élément
+ * de la colonne. Ce premier élément était le titre ; c'est désormais le bandeau,
+ * qui se faisait donc rogner à droite d'une centaine de pixels. La feuille de
+ * style saute cette réservation sur les pages qui portent un bandeau — la
+ * vignette s'y épingle sur l'image, loin du titre.
+ *
  * `alt=""` et `aria-hidden` : ce sont des illustrations, elles ne portent
  * aucune information. Les décrire à un lecteur d'écran lui ferait perdre du
  * temps avant d'arriver au contenu.
@@ -36,7 +43,7 @@ export default function Bandeau({ nom, position = 'center 50%', className = '' }
   return (
     <div
       aria-hidden="true"
-      className={`-mx-4 sm:mx-0 sm:rounded-xl overflow-hidden ${className}`}
+      className={`bandeau -mx-4 sm:mx-0 sm:rounded-xl overflow-hidden ${className}`}
       style={{
         WebkitMaskImage: 'linear-gradient(#000 74%, transparent 100%)',
         maskImage: 'linear-gradient(#000 74%, transparent 100%)',
