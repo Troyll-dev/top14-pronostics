@@ -307,12 +307,32 @@ export default function MatchCard({
         </span>
       </div>
 
-      {/* Affiche */}
+      {/* Affiche
+
+          Les noms d'équipes ne sont plus tronqués : ils passent à la ligne.
+
+          Cette rangée range six choses sur une seule ligne — nom, écusson,
+          score, tiret, écusson, nom — et quatre d'entre elles ont une largeur
+          fixe qui ne se comprime pas. Sur un téléphone en portrait il restait
+          une centaine de pixels par nom, là où « Stade Français Paris » en gras
+          en demande le triple : on lisait « Stade… » et « Mont… », ce qui ne
+          désigne plus personne.
+
+          Couper n'était donc pas un réglage malheureux mais la seule issue
+          laissée à une ligne qui demandait trop. On lui rend la hauteur : plus
+          de `truncate`, et `overflow-wrap:anywhere` pour qu'un nom d'un seul
+          tenant plus large que sa colonne se coupe plutôt que de pousser la
+          page. Rien n'est perdu, la carte grandit de quelques pixels sur
+          mobile, et ne bouge pas du tout sur ordinateur où les noms tenaient
+          déjà.
+
+          Les scores restent centrés verticalement, donc un nom qui se replie
+          sur deux lignes ne les décale pas. */}
       <div className="relative z-10 flex items-center gap-2.5 sm:gap-4">
         <div className="flex-1 min-w-0 flex items-center justify-end gap-2.5">
           <div className="min-w-0 text-right">
-            <p className="font-display font-bold text-[15.5px] leading-tight truncate">{match.homeTeam.name}</p>
-            <p className="text-[10.5px] italic text-slate-500 mt-0.5 truncate">{match.venue || match.homeTeam.city}</p>
+            <p className="[overflow-wrap:anywhere] font-display font-bold text-[15.5px] leading-tight">{match.homeTeam.name}</p>
+            <p className="[overflow-wrap:anywhere] text-[10.5px] italic text-slate-500 mt-0.5">{match.venue || match.homeTeam.city}</p>
           </div>
           <TeamCrest team={match.homeTeam} size={28} />
         </div>
@@ -340,8 +360,8 @@ export default function MatchCard({
         <div className="flex-1 min-w-0 flex items-center gap-2.5">
           <TeamCrest team={match.awayTeam} size={28} />
           <div className="min-w-0">
-            <p className="font-display font-bold text-[15.5px] leading-tight truncate">{match.awayTeam.name}</p>
-            <p className="text-[10.5px] italic text-slate-500 mt-0.5 truncate">{match.awayTeam.city}</p>
+            <p className="[overflow-wrap:anywhere] font-display font-bold text-[15.5px] leading-tight">{match.awayTeam.name}</p>
+            <p className="[overflow-wrap:anywhere] text-[10.5px] italic text-slate-500 mt-0.5">{match.awayTeam.city}</p>
           </div>
         </div>
       </div>

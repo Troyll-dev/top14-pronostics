@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 /**
  * La forme des deux clubs, sur la carte de match.
  *
@@ -6,16 +8,37 @@
  * quand on rouvre la page d'une journée passée : on y voit ce qu'on savait à ce
  * moment-là, pas le résultat qu'on a sous les yeux.
  *
- * Toujours visible, contrairement aux compositions. C'est l'information qu'on
- * veut avoir devant soi **pendant** qu'on saisit un score, pas après avoir
- * cliqué pour déplier.
+ * ---------------------------------------------------------------------------
+ * Dépliable, et ouvert par défaut
+ * ---------------------------------------------------------------------------
  *
- * Sur les couleurs, et c'est le point délicat de ce projet. Dans la
- * configuration Tailwind du site, `white` est branché sur la variable `--ink` :
- * `text-white` veut donc dire « encre du thème », sombre en mode crème et clair
- * en mode nuit. C'est exactement ce qu'on veut pour une valeur en avant, et c'est
- * ce que MatchCard utilise déjà pour les scores. Les classes `slate` suivent le
- * thème de la même façon.
+ * Ce bloc était le seul des trois à ne pas se replier, alors que les
+ * compositions et les pronos des joueurs le font depuis le début. Rien ne
+ * justifiait l'exception, et c'était le plus haut des trois : sept cartes avec
+ * six lignes de chiffres chacune, ça fait quarante-deux lignes qu'on traverse
+ * pour arriver au bas de la page.
+ *
+ * Il s'ouvre toutefois **par défaut**, contrairement aux deux autres, et la
+ * différence tient à ce qu'on en fait. On déplie une composition pour vérifier
+ * un point précis, une fois ; on regarde les moyennes pendant qu'on choisit le
+ * score qu'on va saisir, donc sur chaque carte. Les refermer d'office
+ * obligerait à les rouvrir sept fois par journée, ce qui est exactement le
+ * geste qu'on cherche à éviter.
+ *
+ * L'état est propre à chaque carte et n'est pas conservé d'une visite à
+ * l'autre. Si tu veux qu'un repli vaille pour toute la page, ou qu'il soit
+ * retenu d'une fois sur l'autre, c'est une autre mécanique — dis-le et je la
+ * pose.
+ *
+ * ---------------------------------------------------------------------------
+ * Couleurs
+ * ---------------------------------------------------------------------------
+ *
+ * Point délicat de ce projet. Dans la configuration Tailwind du site, `white`
+ * est branché sur la variable `--ink` : `text-white` veut donc dire « encre du
+ * thème », sombre en mode crème et clair en mode nuit. C'est exactement ce
+ * qu'on veut pour une valeur en avant, et c'est ce que MatchCard utilise déjà
+ * pour les scores. Les classes `slate` suivent le thème de la même façon.
  *
  * En revanche un fond de couleur fixe ne doit jamais passer par une classe de
  * palette — il prendrait la teinte du thème et redonnerait du noir sur fond
@@ -56,26 +79,47 @@ function Duel({ libelle, gauche, droite, petitEstMieux = false }) {
 }
 
 export default function FormeClubs({ match }) {
+  const [ouvert, setOuvert] = useState(true);
+
   const h = match?.forme?.home;
   const a = match?.forme?.away;
 
   // Tant qu'aucun des deux clubs n'a de rencontre enregistrée, il n'y a rien à
-  // dire : en début de saison le bloc n'apparaît simplement pas.
+  // dire : en début de saison le bloc n'apparaît simplement pas — ni le
+  // contenu, ni le bouton, qui ouvrirait sur du vide.
   const joues = Math.min(h?.matchs || 0, a?.matchs || 0);
   if (!joues) return null;
 
   return (
     <div className="relative z-10 mt-3 pt-3 border-t border-slate-800">
-      <p className="mb-1.5 text-center font-display text-[9.5px] font-bold uppercase tracking-wider text-slate-500">
-        Moyennes par match · {joues} {joues > 1 ? 'journées' : 'journée'}
-      </p>
+      {/* Même bouton que « Compositions » et « Pronos des joueurs » : même
+          flèche, même rotation, même survol ambre. Trois dépliants qui se
+          ressemblent s'apprennent une fois pour trois.
 
-      <Duel libelle="essais marqués" gauche={h?.essaisPourParMatch} droite={a?.essaisPourParMatch} />
-      <Duel libelle="essais encaissés" gauche={h?.essaisContreParMatch} droite={a?.essaisContreParMatch} petitEstMieux />
-      <Duel libelle="points marqués" gauche={h?.pointsPourParMatch} droite={a?.pointsPourParMatch} />
-      <Duel libelle="points encaissés" gauche={h?.pointsContreParMatch} droite={a?.pointsContreParMatch} petitEstMieux />
-      <Duel libelle="pénalités concédées" gauche={h?.penalitesParMatch} droite={a?.penalitesParMatch} petitEstMieux />
-      <Duel libelle="plaquages manqués" gauche={h?.plaquagesManquesParMatch} droite={a?.plaquagesManquesParMatch} petitEstMieux />
+          Il est centré, là où les deux autres sont alignés à gauche, parce que
+          le tableau qu'il commande est lui-même centré : un intitulé centré
+          au-dessus de colonnes centrées se lit comme leur titre. */}
+      <button
+        type="button"
+        onClick={() => setOuvert((v) => !v)}
+        aria-expanded={ouvert}
+        className="mx-auto flex items-center gap-2 font-display text-[9.5px] font-bold uppercase
+                   tracking-wider text-slate-500 transition-colors hover:text-amber-400"
+      >
+        <span className={`text-[9px] text-amber-500 transition-transform ${ouvert ? 'rotate-90' : ''}`}>▶</span>
+        Moyennes par match · {joues} {joues > 1 ? 'journées' : 'journée'}
+      </button>
+
+      {ouvert && (
+        <div className="mt-1.5">
+          <Duel libelle="essais marqués" gauche={h?.essaisPourParMatch} droite={a?.essaisPourParMatch} />
+          <Duel libelle="essais encaissés" gauche={h?.essaisContreParMatch} droite={a?.essaisContreParMatch} petitEstMieux />
+          <Duel libelle="points marqués" gauche={h?.pointsPourParMatch} droite={a?.pointsPourParMatch} />
+          <Duel libelle="points encaissés" gauche={h?.pointsContreParMatch} droite={a?.pointsContreParMatch} petitEstMieux />
+          <Duel libelle="pénalités concédées" gauche={h?.penalitesParMatch} droite={a?.penalitesParMatch} petitEstMieux />
+          <Duel libelle="plaquages manqués" gauche={h?.plaquagesManquesParMatch} droite={a?.plaquagesManquesParMatch} petitEstMieux />
+        </div>
+      )}
     </div>
   );
 }

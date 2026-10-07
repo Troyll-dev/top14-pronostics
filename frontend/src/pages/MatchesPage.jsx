@@ -278,6 +278,18 @@ export default function MatchesPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6">
+      {/* Le nom de la page, au-dessus du titre.
+
+          Cette page était la seule à ne pas se nommer : les autres annoncent
+          « Tous les pronos » ou « Classement », celle-ci annonçait la journée
+          affichée. En arrivant par l'icône de la barre, rien ne disait où l'on
+          était — on le déduisait du contenu.
+
+          L'intitulé est volontairement discret et reprend `rule-label`, le même
+          style que « Récapitulatif » plus bas : il nomme sans voler la vedette
+          au numéro de journée, qui reste l'information qui change. */}
+      <p className="rule-label mb-1.5">Mes pronos</p>
+
       <div className="flex items-baseline justify-between gap-3 mb-1">
         <h1 className="font-display text-[26px] font-extrabold leading-none">
           Journée <span className="text-amber-500">{currentRound ?? '—'}</span>
