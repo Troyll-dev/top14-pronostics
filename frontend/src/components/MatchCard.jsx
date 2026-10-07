@@ -398,19 +398,43 @@ export default function MatchCard({
 
           Couper n'était donc pas un réglage malheureux mais la seule issue
           laissée à une ligne qui demandait trop. On lui rend la hauteur : plus
-          de `truncate`, et `overflow-wrap:anywhere` pour qu'un nom d'un seul
-          tenant plus large que sa colonne se coupe plutôt que de pousser la
-          page. Rien n'est perdu, la carte grandit de quelques pixels sur
-          mobile, et ne bouge pas du tout sur ordinateur où les noms tenaient
-          déjà.
+          de `truncate`, les noms se replient.
 
-          Les scores restent centrés verticalement, donc un nom qui se replie
-          sur deux lignes ne les décale pas. */}
-      <div className="relative z-10 flex items-center gap-2.5 sm:gap-4">
-        <div className="flex-1 min-w-0 flex items-center justify-end gap-2.5">
+          Reste à dire **où** ils ont le droit de se replier, et c'est là que la
+          première correction s'est trompée. Elle employait
+          `overflow-wrap:anywhere`, qui autorise la coupure à l'intérieur des
+          mots — et surtout, qui fait croire au moteur de mise en page que la
+          colonne peut se réduire à une lettre. Le calcul de largeur partait
+          donc d'une colonne minuscule, et l'on obtenait « Montp / ellier / HR »
+          et « Vanne / s ». Un nom propre coupé au milieu se lit plus mal que le
+          nom tronqué qu'on venait de supprimer.
+
+          `break-words` dit l'inverse : la colonne ne peut pas descendre sous la
+          largeur de son mot le plus long, donc la mise en page lui réserve la
+          place, et la coupure intérieure ne survient qu'en dernier recours —
+          pour un mot qui, seul, ne tiendrait pas. Les noms se replient alors
+          entre les mots, « Stade Français / Paris », comme on les écrirait.
+
+          Le corps passe à 13,5 pixels sur téléphone et retrouve ses 15,5 à
+          partir des écrans moyens. C'est la condition pour que « Montpellier »,
+          le plus long mot d'un nom de club du championnat, tienne dans la
+          centaine de pixels que lui laissent les scores et les écussons. Sur
+          ordinateur rien ne change.
+          Les deux noms sont alignés par le haut sur téléphone, et seulement
+          là. C'est le second défaut qu'avait révélé l'usage : avec un
+          alignement centré, « Stade Français Paris » sur trois lignes et
+          « Montpellier HR » sur deux ne commençaient pas à la même hauteur,
+          chaque colonne étant centrée sur elle-même. Alignés par le haut, les
+          premières lignes des deux noms tombent en regard, ce qui est la seule
+          chose qu'on lise vraiment. Sur les écrans où les noms tiennent sur une
+          ligne, l'alignement centré d'origine reprend la main.
+
+          */}
+      <div className="relative z-10 flex items-start sm:items-center gap-2.5 sm:gap-4">
+        <div className="flex-1 min-w-0 flex items-start sm:items-center justify-end gap-2.5">
           <div className="min-w-0 text-right">
-            <p className="[overflow-wrap:anywhere] font-display font-bold text-[15.5px] leading-tight">{match.homeTeam.name}</p>
-            <p className="[overflow-wrap:anywhere] text-[10.5px] italic text-slate-500 mt-0.5">{match.venue || match.homeTeam.city}</p>
+            <p className="break-words font-display font-bold text-[13.5px] sm:text-[15.5px] leading-tight">{match.homeTeam.name}</p>
+            <p className="break-words text-[10px] sm:text-[10.5px] italic text-slate-500 mt-0.5">{match.venue || match.homeTeam.city}</p>
           </div>
           <TeamCrest team={match.homeTeam} size={28} />
         </div>
@@ -435,11 +459,11 @@ export default function MatchCard({
           )}
         </div>
 
-        <div className="flex-1 min-w-0 flex items-center gap-2.5">
+        <div className="flex-1 min-w-0 flex items-start sm:items-center gap-2.5">
           <TeamCrest team={match.awayTeam} size={28} />
           <div className="min-w-0">
-            <p className="[overflow-wrap:anywhere] font-display font-bold text-[15.5px] leading-tight">{match.awayTeam.name}</p>
-            <p className="[overflow-wrap:anywhere] text-[10.5px] italic text-slate-500 mt-0.5">{match.awayTeam.city}</p>
+            <p className="break-words font-display font-bold text-[13.5px] sm:text-[15.5px] leading-tight">{match.awayTeam.name}</p>
+            <p className="break-words text-[10px] sm:text-[10.5px] italic text-slate-500 mt-0.5">{match.awayTeam.city}</p>
           </div>
         </div>
       </div>
