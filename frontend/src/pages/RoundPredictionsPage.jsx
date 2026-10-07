@@ -87,6 +87,23 @@ export default function RoundPredictionsPage() {
   const [predictions, setPredictions] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  /**
+   * L'affiche de la journée, demandée au serveur.
+   *
+   * Elle n'est pas recalculée ici, alors que le navigateur aurait tout ce qu'il
+   * faut : la règle est « le match qui commence le plus tard », et elle se fige
+   * au premier coup d'envoi de la journée. Deux énoncés d'une même règle
+   * finissent toujours par diverger — la page désignerait une affiche et le
+   * calcul des points en compterait une autre, ce qui est exactement le genre
+   * d'écart qu'on ne découvre qu'en voyant un total qui ne tombe pas juste.
+   *
+   * C'est une information globale, la même pour tout le monde : elle va donc en
+   * en-tête de colonne. Le joker, lui, appartient à chaque joueur et se marque
+   * dans les cellules. Deux symboles de nature différente dans le même tableau,
+   * à deux endroits différents — c'est ce qui permet de ne pas les confondre.
+   */
+  const [afficheMatchId, setAfficheMatchId] = useState(null);
+
   useEffect(() => {
     api.get('/matches/rounds').then((res) => setRounds(res.data)).catch(console.error);
 
@@ -128,6 +145,12 @@ export default function RoundPredictionsPage() {
       })
       .catch(console.error)
       .finally(() => setLoading(false));
+
+    // Les règles ne sont qu'un habillage : si l'appel échoue, le tableau reste
+    // entièrement lisible, simplement sans l'étoile.
+    api.get(`/predictions/round/${currentRound}/regles`)
+      .then((res) => setAfficheMatchId(res.data.afficheMatchId ?? null))
+      .catch(() => setAfficheMatchId(null));
   }, [currentRound]);
 
   const playersById = {};
@@ -190,6 +213,20 @@ export default function RoundPredictionsPage() {
                   </th>
                   {matches.map((m) => (
                     <th key={m.id} className="px-1.5 pb-2.5 min-w-[4.6rem] align-bottom">
+                      {/* L'étoile de l'affiche, au-dessus des écussons.
+
+                          Elle occupe sa propre ligne, et cette ligne existe sur
+                          toutes les colonnes même quand elle est vide : sans
+                          cela, la seule colonne qui la porte serait plus haute
+                          que les six autres et les écussons ne seraient plus
+                          alignés. Une réservation de place invisible vaut mieux
+                          qu'un décalage visible. */}
+                      <div
+                        className="h-3.5 text-center text-[11px] leading-none"
+                        title={m.id === afficheMatchId ? 'Affiche de la journée : points triplés' : ''}
+                      >
+                        {m.id === afficheMatchId ? '⭐' : ''}
+                      </div>
                       <div className="flex items-center justify-center gap-1">
                         <TeamCrest team={m.homeTeam} size={18} />
                         <span className="text-slate-600 text-[10px]">–</span>
@@ -254,8 +291,29 @@ export default function RoundPredictionsPage() {
                           <td key={m.id} className="px-0.5 py-0.5">
                             <div
                               style={styleCellule(p)}
-                              className="rounded py-1 text-center font-display text-[12px] tabular-nums leading-tight"
+                              className="relative rounded py-1 text-center font-display text-[12px] tabular-nums leading-tight"
                             >
+                              {/* Le joker, sur la cellule elle-même.
+
+                                  Il n'apparaissait qu'accolé aux points gagnés,
+                                  donc seulement une fois la journée notée. Or
+                                  c'est avant les matchs qu'on veut savoir qui a
+                                  misé où : le tableau annonçait le joker dans sa
+                                  légende et ne le montrait jamais au moment où
+                                  il est intéressant.
+
+                                  Posé en coin plutôt qu'à côté du score, pour ne
+                                  pas décentrer les chiffres — ils se lisent en
+                                  colonne, d'un joueur à l'autre. */}
+                              {p?.joker && (
+                                <span
+                                  className="absolute top-0 right-0.5 text-[9px] leading-none"
+                                  title="Joker : points doublés"
+                                >
+                                  🃏
+                                </span>
+                              )}
+
                               {p ? `${p.homeScorePred}–${p.awayScorePred}` : '—'}
                               {/* Le gain, sous le pronostic. La couleur disait
                                   déjà la qualité du pari, mais pas ce qu'il a
@@ -265,7 +323,7 @@ export default function RoundPredictionsPage() {
                                   ordinaire. */}
                               {p && p.points !== null && p.points !== undefined && (
                                 <div className="text-[9.5px] font-bold opacity-80">
-                                  {p.joker && '🃏'}+{p.points}
+                                  +{p.points}
                                 </div>
                               )}
                             </div>
