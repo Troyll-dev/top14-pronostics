@@ -322,6 +322,36 @@ export default function MatchCard({
   const homeWon = isFinished && match.homeScore > match.awayScore;
   const awayWon = isFinished && match.awayScore > match.homeScore;
 
+  /**
+   * Les deux cases de score, construites ici et posées dans les deux
+   * dispositions.
+   *
+   * Le même élément React sert aux deux : la version téléphone et la version
+   * ordinateur ne peuvent donc pas diverger, et il n'y a qu'un seul endroit à
+   * reprendre le jour où l'on touche à la saisie. Celle qui n'est pas affichée
+   * est retirée du flux par `display:none`, donc elle n'attrape ni le clavier
+   * ni la tabulation.
+   */
+  const caseScore = (cote) => {
+    if (isFinished) {
+      const gagne = cote === 'home' ? homeWon : awayWon;
+      return (
+        <span className={`font-display font-extrabold text-[29px] leading-none tabular-nums ${gagne ? 'text-amber-400' : ''}`}>
+          {cote === 'home' ? match.homeScore : match.awayScore}
+        </span>
+      );
+    }
+    return (
+      <ScoreInput
+        value={cote === 'home' ? home : away}
+        onChange={(v) => onDraftChange(match.id, cote, v)}
+        disabled={locked}
+      />
+    );
+  };
+  const caseHome = caseScore('home');
+  const caseAway = caseScore('away');
+
   return (
     <div className={`card stitched ${bordure}`}>
       {/* En-tête
@@ -385,85 +415,70 @@ export default function MatchCard({
         </span>
       </div>
 
-      {/* Affiche
+      {/* L'affiche de la rencontre : deux dispositions, une par largeur.
 
-          Les noms d'équipes ne sont plus tronqués : ils passent à la ligne.
+          Sur ordinateur, celle d'origine — les deux équipes face à face, les
+          scores au milieu. Sur téléphone, une équipe par ligne.
 
-          Cette rangée range six choses sur une seule ligne — nom, écusson,
-          score, tiret, écusson, nom — et quatre d'entre elles ont une largeur
-          fixe qui ne se comprime pas. Sur un téléphone en portrait il restait
-          une centaine de pixels par nom, là où « Stade Français Paris » en gras
-          en demande le triple : on lisait « Stade… » et « Mont… », ce qui ne
-          désigne plus personne.
+          Ce n'est pas un caprice de mise en page, c'est l'aveu qu'une ligne
+          demandait l'impossible. Elle range six choses dont quatre ont une
+          largeur fixe qui ne se comprime pas ; sur un écran de 390 pixels il
+          restait une centaine de pixels par nom, là où « Stade Français Paris »
+          en demande le triple. On a essayé de tronquer — on lisait « Stade… »,
+          qui ne désigne personne. Puis de replier — « Montp / ellier », puis des
+          noms à des hauteurs différentes, puisque deux noms de longueurs
+          différentes n'ont aucune raison d'occuper le même nombre de lignes.
 
-          Couper n'était donc pas un réglage malheureux mais la seule issue
-          laissée à une ligne qui demandait trop. On lui rend la hauteur : plus
-          de `truncate`, les noms se replient.
+          Chacune de ces corrections réglait un symptôme du même mal. Une équipe
+          par ligne le supprime : le nom dispose de toute la largeur, il tient à
+          sa taille normale, et les deux équipes sont forcément au même niveau
+          l'une que l'autre. On y perd le face-à-face lu de gauche à droite, et
+          c'est dommage ; on y gagne de ne plus avoir à y revenir à chaque nom
+          long — y compris le jour où ces cartes porteront « Angleterre » et
+          « Pays de Galles ».
 
-          Reste à dire **où** ils ont le droit de se replier, et c'est là que la
-          première correction s'est trompée. Elle employait
-          `overflow-wrap:anywhere`, qui autorise la coupure à l'intérieur des
-          mots — et surtout, qui fait croire au moteur de mise en page que la
-          colonne peut se réduire à une lettre. Le calcul de largeur partait
-          donc d'une colonne minuscule, et l'on obtenait « Montp / ellier / HR »
-          et « Vanne / s ». Un nom propre coupé au milieu se lit plus mal que le
-          nom tronqué qu'on venait de supprimer.
+          Les deux dispositions partagent les mêmes cases de score, construites
+          une fois ci-dessous : il ne peut donc pas y avoir de divergence entre
+          ce qu'on voit sur téléphone et ce qu'on voit sur ordinateur. */}
+      <div className="relative z-10 sm:hidden flex flex-col gap-2">
+        <div className="flex items-center gap-2.5">
+          <TeamCrest team={match.homeTeam} size={28} />
+          <div className="min-w-0 flex-1">
+            <p className="break-words font-display font-bold text-[15.5px] leading-tight">{match.homeTeam.name}</p>
+            <p className="break-words text-[10.5px] italic text-slate-500 mt-0.5">{match.venue || match.homeTeam.city}</p>
+          </div>
+          {caseHome}
+        </div>
+        <div className="flex items-center gap-2.5">
+          <TeamCrest team={match.awayTeam} size={28} />
+          <div className="min-w-0 flex-1">
+            <p className="break-words font-display font-bold text-[15.5px] leading-tight">{match.awayTeam.name}</p>
+            <p className="break-words text-[10.5px] italic text-slate-500 mt-0.5">{match.awayTeam.city}</p>
+          </div>
+          {caseAway}
+        </div>
+      </div>
 
-          `break-words` dit l'inverse : la colonne ne peut pas descendre sous la
-          largeur de son mot le plus long, donc la mise en page lui réserve la
-          place, et la coupure intérieure ne survient qu'en dernier recours —
-          pour un mot qui, seul, ne tiendrait pas. Les noms se replient alors
-          entre les mots, « Stade Français / Paris », comme on les écrirait.
-
-          Le corps passe à 13,5 pixels sur téléphone et retrouve ses 15,5 à
-          partir des écrans moyens. C'est la condition pour que « Montpellier »,
-          le plus long mot d'un nom de club du championnat, tienne dans la
-          centaine de pixels que lui laissent les scores et les écussons. Sur
-          ordinateur rien ne change.
-          Les deux noms sont alignés par le haut sur téléphone, et seulement
-          là. C'est le second défaut qu'avait révélé l'usage : avec un
-          alignement centré, « Stade Français Paris » sur trois lignes et
-          « Montpellier HR » sur deux ne commençaient pas à la même hauteur,
-          chaque colonne étant centrée sur elle-même. Alignés par le haut, les
-          premières lignes des deux noms tombent en regard, ce qui est la seule
-          chose qu'on lise vraiment. Sur les écrans où les noms tiennent sur une
-          ligne, l'alignement centré d'origine reprend la main.
-
-          */}
-      <div className="relative z-10 flex items-start sm:items-center gap-2.5 sm:gap-4">
-        <div className="flex-1 min-w-0 flex items-start sm:items-center justify-end gap-2.5">
+      <div className="relative z-10 hidden sm:flex items-center gap-4">
+        <div className="flex-1 min-w-0 flex items-center justify-end gap-2.5">
           <div className="min-w-0 text-right">
-            <p className="break-words font-display font-bold text-[13.5px] sm:text-[15.5px] leading-tight">{match.homeTeam.name}</p>
-            <p className="break-words text-[10px] sm:text-[10.5px] italic text-slate-500 mt-0.5">{match.venue || match.homeTeam.city}</p>
+            <p className="break-words font-display font-bold text-[15.5px] leading-tight">{match.homeTeam.name}</p>
+            <p className="break-words text-[10.5px] italic text-slate-500 mt-0.5">{match.venue || match.homeTeam.city}</p>
           </div>
           <TeamCrest team={match.homeTeam} size={28} />
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          {isFinished ? (
-            <>
-              <span className={`font-display font-extrabold text-[29px] leading-none tabular-nums ${homeWon ? 'text-amber-400' : ''}`}>
-                {match.homeScore}
-              </span>
-              <span className="text-slate-500 text-base">–</span>
-              <span className={`font-display font-extrabold text-[29px] leading-none tabular-nums ${awayWon ? 'text-amber-400' : ''}`}>
-                {match.awayScore}
-              </span>
-            </>
-          ) : (
-            <>
-              <ScoreInput value={home} onChange={(v) => onDraftChange(match.id, 'home', v)} disabled={locked} />
-              <span className="text-slate-500 text-base">–</span>
-              <ScoreInput value={away} onChange={(v) => onDraftChange(match.id, 'away', v)} disabled={locked} />
-            </>
-          )}
+          {caseHome}
+          <span className="text-slate-500 text-base">–</span>
+          {caseAway}
         </div>
 
-        <div className="flex-1 min-w-0 flex items-start sm:items-center gap-2.5">
+        <div className="flex-1 min-w-0 flex items-center gap-2.5">
           <TeamCrest team={match.awayTeam} size={28} />
           <div className="min-w-0">
-            <p className="break-words font-display font-bold text-[13.5px] sm:text-[15.5px] leading-tight">{match.awayTeam.name}</p>
-            <p className="break-words text-[10px] sm:text-[10.5px] italic text-slate-500 mt-0.5">{match.awayTeam.city}</p>
+            <p className="break-words font-display font-bold text-[15.5px] leading-tight">{match.awayTeam.name}</p>
+            <p className="break-words text-[10.5px] italic text-slate-500 mt-0.5">{match.awayTeam.city}</p>
           </div>
         </div>
       </div>
