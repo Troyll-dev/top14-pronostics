@@ -132,3 +132,48 @@
   .photo-copains-ancre ~ *:not(:has(> .bandeau)) > :first-child,
   .photo-copains-ancre ~ *:not(:has(> .bandeau)) > h1 + p { padding-right: 176px; }   /* 150 + 10 + 16 */
 }
+
+/* ---------------------------------------------------------------------------
+   Les pages qui portent un bandeau.
+
+   Sur l'accueil et le classement, une image pleine largeur occupe desormais le
+   haut de la colonne. La vignette, ancree a `top: 14px`, se posait donc sur
+   l'image — un polaroid au milieu d'une photo, loin du titre qu'elle est censee
+   accompagner.
+
+   Elle descend donc de la hauteur du bandeau pour retrouver le niveau du titre,
+   et se comporte alors exactement comme au vestiaire, qui n'a pas de bandeau.
+
+   Le calcul est fait en CSS plutot qu'avec un nombre fixe, parce que la hauteur
+   du bandeau depend de la largeur de l'ecran : il est en 16/9, bord a bord sous
+   640 px et large comme la colonne au-dela. Une valeur en dur serait juste sur
+   un seul telephone.
+
+   Les 34 px ajoutes sont la marge basse du bandeau (20 px) plus le decalage
+   d'origine de la vignette (14 px).
+   --------------------------------------------------------------------------- */
+.photo-copains-ancre:has(~ * > .bandeau) .photo-copains {
+  top: calc(100vw / 1.7778 + 34px);
+}
+
+/* Et la place reservee au texte passe du premier element — le bandeau, qui doit
+   garder toute sa largeur — au titre qui le suit. */
+.photo-copains-ancre ~ * > .bandeau ~ h1,
+.photo-copains-ancre ~ * > .bandeau ~ h1 + p {
+  padding-right: 118px;
+  flex-wrap: wrap;
+  row-gap: 6px;
+}
+
+@media (min-width: 640px) {
+  .photo-copains-ancre:has(~ * > .bandeau) .photo-copains {
+    top: calc(min(100vw - 32px, 672px) / 1.7778 + 36px);
+  }
+  .photo-copains-ancre ~ * > .bandeau ~ h1,
+  .photo-copains-ancre ~ * > .bandeau ~ h1 + p { padding-right: 150px; }
+}
+
+@media (min-width: 1100px) {
+  .photo-copains-ancre ~ * > .bandeau ~ h1,
+  .photo-copains-ancre ~ * > .bandeau ~ h1 + p { padding-right: 176px; }
+}
