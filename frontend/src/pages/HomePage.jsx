@@ -5,6 +5,7 @@ import { fr } from 'date-fns/locale';
 import api from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 import TeamCrest from '../components/TeamCrest';
+import Bandeau from '../components/Bandeau';
 import { matchState, STATE, STATE_CHIP, useNow } from '../utils/matchState';
 
 function pointsTone(points) {
@@ -139,6 +140,13 @@ export default function HomePage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6">
+      {/* Le bandeau, au-dessus de l'accueil.
+
+          Il arrive avant le salut plutôt qu'après : c'est la première chose
+          qu'on voit en ouvrant l'appli, et une page qui commence par une
+          tablée de copains dit mieux de quoi il s'agit qu'un titre. */}
+      <Bandeau nom="accueil" className="mb-5" />
+
       <h1 className="font-display text-[26px] font-extrabold leading-none mb-1">
         Salut {user?.username} 🏉
       </h1>

@@ -1,55 +1,11 @@
 import { Link } from 'react-router-dom';
+import Bandeau from '../components/Bandeau';
 
 function Rule({ points, children }) {
   return (
     <div className="flex items-center justify-between gap-3 py-1.5">
       <span className="text-slate-400">{children}</span>
       <span className="font-display font-bold text-amber-500 shrink-0">{points}</span>
-    </div>
-  );
-}
-
-/**
- * Le bandeau du pub.
- *
- * Une photo, donc opaque : c'est le seul element des trois pages de demarrage
- * qui ne bascule pas avec le theme. C'est assume — une enseigne eclaire pareil
- * de jour comme de nuit — et ca evite le piege inverse, une image detouree sur
- * fond sombre dont les noirs se fondraient dans la page.
- *
- * Le bas se fond dans le fond par un masque en degrade, pour qu'il n'y ait pas
- * de bord net entre la photo et la page. Meme principe que le bandeau des
- * joueurs ailleurs sur le site.
- *
- * Bord a bord sur telephone, arrondi des qu'il y a de la place : une photo qui
- * touche les deux cotes de l'ecran a de l'ampleur, la meme photo avec seize
- * pixels de marge de chaque cote a l'air d'avoir rate son cadre.
- *
- * `aspect-ratio` plutot qu'une hauteur : le cadrage reste identique partout, et
- * la place est reservee avant meme que l'image arrive — donc rien ne saute quand
- * elle finit de charger.
- */
-function BandeauPub() {
-  return (
-    <div
-      aria-hidden="true"
-      className="-mx-4 sm:mx-0 sm:rounded-xl overflow-hidden mb-2"
-      style={{
-        WebkitMaskImage: 'linear-gradient(#000 74%, transparent 100%)',
-        maskImage: 'linear-gradient(#000 74%, transparent 100%)',
-      }}
-    >
-      <img
-        src="/pub-accueil-1008.webp"
-        srcSet="/pub-accueil-672.webp 672w, /pub-accueil-1008.webp 1008w, /pub-accueil-1344.webp 1344w"
-        sizes="(min-width: 768px) 768px, 100vw"
-        alt=""
-        width={1008}
-        height={567}
-        decoding="async"
-        className="block w-full h-auto object-cover"
-        style={{ aspectRatio: '1.78', objectPosition: 'center 42%' }}
-      />
     </div>
   );
 }
@@ -75,7 +31,7 @@ export default function WelcomePage() {
           {/* L'emoji ballon de 64 pixels a disparu d'ici : il tenait lieu
               d'identite faute de mieux, et une photo du pub dit la meme chose
               en mieux. Il reste dans la barre du haut, ou il sert de marque. */}
-          <BandeauPub />
+          <Bandeau nom="bienvenue" position="center 42%" className="mb-2" />
 
           <h1 className="font-display text-4xl sm:text-5xl font-extrabold leading-[1.05] mb-4 mt-6">
             Rugby.<br />

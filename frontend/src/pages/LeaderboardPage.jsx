@@ -3,6 +3,7 @@ import api from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 import Avatar from '../components/Avatar';
 import SelecteurJournee from '../components/SelecteurJournee';
+import Bandeau from '../components/Bandeau';
 
 function MedalIcon({ rank }) {
   // Pas de rang : un joueur en pause. Un tiret, et surtout pas un numero apres
@@ -211,6 +212,8 @@ export default function LeaderboardPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6">
+      <Bandeau nom="classement" className="mb-5" />
+
       <h1 className="font-display text-[26px] font-extrabold leading-none mb-1">🏆 Classement</h1>
       <p className="text-xs italic text-slate-500 mb-4">
         {view === 'general'
