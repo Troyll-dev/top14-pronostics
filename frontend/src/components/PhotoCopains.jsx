@@ -4,21 +4,23 @@ import './PhotoCopains.css';
 /**
  * La bande de copains, epinglee a cote du titre.
  *
- * Elle n'apparait que sur les pages listees dans PAGES. Ailleurs, les en-tetes
- * portent deja des pastilles, des selecteurs de journee ou des liens, et la
- * vignette leur disputait la place.
- *
- * Elle a longtemps vecu aussi sur le classement, pour la meme raison qu'au
- * vestiaire : ce sont les pages ou l'on regarde les copains plutot que le
- * championnat. Le classement porte desormais un bandeau pleine largeur, et deux
- * photos de la meme bande sur le meme ecran, l'une au-dessus de l'autre, ne
- * disent pas deux fois plus — elles se font concurrence. La vignette cede donc
- * la place au bandeau, qui occupe le meme role en plus grand.
+ * Elle n'apparait que sur les pages listees dans PAGES : l'accueil, le
+ * classement et le vestiaire. Ailleurs — « Mes pronos », « Tous les pronos »,
+ * le championnat — les en-tetes portent deja des pastilles, des selecteurs de
+ * journee ou des liens, et la vignette leur disputait la place. Ces trois
+ * pages-la sont celles ou l'on regarde les copains plutot que le championnat,
+ * donc la photo y est a sa place.
  *
  * Le filtre est ici plutot que dans App.jsx pour que le montage reste d'une
  * seule ligne cote routes, et pour que la regle « ou cette vignette a le droit
  * d'apparaitre » reste avec la vignette. Pour changer la liste, il suffit de
  * modifier PAGES ci-dessous.
+ *
+ * Depuis que l'accueil et le classement portent un bandeau pleine largeur, la
+ * vignette se pose dessus plutot qu'a cote du titre : un polaroid epingle sur
+ * une photo. C'est voulu — la reservation de place dans PhotoCopains.css est
+ * d'ailleurs desactivee sur ces pages-la, pour que le bandeau garde toute sa
+ * largeur.
  *
  * Deux niveaux : une ancre invisible qui reproduit la geometrie de la colonne
  * de contenu, et la vignette posee a son bord droit. Sans cette ancre, `right`
@@ -33,7 +35,7 @@ import './PhotoCopains.css';
  * la signature du coin inferieur droit hors champ, puisqu'elle se trouve a
  * 97 % de la hauteur.
  */
-const PAGES = ['/chat'];
+const PAGES = ['/', '/classement', '/chat'];
 
 export default function PhotoCopains() {
   const { pathname } = useLocation();
