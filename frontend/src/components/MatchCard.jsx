@@ -8,16 +8,44 @@ import { matchState, STATE, STATE_CHIP } from '../utils/matchState';
 import CompositionsMatch from './CompositionsMatch';
 import FormeClubs from './FormeClubs';
 
+/**
+ * La case de score.
+ *
+ * Champ texte, pas champ nombre, et c'est délibéré.
+ *
+ * `type="number"` affichait deux petites flèches haut/bas à droite du champ.
+ * Elles mangeaient la place et décentraient le chiffre, pour un service que
+ * personne ne demande : on ne saisit pas un score de rugby en cliquant
+ * vingt-sept fois sur une flèche.
+ *
+ * Elles emportaient surtout un piège discret. Sur un champ nombre qui a le
+ * focus, la molette de la souris change la valeur. Avec sept cartes à faire
+ * défiler, il suffisait de cliquer dans une case puis de continuer à dérouler
+ * la page pour modifier un score sans s'en apercevoir — et l'enregistrer
+ * ensuite en croyant valider ce qu'on avait tapé.
+ *
+ * `inputMode="numeric"` conserve le pavé numérique sur téléphone, qui était le
+ * seul vrai apport du champ nombre. Le filtre ne garde que les chiffres : ni
+ * signe, ni virgule, ni exponentielle — autant de choses qu'un champ nombre
+ * acceptait et que le serveur devait refuser ensuite.
+ *
+ * La borne haute reste côté serveur, où elle fait foi ; ici on se contente de
+ * trois chiffres, qui est la largeur du champ.
+ */
 function ScoreInput({ value, onChange, disabled }) {
   return (
     <input
-      type="number"
-      min="0"
-      max="150"
+      type="text"
+      inputMode="numeric"
+      autoComplete="off"
+      maxLength={3}
       value={value}
       // On laisse passer la chaine vide : convertir tout de suite afficherait
       // un 0 des que l'on efface le champ.
-      onChange={(e) => onChange(e.target.value === '' ? '' : Number(e.target.value))}
+      onChange={(e) => {
+        const chiffres = e.target.value.replace(/\D/g, '').slice(0, 3);
+        onChange(chiffres === '' ? '' : Number(chiffres));
+      }}
       disabled={disabled}
       className="w-[52px] h-11 text-center font-display text-xl font-bold tabular-nums
                  bg-slate-950 border-[1.5px] border-slate-800 rounded-md text-white
