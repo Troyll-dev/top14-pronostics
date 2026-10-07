@@ -84,30 +84,46 @@ export default function FormeClubs({ match }) {
   const h = match?.forme?.home;
   const a = match?.forme?.away;
 
-  // Tant qu'aucun des deux clubs n'a de rencontre enregistrée, il n'y a rien à
-  // dire : en début de saison le bloc n'apparaît simplement pas — ni le
-  // contenu, ni le bouton, qui ouvrirait sur du vide.
+  /**
+   * Sur combien de rencontres portent ces moyennes.
+   *
+   * Le titre disait « 4 journées », et c'était faux. Ce nombre n'est pas une
+   * quantité de journées de championnat : c'est le nombre de rencontres déjà
+   * jouées par le club qui en a joué le moins des deux. À la J6, deux clubs
+   * peuvent en afficher 5 et 4 si l'un a eu un match reporté — et deux cartes
+   * de la même journée annonçaient alors des totaux différents, ce qui ne
+   * pouvait que dérouter.
+   *
+   * On prend le plus petit des deux pour que la comparaison reste honnête :
+   * comparer une moyenne sur cinq matchs à une moyenne sur trois reviendrait à
+   * mettre en regard deux échantillons de poids différents.
+   *
+   * Tant qu'aucun des deux clubs n'a de rencontre enregistrée, il n'y a rien à
+   * dire : en début de saison le bloc n'apparaît pas — ni le contenu, ni le
+   * bouton, qui ouvrirait sur du vide.
+   */
   const joues = Math.min(h?.matchs || 0, a?.matchs || 0);
   if (!joues) return null;
 
   return (
     <div className="relative z-10 mt-3 pt-3 border-t border-slate-800">
       {/* Même bouton que « Compositions » et « Pronos des joueurs » : même
-          flèche, même rotation, même survol ambre. Trois dépliants qui se
-          ressemblent s'apprennent une fois pour trois.
-
-          Il est centré, là où les deux autres sont alignés à gauche, parce que
-          le tableau qu'il commande est lui-même centré : un intitulé centré
-          au-dessus de colonnes centrées se lit comme leur titre. */}
+          flèche, même rotation, même taille, même survol ambre, et aligné à
+          gauche comme eux. Trois dépliants qui se ressemblent s'apprennent une
+          fois pour trois — je l'avais centré pour épouser le tableau qu'il
+          commande, et c'était la mauvaise règle : un dépliant appartient à la
+          famille des dépliants, pas à son contenu. */}
       <button
         type="button"
         onClick={() => setOuvert((v) => !v)}
         aria-expanded={ouvert}
-        className="mx-auto flex items-center gap-2 font-display text-[9.5px] font-bold uppercase
-                   tracking-wider text-slate-500 transition-colors hover:text-amber-400"
+        className="flex items-center gap-2 text-xs text-slate-400 transition-colors hover:text-amber-400"
       >
         <span className={`text-[9px] text-amber-500 transition-transform ${ouvert ? 'rotate-90' : ''}`}>▶</span>
-        Moyennes par match · {joues} {joues > 1 ? 'journées' : 'journée'}
+        Moyennes par match
+        <span className="text-slate-600">
+          · sur {joues} {joues > 1 ? 'matchs joués' : 'match joué'}
+        </span>
       </button>
 
       {ouvert && (
