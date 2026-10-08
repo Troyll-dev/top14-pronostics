@@ -1,20 +1,31 @@
 /**
- * Le « Quoi de neuf », envoye une fois.
+ * Les nouveautes, et les deux facons de les annoncer.
  *
- * Pourquoi un courriel a part plutot qu'une rubrique dans le rappel du vendredi
- * ou dans le bilan du lundi : ces deux-la partent chaque semaine. Une nouveaute
- * qu'ils porteraient serait relue tous les vendredis jusqu'a ce que plus
- * personne ne lise rien — ou bien il faudrait retenir qui a deja vu quoi, donc
- * une colonne, une notion de version et un mecanisme entier pour une annonce
- * qu'on fait une seule fois.
+ * Il y en avait une seule, un courriel a part envoye a la main. Elle reste —
+ * c'est `envoyerAnnonce` plus bas — et la voici doublee d'un bloc glisse dans le
+ * rappel du vendredi.
  *
- * Une annonce ponctuelle merite un envoi ponctuel. Celui-ci se declenche a la
- * main, le jour choisi, et ne revient jamais.
+ * Pourquoi les deux plutot qu'un seul : ils ne touchent pas les memes gens. Le
+ * rappel du vendredi ne part qu'aux joueurs a qui il manque des pronostics,
+ * c'est tout son objet ; ceux qui ont deja tout pose ne le recoivent jamais. Le
+ * courriel d'annonce, lui, part a tout le monde, mais c'est un courriel de plus
+ * dans une boite. Selon ce qu'on annonce, l'un ou l'autre convient — et ce
+ * fichier porte le texte une seule fois pour les deux.
  *
- * Ce qui reste dans le rappel du vendredi, c'est `NOUVEAUTE_VENDREDI` : une
- * ligne, une seule nouveaute a la fois, changee a la main quand il y a quelque
- * chose a dire et videe le reste du temps. Pas de base, pas de version, pas de
- * suivi — un texte, ou rien.
+ * ---------------------------------------------------------------------------
+ * LE BLOC DU VENDREDI S'ETEINT A LA MAIN
+ * ---------------------------------------------------------------------------
+ *
+ * `ANNONCE_VENDREDI` a faux, et il disparait. C'est la seule chose a faire une
+ * fois l'annonce passee, et il faut y penser : le rappel du vendredi repart
+ * chaque semaine, donc un bloc laisse allume serait relu tous les vendredis
+ * jusqu'a ce que plus personne ne lise rien.
+ *
+ * On aurait pu l'eteindre tout seul — retenir qui a vu quoi, dater l'annonce,
+ * comparer. Ca demande une colonne, une notion de version et un mecanisme
+ * entier, pour une chose qu'on fait trois fois par saison. Un booleen qu'on
+ * bascule a la main est plus honnete : il ne pretend pas savoir ce qu'il ne sait
+ * pas.
  */
 
 const { PrismaClient } = require('@prisma/client');
@@ -24,56 +35,69 @@ const desinscription = require('./desinscription.service');
 const prisma = new PrismaClient();
 
 /**
- * La ligne du rappel du vendredi. Vide = rien ne s'affiche.
+ * Le bloc de nouveautes apparait-il dans le rappel du vendredi ?
  *
- * Une seule nouveaute a la fois, et courte : elle se glisse dans un message qui
- * a deja un travail a faire, et qui ne doit pas devenir un bulletin.
+ * A `false`, et c'est le bon reglage pour cette annonce-ci : le rappel du
+ * vendredi ne part qu'aux joueurs a qui il manque des pronostics, donc ceux qui
+ * ont deja tout pose n'auraient rien su. Cette annonce-la part par courriel a
+ * part, `envoyerAnnonce` plus bas, qui ecrit a tout le monde.
+ *
+ * Le mecanisme reste en place pour la prochaine fois. Il vaut quand ce qu'on
+ * annonce s'adresse surtout aux retardataires — un changement dans la facon de
+ * poser ses pronos, par exemple — et il evite alors un courriel de plus.
+ *
+ * S'il repasse a `true`, penser a le remettre a `false` une fois l'annonce
+ * faite : le rappel repart chaque semaine, et un bloc laisse allume serait relu
+ * tous les vendredis jusqu'a ce que plus personne ne lise rien.
  */
-const NOUVEAUTE_VENDREDI =
-  '';
+const ANNONCE_VENDREDI = false;
 
 /**
  * Ce qu'on annonce, du plus utile au moins.
  *
- * Cinq entrees, et pas une de plus : au-dela, un courriel d'annonce se parcourt
- * au lieu de se lire. Rien sur les sauvegardes, le journal des taches ni la
- * table de classement — ce sont des choses qui interessent celui qui maintient,
- * pas celui qui joue.
+ * Cinq entrees, et pas une de plus : au-dela, une annonce se parcourt au lieu de
+ * se lire. Rien sur les sauvegardes, le journal des taches ni la table de
+ * classement — ce sont des choses qui interessent celui qui maintient, pas celui
+ * qui joue.
+ *
+ * L'ordre n'est pas chronologique mais utile : d'abord ce qui change la facon de
+ * jouer, ensuite ce qui corrige une erreur, enfin ce qui rend le site plus
+ * agreable. Quelqu'un qui s'arrete apres deux entrees aura lu les deux qui
+ * comptent.
  */
 const NOUVEAUTES = [
   {
-    titre: 'Les compositions, avant le coup d\'envoi',
+    titre: 'Bob le poulpe',
     texte:
-      'Dès que la LNR les publie, les quinze de départ et les remplaçants ' +
-      's\'affichent sous chaque match. De quoi pronostiquer en sachant qui joue.',
+      'Un nouveau bouton qui remplit tes cases vides à partir des stats des ' +
+      'clubs, pour les journées où tu es en retard ou sans avis. Il peut aussi ' +
+      'commenter tes pronos — il n\'est pas tendre !',
   },
   {
-    titre: 'La forme des deux clubs',
+    titre: 'Les statistiques des clubs étaient fausses',
     texte:
-      'Sous chaque affiche, six chiffres qui se répondent : essais marqués et ' +
-      'encaissés, possession, pénalités concédées. Cumulés depuis le début de la ' +
-      'saison, arrêtés à la journée précédente.',
+      'Trois matchs manquaient depuis la première journée, ce qui faussait les ' +
+      'moyennes de huit clubs sur quatorze. C\'est corrigé : si certains chiffres ' +
+      'te paraissaient bizarres, tu avais raison.',
   },
   {
-    titre: 'Le classement officiel de la LNR',
+    titre: 'Le joker se pose sur le match',
     texte:
-      'Le championnat n\'est plus recalculé dans notre coin : c\'est le tableau ' +
-      'de la Ligue, avec ses colonnes, son état de forme et le prochain match de ' +
-      'chaque club.',
+      'Tu le coches directement sur la rencontre de ton choix, et il reste ' +
+      'déplaçable jusqu\'au coup d\'envoi de ce match-là. Sur « Tous les pronos », ' +
+      'on voit maintenant où chacun a posé le sien.',
   },
   {
-    titre: 'Tes séries et l\'écart avec le voisin',
+    titre: 'Les noms de clubs ne sont plus coupés',
     texte:
-      'Sur l\'accueil et au classement : combien de bons pronostics tu enchaînes, ' +
-      'et combien de points te séparent de celui qui te précède. Le classement dit ' +
-      'qui gagne, ça dit ce qui se passe.',
+      'Fini les « Montp / ellier » et les colonnes qui débordent : les noms ' +
+      's\'affichent en entier sur toutes les pages, y compris sur téléphone.',
   },
   {
-    titre: 'Tu choisis ce que tu reçois',
+    titre: 'Le site s\'installe sur ton téléphone',
     texte:
-      'Deux cases dans ton profil — le rappel du vendredi, le bilan du lundi — et ' +
-      'un lien au bas de chaque message pour tout couper sans même te connecter. ' +
-      'Et si tu veux faire une pause dans la saison, ça se dit aussi, sans rien perdre.',
+      'Depuis le menu de ton navigateur, « Ajouter à l\'écran d\'accueil » : il ' +
+      's\'ouvre comme une application, sans barre d\'adresse.',
   },
 ];
 
@@ -91,7 +115,47 @@ function corpsTexte() {
 }
 
 /**
- * Envoie l'annonce.
+ * Le bloc du vendredi, en HTML.
+ *
+ * Il arrive apres la liste des matchs manquants, et il est separe d'elle par un
+ * filet : le rappel a un travail — dire d'aller jouer — et ce bloc n'en fait
+ * pas partie. Sans separation visible, cinq paragraphes de nouveautes
+ * donneraient l'impression que le message parle d'autre chose, et la liste des
+ * matchs se perdrait au milieu.
+ *
+ * Styles ecrits sur chaque balise, et filet en `<table>` plutot qu'en `<hr>` :
+ * ce sont les contraintes du courriel, expliquees en tete de `mailer.service`.
+ * Les couleurs sont celles du gabarit, recopiees ici parce qu'un courriel n'a
+ * pas de variables.
+ *
+ * Rend une chaine vide quand il n'y a rien a dire — l'appelant n'a donc aucun
+ * test a faire de son cote.
+ */
+function vendrediHtml() {
+  if (!ANNONCE_VENDREDI || !NOUVEAUTES.length) return '';
+  return (
+    '<br><br>' +
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">' +
+    '<tr><td style="border-top:1px solid #e3dcc6;font-size:0;line-height:0;">&nbsp;</td></tr>' +
+    '</table>' +
+    '<p style="margin:18px 0 12px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;' +
+    'color:#b4863b;font-weight:700;">✦ Du neuf sur le site</p>' +
+    NOUVEAUTES.map(
+      (n) =>
+        `<p style="margin:0 0 14px;font-size:14px;line-height:1.6;"><b>${n.titre}</b><br>` +
+        `<span style="color:#6b6357;">${n.texte}</span></p>`
+    ).join('')
+  );
+}
+
+/** Le meme bloc pour la version texte du rappel. */
+function vendrediTexte() {
+  if (!ANNONCE_VENDREDI || !NOUVEAUTES.length) return '';
+  return `\n\n--\nDU NEUF SUR LE SITE\n\n${corpsTexte()}`;
+}
+
+/**
+ * Envoie l'annonce comme courriel a part.
  *
  * `dryRun` n'ecrit rien et n'envoie rien : il rend la liste des destinataires et
  * le texte du message. A faire tourner d'abord, toujours — une annonce partie
@@ -167,4 +231,10 @@ async function envoyerAnnonce({ dryRun = true, seulement = null } = {}) {
   return rapport;
 }
 
-module.exports = { NOUVEAUTE_VENDREDI, NOUVEAUTES, envoyerAnnonce };
+module.exports = {
+  ANNONCE_VENDREDI,
+  NOUVEAUTES,
+  vendrediHtml,
+  vendrediTexte,
+  envoyerAnnonce,
+};
