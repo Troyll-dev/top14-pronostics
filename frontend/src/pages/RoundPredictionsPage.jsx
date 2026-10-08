@@ -213,20 +213,6 @@ export default function RoundPredictionsPage() {
                   </th>
                   {matches.map((m) => (
                     <th key={m.id} className="px-1.5 pb-2.5 min-w-[4.6rem] align-bottom">
-                      {/* L'étoile de l'affiche, au-dessus des écussons.
-
-                          Elle occupe sa propre ligne, et cette ligne existe sur
-                          toutes les colonnes même quand elle est vide : sans
-                          cela, la seule colonne qui la porte serait plus haute
-                          que les six autres et les écussons ne seraient plus
-                          alignés. Une réservation de place invisible vaut mieux
-                          qu'un décalage visible. */}
-                      <div
-                        className="h-3.5 text-center text-[11px] leading-none"
-                        title={m.id === afficheMatchId ? 'Affiche de la journée : points triplés' : ''}
-                      >
-                        {m.id === afficheMatchId ? '⭐' : ''}
-                      </div>
                       <div className="flex items-center justify-center gap-1">
                         <TeamCrest team={m.homeTeam} size={18} />
                         <span className="text-slate-600 text-[10px]">–</span>
@@ -287,6 +273,7 @@ export default function RoundPredictionsPage() {
 
                       {matches.map((m) => {
                         const p = byUserMatch[`${pl.id}-${m.id}`];
+                        const estAffiche = m.id === afficheMatchId;
                         return (
                           <td key={m.id} className="px-0.5 py-0.5">
                             <div
@@ -305,12 +292,46 @@ export default function RoundPredictionsPage() {
                                   Posé en coin plutôt qu'à côté du score, pour ne
                                   pas décentrer les chiffres — ils se lisent en
                                   colonne, d'un joueur à l'autre. */}
-                              {p?.joker && (
+                              {p?.joker && !estAffiche && (
                                 <span
                                   className="absolute top-0 right-0.5 text-[9px] leading-none"
                                   title="Joker : points doublés"
                                 >
                                   🃏
+                                </span>
+                              )}
+
+                              {/* L'étoile de l'affiche, dans chaque cellule de
+                                  sa colonne.
+
+                                  Elle a d'abord été posée en en-tête, une seule
+                                  fois, puisque l'affiche est la même pour tout
+                                  le monde. C'était logique et illisible : au
+                                  milieu des écussons et du score, à la taille
+                                  d'une ligne d'en-tête, on ne la voyait pas.
+
+                                  Répétée sur chaque ligne elle devient une
+                                  colonne marquée, qu'on repère d'un coup d'œil
+                                  en parcourant le tableau — et c'est bien de la
+                                  colonne qu'il s'agit, pas d'un joueur en
+                                  particulier. La redondance est le prix de la
+                                  lisibilité, et il est modeste.
+
+                                  Même coin que le joker, en haut à droite : les
+                                  deux disent la même chose — « cette case
+                                  rapporte plus » — et une information de même
+                                  nature se lit mieux toujours au même endroit.
+                                  Elles ne peuvent pas se rencontrer, le joker
+                                  étant interdit sur l'affiche ; si une donnée
+                                  ancienne en base les faisait coexister, c'est
+                                  l'étoile qui l'emporte, puisque c'est elle qui
+                                  compte dans le calcul des points. */}
+                              {estAffiche && !p?.joker && (
+                                <span
+                                  className="absolute top-0 right-0.5 text-[9px] leading-none"
+                                  title="Affiche de la journée : points triplés"
+                                >
+                                  ⭐
                                 </span>
                               )}
 
