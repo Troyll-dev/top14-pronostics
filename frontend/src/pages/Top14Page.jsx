@@ -203,9 +203,15 @@ export default function Top14Page() {
               const awayWon = done && m.awayScore > m.homeScore;
               return (
                 <div key={m.id} className="py-2.5">
+                  {/* Les noms de clubs ne sont jamais tronqués : ils se replient
+                      entre les mots. « Montpel… » ne désigne plus personne, là
+                      où un nom sur deux lignes se lit encore. C'est la même
+                      règle que sur la carte de match et sur l'accueil — une
+                      seule façon de traiter un nom trop long dans toute
+                      l'application. */}
                   <div className="flex items-center gap-2 text-[13px]">
                     <div className="flex-1 min-w-0 flex items-center justify-end gap-2">
-                      <span className={`truncate font-display ${homeWon ? 'font-bold' : 'text-slate-400'}`}>
+                      <span className={`break-words text-right font-display ${homeWon ? 'font-bold' : 'text-slate-400'}`}>
                         {m.homeTeam.name}
                       </span>
                       <TeamCrest team={m.homeTeam} size={20} />
@@ -227,7 +233,7 @@ export default function Top14Page() {
 
                     <div className="flex-1 min-w-0 flex items-center gap-2">
                       <TeamCrest team={m.awayTeam} size={20} />
-                      <span className={`truncate font-display ${awayWon ? 'font-bold' : 'text-slate-400'}`}>
+                      <span className={`break-words font-display ${awayWon ? 'font-bold' : 'text-slate-400'}`}>
                         {m.awayTeam.name}
                       </span>
                     </div>

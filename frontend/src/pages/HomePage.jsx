@@ -191,9 +191,16 @@ export default function HomePage() {
               <p className="text-[11px] uppercase tracking-wide text-slate-500 mb-2">
                 Prochain coup d'envoi
               </p>
-              <div className="flex items-center gap-2.5">
+              {/* Les noms ne sont plus tronqués : ils se replient.
+
+                  Les deux noms, les deux écussons et la date tenaient sur une
+                  seule ligne, et c'est la ligne qui cédait — on lisait
+                  « Stade Français Paris — Montpel… ». La date passe donc à la
+                  ligne quand la place manque (`flex-wrap`), et les noms se
+                  replient entre les mots, jamais à l'intérieur de l'un d'eux. */}
+              <div className="flex items-center gap-2.5 flex-wrap">
                 <TeamCrest team={nextMatch.homeTeam} size={22} />
-                <p className="font-display font-bold text-[14.5px] truncate">
+                <p className="font-display font-bold text-[13.5px] sm:text-[14.5px] min-w-0 flex-1 break-words leading-tight">
                   {nextMatch.homeTeam.name}
                   <span className="text-slate-500 font-normal"> — </span>
                   {nextMatch.awayTeam.name}
@@ -218,6 +225,10 @@ export default function HomePage() {
             </span>
           </div>
 
+          {/* Mêmes règles que sur la carte de match : on ne tronque jamais un
+              nom de club, il se replie entre les mots. Un nom coupé — « Montpel… »
+              — ne désigne plus personne, alors qu'un nom sur deux lignes se lit
+              encore. */}
           <div className="divide-y divide-slate-800">
             {dayResults.map((m) => {
               const state = matchState(m, now);
@@ -229,7 +240,7 @@ export default function HomePage() {
                 <div key={m.id} className="py-2">
                   <div className="flex items-center gap-2 text-[13px]">
                     <div className="flex-1 min-w-0 flex items-center justify-end gap-2">
-                      <span className={`truncate font-display ${homeWon ? 'font-bold' : 'text-slate-400'}`}>
+                      <span className={`break-words text-right font-display ${homeWon ? 'font-bold' : 'text-slate-400'}`}>
                         {m.homeTeam.name}
                       </span>
                       <TeamCrest team={m.homeTeam} size={20} />
@@ -251,7 +262,7 @@ export default function HomePage() {
 
                     <div className="flex-1 min-w-0 flex items-center gap-2">
                       <TeamCrest team={m.awayTeam} size={20} />
-                      <span className={`truncate font-display ${awayWon ? 'font-bold' : 'text-slate-400'}`}>
+                      <span className={`break-words font-display ${awayWon ? 'font-bold' : 'text-slate-400'}`}>
                         {m.awayTeam.name}
                       </span>
                     </div>
