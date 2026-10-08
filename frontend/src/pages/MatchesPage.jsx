@@ -3,6 +3,7 @@ import api from '../api/client';
 import MatchCard from '../components/MatchCard';
 import { matchState, useNow } from '../utils/matchState';
 import SelecteurJournee from '../components/SelecteurJournee';
+import Bob from '../components/Bob';
 
 const DRAFT_KEY = 't14-brouillons';
 const DRAFT_TTL = 30 * 24 * 3600 * 1000; // un mois
@@ -344,6 +345,38 @@ export default function MatchesPage() {
               est conservé par cette ligne, qui informe sans rien piloter. */}
           {regles?.actif && <RappelJoker matches={matches} regles={regles} />}
         </div>
+      )}
+
+      {/* Bob le poulpe, juste après le récapitulatif et avant « Tout valider ».
+
+          L'ordre n'est pas indifférent : le récapitulatif annonce ce qu'il
+          reste à faire, Bob propose de le faire, et le bloc suivant envoie ce
+          qui est saisi. On lit donc la page comme une phrase, et le secours
+          arrive au moment où l'on vient de constater le retard.
+
+          Le bloc ne disparaît jamais, même quand tout est pronostiqué : Bob sert
+          alors à autre chose, il donne son avis. Il reçoit pour cela trois
+          nombres qu'il ne saurait pas calculer lui-même — les cases vides, les
+          scores saisis mais pas encore envoyés, et la liste des matchs pour
+          nommer les équipes dans son commentaire.
+
+          `aValider` est le même compte que le bloc « Tout valider » juste en
+          dessous, et ce doublon est volontaire : des scores tapés mais pas
+          envoyés ne comptent pour rien, ils ne vivent que dans ce navigateur, et
+          c'est la seule façon de perdre une journée sans s'en rendre compte. Le
+          dire deux fois est moins grave que de ne le dire qu'en bas de page.
+
+          Après son passage on relit tout depuis le serveur plutôt que de
+          deviner — même règle que pour le joker. */}
+      {!loading && currentRound && matches.length > 0 && (
+        <Bob
+          round={currentRound}
+          regles={regles}
+          matches={matches}
+          aRemplir={pending.length}
+          aValider={toSave.length}
+          onFait={() => { fetchMatches(); fetchRegles(); }}
+        />
       )}
 
       {/* Tout valider — place AVANT la liste, et c'est tout l'objet du
