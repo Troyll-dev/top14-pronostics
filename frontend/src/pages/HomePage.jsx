@@ -191,25 +191,40 @@ export default function HomePage() {
               <p className="text-[11px] uppercase tracking-wide text-slate-500 mb-2">
                 Prochain coup d'envoi
               </p>
-              {/* Les noms ne sont plus tronqués : ils se replient.
+              {/* Les deux équipes côte à côte, la date en dessous.
 
-                  Les deux noms, les deux écussons et la date tenaient sur une
-                  seule ligne, et c'est la ligne qui cédait — on lisait
-                  « Stade Français Paris — Montpel… ». La date passe donc à la
-                  ligne quand la place manque (`flex-wrap`), et les noms se
-                  replient entre les mots, jamais à l'intérieur de l'un d'eux. */}
-              <div className="flex items-center gap-2.5 flex-wrap">
-                <TeamCrest team={nextMatch.homeTeam} size={22} />
-                <p className="font-display font-bold text-[13.5px] sm:text-[14.5px] min-w-0 flex-1 break-words leading-tight">
-                  {nextMatch.homeTeam.name}
-                  <span className="text-slate-500 font-normal"> — </span>
-                  {nextMatch.awayTeam.name}
-                </p>
-                <TeamCrest team={nextMatch.awayTeam} size={22} />
-                <p className="ml-auto text-[12px] italic text-slate-500 shrink-0 first-letter:uppercase">
-                  {format(new Date(nextMatch.kickoff), "EEE d MMM · HH'h'mm", { locale: fr })}
-                </p>
+                  Tout tenait sur une seule ligne — nom, écusson, nom, écusson,
+                  date — et la ligne cédait. L'autoriser à se replier n'a rien
+                  arrangé : les deux noms étant dans un même paragraphe, ils se
+                  sont empilés du même côté, et l'on ne voyait plus qui recevait
+                  qui.
+
+                  La rencontre reprend donc la disposition de la carte de match :
+                  deux colonnes symétriques, chaque nom contre son écusson, le
+                  tiret au milieu. C'est la seule forme qui dise d'elle-même que
+                  ce sont deux équipes qui s'opposent. La date descend d'une
+                  ligne, puisqu'elle n'a pas besoin d'être lue en même temps. */}
+              <div className="flex items-center gap-2">
+                <div className="flex-1 min-w-0 flex items-center justify-end gap-2">
+                  <span className="break-words text-right font-display font-bold text-[13.5px] sm:text-[14.5px] leading-tight">
+                    {nextMatch.homeTeam.name}
+                  </span>
+                  <TeamCrest team={nextMatch.homeTeam} size={22} />
+                </div>
+
+                <span className="shrink-0 text-slate-500 text-[13px]">—</span>
+
+                <div className="flex-1 min-w-0 flex items-center gap-2">
+                  <TeamCrest team={nextMatch.awayTeam} size={22} />
+                  <span className="break-words font-display font-bold text-[13.5px] sm:text-[14.5px] leading-tight">
+                    {nextMatch.awayTeam.name}
+                  </span>
+                </div>
               </div>
+
+              <p className="mt-1.5 text-center text-[12px] italic text-slate-500 first-letter:uppercase">
+                {format(new Date(nextMatch.kickoff), "EEEE d MMMM · HH'h'mm", { locale: fr })}
+              </p>
             </div>
           )}
         </div>
