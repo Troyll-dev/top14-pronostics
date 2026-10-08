@@ -84,6 +84,20 @@ export default function Bob({
   const [bilan, setBilan] = useState(null);
   const [avis, setAvis] = useState(null);
   const [chargeAvis, setChargeAvis] = useState(false);
+  const [confirmeEffacer, setConfirmeEffacer] = useState(false);
+  const [efface, setEfface] = useState(false);
+
+  /**
+   * Bob vient de remplir dans cette session.
+   *
+   * Sert uniquement à retirer le bouton d'avis tout de suite, sans attendre un
+   * aller-retour au serveur. Le vrai refus est ailleurs : le serveur reconnaît
+   * sa propre écriture dans la grille et répond qu'il ne se notera pas lui-même.
+   * Celui-ci est donc un raccourci d'affichage, pas la règle — et il disparaît au
+   * rechargement de la page, ce qui est sans conséquence puisque l'autre, lui,
+   * survit à tout.
+   */
+  const [vientDeRemplir, setVientDeRemplir] = useState(false);
 
   // Tant que les règles ne sont pas chargées, on ne montre rien plutôt qu'un
   // bouton dont on ignore s'il est utilisable.
@@ -98,7 +112,9 @@ export default function Bob({
     try {
       const { data } = await api.post('/predictions/bob', { round });
       setBilan(data);
+      setEfface(false);
       setAvis(null); // l'avis d'avant ne vaut plus pour la grille d'après
+      setVientDeRemplir(true);
       onFait?.();
     } catch (err) {
       setErreur(err.response?.data?.error || 'Bob n’a pas répondu');
@@ -118,6 +134,32 @@ export default function Bob({
       setErreur(err.response?.data?.error || 'Bob n’a pas d’avis aujourd’hui');
     } finally {
       setChargeAvis(false);
+    }
+  };
+
+  /**
+   * Tout effacer, et repartir de cases vides.
+   *
+   * Le seul geste destructeur du bloc, donc le seul à demander confirmation —
+   * et la confirmation est la vraie raison de la version à deux temps : les
+   * autres boutons ajoutent quelque chose qu'on peut corriger, celui-ci retire
+   * quelque chose qu'on ne peut pas récupérer.
+   */
+  const effacer = async () => {
+    setEnvoi(true);
+    setErreur(null);
+    try {
+      const { data } = await api.delete(`/predictions/round/${round}`);
+      setEfface(data);
+      setBilan(null);
+      setAvis(null);
+      setVientDeRemplir(false);
+      setConfirmeEffacer(false);
+      onFait?.();
+    } catch (err) {
+      setErreur(err.response?.data?.error || 'Bob n’a rien pu effacer');
+    } finally {
+      setEnvoi(false);
     }
   };
 
@@ -183,8 +225,9 @@ export default function Bob({
 
               {/* L'avis n'a de sens que s'il y a quelque chose à commenter. Bob
                   ne juge pas une grille vide : sur celle-là, il propose de la
-                  remplir, et c'est l'autre bouton. */}
-              {poses > 0 && (
+                  remplir, et c'est l'autre bouton. Et il ne se juge pas lui-même :
+                  après qu'il vient de remplir, le bouton disparaît. */}
+              {poses > 0 && !vientDeRemplir && (
                 <button
                   onClick={demanderAvis}
                   disabled={chargeAvis}
@@ -193,7 +236,48 @@ export default function Bob({
                   {chargeAvis ? 'Bob relit…' : avis ? 'Replier son avis' : 'Qu’en pense Bob ?'}
                 </button>
               )}
+
+              {/* Tout effacer. Discret, et à l'écart des deux autres : c'est le
+                  seul geste qui retire quelque chose, et il ne doit pas se
+                  trouver sous le doigt qui visait « Demander à Bob ». */}
+              {poses > 0 && (
+                confirmeEffacer ? (
+                  <span className="flex items-center gap-2 text-[12.5px]">
+                    <span className="text-slate-500">Effacer les {poses} pronos ?</span>
+                    <button
+                      onClick={effacer}
+                      disabled={envoi}
+                      className="font-display font-bold text-red-400 hover:text-red-300 transition-colors"
+                    >
+                      Oui
+                    </button>
+                    <button
+                      onClick={() => setConfirmeEffacer(false)}
+                      className="text-slate-500 hover:text-amber-400 transition-colors"
+                    >
+                      Non
+                    </button>
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => setConfirmeEffacer(true)}
+                    className="text-[12.5px] text-slate-600 hover:text-red-400 transition-colors ml-auto"
+                  >
+                    Tout effacer
+                  </button>
+                )
+              )}
             </div>
+          )}
+
+          {efface && (
+            <p className="mt-3 pt-3 border-t border-slate-800 text-[12.5px] text-slate-400">
+              {efface.effaces > 0
+                ? `${efface.effaces} prono${efface.effaces > 1 ? 's effacés' : ' effacé'}.`
+                : 'Rien à effacer.'}
+              {efface.conserves > 0 &&
+                ` ${efface.conserves} conservé${efface.conserves > 1 ? 's' : ''} : ${efface.conserves > 1 ? 'ces matchs ont' : 'ce match a'} déjà commencé.`}
+            </p>
           )}
 
           {bilan && (

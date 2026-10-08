@@ -434,6 +434,54 @@ exports.setJoker = async (req, res) => {
 };
 
 /**
+ * DELETE /api/predictions/round/:round — tout effacer et repartir de zéro.
+ *
+ * Le geste complémentaire de Bob : il remplit, celui-ci vide. On s'en sert quand
+ * Bob a rempli une grille qu'on ne veut finalement pas, ou simplement pour
+ * reprendre une journée à blanc.
+ *
+ * **Les matchs commencés sont épargnés, et ce n'est pas négociable.** Un
+ * pronostic sur une rencontre jouée porte des points déjà marqués ; l'effacer
+ * reviendrait à réécrire le classement. La requête ne touche donc que ce que
+ * `upsertPrediction` accepterait encore de modifier — même borne, même raison.
+ *
+ * On répond avec les deux nombres, effacés et conservés. Le second est le plus
+ * important des deux : un joueur qui demande à tout effacer et retrouve trois
+ * cases pleines doit comprendre pourquoi, sans quoi il croira que ça n'a pas
+ * marché et recommencera.
+ *
+ * Le joker part avec les pronostics qu'il accompagnait — il est une colonne de
+ * `Prediction`, donc la suppression l'emporte. C'est le bon comportement : un
+ * joker sans pronostic est un état que `setJoker` refuse de créer.
+ */
+exports.effacerJournee = async (req, res) => {
+  const round = parseInt(req.params.round, 10);
+  if (!Number.isInteger(round)) return res.status(400).json({ error: 'round invalide' });
+
+  const userId = req.user.id;
+  const maintenant = new Date();
+
+  try {
+    const [ouverts, total] = await Promise.all([
+      prisma.match.findMany({
+        where: { round, season: SEASON, status: 'SCHEDULED', kickoff: { gt: maintenant } },
+        select: { id: true },
+      }),
+      prisma.prediction.count({ where: { userId, match: { round, season: SEASON } } }),
+    ]);
+
+    const { count } = await prisma.prediction.deleteMany({
+      where: { userId, matchId: { in: ouverts.map((m) => m.id) } },
+    });
+
+    res.json({ round, effaces: count, conserves: total - count });
+  } catch (err) {
+    console.error('[bob:effacer]', err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+};
+
+/**
  * GET /api/predictions/round/:round/avis — ce que Bob pense de mes pronostics.
  *
  * Ne lit rien d'autre que les pronostics du demandeur, et n'écrit rien du tout.

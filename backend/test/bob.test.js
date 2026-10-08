@@ -351,11 +351,14 @@ test('un biais dans l\'autre sens aussi', () => {
 });
 
 test('une grille proche de Bob est reconnue comme telle', () => {
-  const { verdict: v } = avisJournee({
-    matchs: sept,
-    forme: formeSept,
-    pronostics: grille(Array.from({ length: 7 }, () => [29, 21])),
+  // Six matchs identiques au sien et un seul franchement différent : la moyenne
+  // des écarts reste basse, et ce dernier match empêche Bob de prendre la grille
+  // pour la sienne — donc il la commente, et gentiment.
+  const scores = [[28, 22], [28, 22], [28, 22], [28, 22], [28, 22], [28, 22], [48, 22]];
+  const { signature, verdict: v } = avisJournee({
+    matchs: sept, forme: formeSept, pronostics: grille(scores),
   });
+  assert.equal(signature, false);
   assert.match(v, /d’accord sur à peu près tout/);
 });
 
@@ -367,4 +370,78 @@ test('chaque ligne porte les deux scores, pour que l\'écran puisse les montrer'
   });
   assert.deepEqual(lignes[0].moi, { home: 31, away: 19 });
   assert.deepEqual(lignes[0].bob, { home: 28, away: 22 });
+});
+
+/* ---------------------------------------------------------------------------
+ * Bob ne se note pas lui-même
+ * ------------------------------------------------------------------------- */
+
+const { signatureDeBob, pronostiquerMatch: pm } = require('../src/services/bob.service');
+
+test('une grille écrite par Bob est reconnue comme la sienne', () => {
+  // On la fabrique exactement comme il le ferait : son estimation, plus le
+  // tirage de zéro à trois points. Aucun de ces écarts ne doit lui échapper.
+  const scores = [[25, 19], [31, 25], [28, 22], [30, 20], [26, 24], [29, 21], [28, 25]];
+  const { lignes, signature, verdict: v } = avisJournee({
+    matchs: sept, forme: formeSept, pronostics: grille(scores),
+  });
+  assert.equal(signature, true);
+  assert.deepEqual(lignes, []);
+  assert.match(v, /écriture/);
+});
+
+test('les bornes du tirage sont couvertes par la détection', () => {
+  // Le pire cas : Bob tire +3 d'un côté et -3 de l'autre, soit six points
+  // d'écart sur le match. C'est son maximum, il doit encore se reconnaître.
+  const extreme = Array.from({ length: 7 }, () => [31, 19]);
+  const { signature } = avisJournee({
+    matchs: sept, forme: formeSept, pronostics: grille(extreme),
+  });
+  assert.equal(signature, true);
+});
+
+test('une grille vraiment écrite par Bob, en tirant au sort', () => {
+  // Cent grilles tirées pour de bon : il doit se reconnaître dans chacune.
+  for (let essai = 0; essai < 100; essai++) {
+    const scores = sept.map(() => {
+      const p = pm({ dom: forme(25, 25), ext: forme(25, 25), hasard: Math.random });
+      return [p.homeScorePred, p.awayScorePred];
+    });
+    const { signature } = avisJournee({
+      matchs: sept, forme: formeSept, pronostics: grille(scores),
+    });
+    assert.equal(signature, true, `grille non reconnue : ${JSON.stringify(scores)}`);
+  }
+});
+
+test('deux corrections à la main rouvrent l\'avis', () => {
+  // C'est ce que Bob invite à faire, donc il faut que ça marche : dès que le
+  // joueur reprend la main sur un match, la grille cesse d'être celle de Bob.
+  const scores = [[28, 22], [28, 22], [28, 22], [28, 22], [28, 22], [28, 22], [12, 44]];
+  const { signature, lignes } = avisJournee({
+    matchs: sept, forme: formeSept, pronostics: grille(scores),
+  });
+  assert.equal(signature, false);
+  assert.equal(lignes.length, 7);
+});
+
+test('un seul vainqueur contesté suffit à rouvrir l\'avis', () => {
+  const scores = [[28, 22], [28, 22], [28, 22], [28, 22], [28, 22], [28, 22], [22, 25]];
+  assert.equal(avisJournee({ matchs: sept, forme: formeSept, pronostics: grille(scores) }).signature, false);
+});
+
+test('trois matchs d\'accord ne font pas une signature', () => {
+  // Être d'accord avec Bob sur trois matchs est une coïncidence, pas une preuve.
+  const lignes = Array.from({ length: 3 }, () => ({ ecart: 0, desaccord: false }));
+  assert.equal(signatureDeBob(lignes), false);
+});
+
+test('une grille ordinaire reste commentée', () => {
+  const { signature, lignes } = avisJournee({
+    matchs: sept,
+    forme: formeSept,
+    pronostics: grille(Array.from({ length: 7 }, () => [40, 10])),
+  });
+  assert.equal(signature, false);
+  assert.equal(lignes.length, 7);
 });

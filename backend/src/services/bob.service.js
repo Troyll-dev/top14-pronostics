@@ -373,6 +373,39 @@ function verdict(lignes) {
  * `pronostics` est indexé par identifiant de match. Les matchs sans pronostic
  * sont ignorés : Bob ne commente pas une case vide, il propose de la remplir.
  */
+/**
+ * Bob reconnaît-il sa propre écriture dans cette grille ?
+ *
+ * Il ne doit pas commenter des pronostics qu'il a lui-même écrits : ce serait se
+ * noter soi-même, et l'avis n'aurait aucun intérêt — il dirait « d'accord »
+ * partout.
+ *
+ * La question se règle sans rien stocker, et c'est ce qui en fait la bonne
+ * solution. On aurait pu écrire quelque part « Bob a rempli cette journée pour
+ * ce joueur », mais ce serait exactement la trace qu'on s'est donné du mal à ne
+ * jamais créer : elle finirait dans une réponse d'API ou dans un export, et
+ * l'usage de Bob cesserait d'être privé.
+ *
+ * On le déduit donc de la grille elle-même. Quand Bob remplit, il s'écarte de
+ * son estimation de trois points au plus sur chaque score, donc de six au plus
+ * sur un match. Une grille entière où aucun match ne dépasse six points d'écart,
+ * et où aucun vainqueur ne diffère, est sa grille — ou une grille si proche de
+ * la sienne que le commentaire serait le même.
+ *
+ * Deux vertus par rapport à un drapeau en base. La détection survit au
+ * rechargement de la page et au changement d'appareil, puisqu'elle ne dépend de
+ * rien d'autre que des scores. Et elle se dément d'elle-même : dès que le joueur
+ * corrige deux ou trois matchs à sa main — ce que Bob l'invite à faire —, la
+ * grille redevient la sienne et l'avis se rouvre.
+ *
+ * Le seuil de quatre matchs évite de conclure sur un échantillon qui ne prouve
+ * rien : être d'accord avec Bob sur deux matchs n'est pas une signature, c'est
+ * une coïncidence.
+ */
+function signatureDeBob(lignes) {
+  return lignes.length >= 4 && lignes.every((l) => !l.desaccord && l.ecart <= 2 * ALEA);
+}
+
 function avisJournee({ matchs = [], forme = {}, pronostics = {} } = {}) {
   const lignes = [];
 
@@ -387,7 +420,16 @@ function avisJournee({ matchs = [], forme = {}, pronostics = {} } = {}) {
     });
   }
 
-  return { lignes, verdict: verdict(lignes) };
+  if (signatureDeBob(lignes)) {
+    return {
+      lignes: [],
+      signature: true,
+      verdict:
+        'Bob reconnaît son écriture : cette grille est la sienne, à trois points près. Il ne va pas se donner une bonne note tout seul. Change deux ou trois scores à ta main et redemande-lui.',
+    };
+  }
+
+  return { lignes, signature: false, verdict: verdict(lignes) };
 }
 
 module.exports = {
@@ -398,6 +440,7 @@ module.exports = {
   estimation,
   avisJournee,
   avisMatch,
+  signatureDeBob,
   verdict,
   SCORE_DEFAUT,
   AVANTAGE_DOMICILE,

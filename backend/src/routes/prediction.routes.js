@@ -4,6 +4,7 @@ const {
   setJoker,
   lancerBob,
   avisBob,
+  effacerJournee,
   getRoundRules,
   getMyPredictions,
   getRoundPredictions,
@@ -29,6 +30,11 @@ router.get('/round/:round/avis', authenticate, avisBob);
 // semaine, et où est mon joker. Avant `/:round` plus bas, sinon Express
 // prendrait « regles » pour un numéro de journée.
 router.get('/round/:round/regles', authenticate, getRoundRules);
+
+// Tout effacer sur une journée, pour repartir de cases vides. En DELETE sur la
+// collection : c'est bien une suppression de ressources, et le verbe suffit à
+// la distinguer du GET de la même adresse.
+router.delete('/round/:round', authenticate, effacerJournee);
 
 router.get('/me', authenticate, getMyPredictions);
 router.get('/round/:round', authenticate, getRoundPredictions);
