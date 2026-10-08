@@ -47,11 +47,30 @@ function ScoreInput({ value, onChange, disabled }) {
         onChange(chiffres === '' ? '' : Number(chiffres));
       }}
       disabled={disabled}
-      className="w-[52px] h-11 text-center font-display text-xl font-bold tabular-nums
+      className="w-9 h-9 sm:w-[52px] sm:h-11 text-center font-display text-base sm:text-xl font-bold tabular-nums
                  bg-slate-950 border-[1.5px] border-slate-800 rounded-md text-white
                  focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/25
                  disabled:opacity-45 disabled:cursor-not-allowed transition-colors"
     />
+  );
+}
+
+/**
+ * L'écusson, plus petit sur téléphone.
+ *
+ * Six pixels de moins de chaque côté, et ce sont douze pixels rendus aux noms
+ * d'équipes — sur une rangée où il en restait quatre-vingts par nom, ça compte.
+ * `TeamCrest` prend sa taille en propriété, qui ne peut pas varier avec la
+ * largeur de l'écran : on en pose donc deux, dont une seule est affichée. Celle
+ * qui ne l'est pas est retirée du flux et ne charge rien de plus, les deux
+ * pointant vers la même image.
+ */
+function Ecusson({ team }) {
+  return (
+    <>
+      <span className="sm:hidden"><TeamCrest team={team} size={22} /></span>
+      <span className="hidden sm:block"><TeamCrest team={team} size={28} /></span>
+    </>
   );
 }
 
@@ -443,70 +462,62 @@ export default function MatchCard({
         </span>
       </div>
 
-      {/* L'affiche de la rencontre : deux dispositions, une par largeur.
+      {/* L'affiche de la rencontre.
 
-          Sur ordinateur, celle d'origine — les deux équipes face à face, les
-          scores au milieu. Sur téléphone, une équipe par ligne.
+          Les deux équipes face à face, à toutes les largeurs. Ça n'a pas été
+          évident : la rangée range six choses dont quatre ont une largeur fixe,
+          et sur un écran de 390 pixels il n'en restait qu'une centaine par nom.
+          On a d'abord tronqué — « Stade… », qui ne désigne personne — puis
+          replié n'importe où — « Montp / ellier » — puis renoncé en passant à
+          une équipe par ligne.
 
-          Ce n'est pas un caprice de mise en page, c'est l'aveu qu'une ligne
-          demandait l'impossible. Elle range six choses dont quatre ont une
-          largeur fixe qui ne se comprime pas ; sur un écran de 390 pixels il
-          restait une centaine de pixels par nom, là où « Stade Français Paris »
-          en demande le triple. On a essayé de tronquer — on lisait « Stade… »,
-          qui ne désigne personne. Puis de replier — « Montp / ellier », puis des
-          noms à des hauteurs différentes, puisque deux noms de longueurs
-          différentes n'ont aucune raison d'occuper le même nombre de lignes.
+          Ce qui la rend tenable, c'est d'avoir rendu de la place au lieu d'en
+          demander aux noms. Les cases de score passent de 52 à 36 pixels sur
+          téléphone, les écussons de 28 à 22, les espacements se resserrent :
+          une cinquantaine de pixels récupérés, répartis sur les deux noms. Sur
+          les écrans moyens et au-delà, tout reprend ses dimensions d'origine.
 
-          Chacune de ces corrections réglait un symptôme du même mal. Une équipe
-          par ligne le supprime : le nom dispose de toute la largeur, il tient à
-          sa taille normale, et les deux équipes sont forcément au même niveau
-          l'une que l'autre. On y perd le face-à-face lu de gauche à droite, et
-          c'est dommage ; on y gagne de ne plus avoir à y revenir à chaque nom
-          long — y compris le jour où ces cartes porteront « Angleterre » et
-          « Pays de Galles ».
+          Les noms se replient alors **entre les mots** et jamais à l'intérieur
+          de l'un d'eux. C'est `break-words` qui le garantit : il interdit à la
+          mise en page de réduire la colonne sous la largeur de son mot le plus
+          long. Mesuré sur le pire cas du championnat, « Montpellier », avec une
+          police plus large que celle du site : il tient. La plupart des clubs
+          s'écrivent alors sur deux lignes, les trois noms les plus longs sur
+          trois — « Stade Français Paris », « Union Bordeaux-Bègles »,
+          « ASM Clermont Auvergne ». Deux lignes pour tous demanderait des noms
+          plus courts, pas une mise en page plus habile : l'espace n'y est pas.
 
-          Les deux dispositions partagent les mêmes cases de score, construites
-          une fois ci-dessous : il ne peut donc pas y avoir de divergence entre
-          ce qu'on voit sur téléphone et ce qu'on voit sur ordinateur. */}
-      <div className="relative z-10 sm:hidden flex flex-col gap-2">
-        <div className="flex items-center gap-2.5">
-          <TeamCrest team={match.homeTeam} size={28} />
-          <div className="min-w-0 flex-1">
-            <p className="break-words font-display font-bold text-[15.5px] leading-tight">{match.homeTeam.name}</p>
-            <p className="break-words text-[10.5px] italic text-slate-500 mt-0.5">{match.venue || match.homeTeam.city}</p>
-          </div>
-          {caseHome}
-        </div>
-        <div className="flex items-center gap-2.5">
-          <TeamCrest team={match.awayTeam} size={28} />
-          <div className="min-w-0 flex-1">
-            <p className="break-words font-display font-bold text-[15.5px] leading-tight">{match.awayTeam.name}</p>
-            <p className="break-words text-[10.5px] italic text-slate-500 mt-0.5">{match.awayTeam.city}</p>
-          </div>
-          {caseAway}
-        </div>
-      </div>
-
-      <div className="relative z-10 hidden sm:flex items-center gap-4">
-        <div className="flex-1 min-w-0 flex items-center justify-end gap-2.5">
+          Les deux côtés sont alignés par le haut sur téléphone, donc les
+          premières lignes des deux noms tombent en regard — c'est ce qu'on lit.
+          Les cases de score, elles, restent centrées verticalement. */}
+      <div className="relative z-10 flex items-start sm:items-center gap-[5px] sm:gap-4">
+        <div className="flex-1 min-w-0 flex items-start sm:items-center justify-end gap-[5px] sm:gap-2.5">
           <div className="min-w-0 text-right">
-            <p className="break-words font-display font-bold text-[15.5px] leading-tight">{match.homeTeam.name}</p>
-            <p className="break-words text-[10.5px] italic text-slate-500 mt-0.5">{match.venue || match.homeTeam.city}</p>
+            <p className="break-words font-display font-bold text-[11.5px] sm:text-[15.5px] leading-tight">
+              {match.homeTeam.name}
+            </p>
+            <p className="break-words text-[9.5px] sm:text-[10.5px] italic text-slate-500 mt-0.5">
+              {match.venue || match.homeTeam.city}
+            </p>
           </div>
-          <TeamCrest team={match.homeTeam} size={28} />
+          <Ecusson team={match.homeTeam} />
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="self-center flex items-center gap-1 sm:gap-2 shrink-0">
           {caseHome}
-          <span className="text-slate-500 text-base">–</span>
+          <span className="text-slate-500 text-sm sm:text-base">–</span>
           {caseAway}
         </div>
 
-        <div className="flex-1 min-w-0 flex items-center gap-2.5">
-          <TeamCrest team={match.awayTeam} size={28} />
+        <div className="flex-1 min-w-0 flex items-start sm:items-center gap-[5px] sm:gap-2.5">
+          <Ecusson team={match.awayTeam} />
           <div className="min-w-0">
-            <p className="break-words font-display font-bold text-[15.5px] leading-tight">{match.awayTeam.name}</p>
-            <p className="break-words text-[10.5px] italic text-slate-500 mt-0.5">{match.awayTeam.city}</p>
+            <p className="break-words font-display font-bold text-[11.5px] sm:text-[15.5px] leading-tight">
+              {match.awayTeam.name}
+            </p>
+            <p className="break-words text-[9.5px] sm:text-[10.5px] italic text-slate-500 mt-0.5">
+              {match.awayTeam.city}
+            </p>
           </div>
         </div>
       </div>
