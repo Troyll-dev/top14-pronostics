@@ -2,9 +2,26 @@
 <html lang="fr" data-theme="creme">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Top 14 Pronostics 2026-2027</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏉</text></svg>" />
+
+    <!-- Installation sur l'écran d'accueil.
+
+         iOS ignore le manifeste pour l'icône : il lui faut cette balise, et une
+         image de 180 pixels sans transparence. Android, lui, se sert du
+         manifeste et de ses icônes masquables.
+
+         `apple-mobile-web-app-capable` fait disparaître la barre d'adresse une
+         fois l'appli posée sur l'écran d'accueil — c'est elle qui transforme le
+         site en application. Le `black-translucent` étend le contenu sous la
+         barre d'état ; c'est pour cela que le viewport porte `viewport-fit=cover`
+         et que les barres de l'interface tiennent compte des zones sûres. -->
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Top 14 Pronos" />
+    <meta name="theme-color" content="#014224" />
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

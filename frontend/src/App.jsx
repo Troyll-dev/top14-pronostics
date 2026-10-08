@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Navbar from './components/Navbar';
 import PhotoCopains from './components/PhotoCopains';
 import JoueursDecor from './components/JoueursDecor';
+import MiseAJour from './components/MiseAJour';
 import WelcomePage from './pages/WelcomePage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -39,6 +40,11 @@ function AppRoutes() {
   const { user } = useAuth();
   return (
     <div className="min-h-screen">
+      {/* Le bandeau de mise a jour, hors de toute route : une nouvelle version
+          peut arriver a n'importe quel moment, y compris sur la page de
+          connexion. */}
+      <MiseAJour />
+
       {user && <Navbar />}
 
       {/* Le filigrane est fixe en z-0 : le contenu doit donc etre eleve
