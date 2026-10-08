@@ -7,6 +7,7 @@ import TeamCrest from './TeamCrest';
 import { matchState, STATE, STATE_CHIP } from '../utils/matchState';
 import CompositionsMatch from './CompositionsMatch';
 import FormeClubs from './FormeClubs';
+import IconeJoker from './IconeJoker';
 
 /**
  * La case de score.
@@ -164,7 +165,7 @@ function PointsChip({ prediction }) {
 
   return (
     <span className={`font-display text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${cls}`}>
-      {prediction.joker && '🃏'}+{total}
+      {prediction.joker && <IconeJoker taille={14} className="-ml-0.5 mr-0.5 align-[-3px]" />}+{total}
     </span>
   );
 }
@@ -444,8 +445,12 @@ export default function MatchCard({
             </span>
           )}
           {estJoker && (
-            <span title="Ton joker est posé ici : tes points sur cette rencontre sont doublés" style={PASTILLE.joker}>
-              🃏 Joker ×2
+            <span
+              title="Ton joker est posé ici : tes points sur cette rencontre sont doublés"
+              style={PASTILLE.joker}
+              className="inline-flex items-center gap-1"
+            >
+              <IconeJoker taille={20} /> Joker ×2
             </span>
           )}
 
@@ -617,8 +622,9 @@ export default function MatchCard({
                 className="w-4 h-4 shrink-0 accent-violet-600 cursor-[inherit]
                            focus:outline-none focus:ring-2 focus:ring-violet-600/40"
               />
-              <span className={estJoker ? 'font-semibold' : 'text-slate-400'}>
-                🃏 Mon joker ici <span className="text-slate-500">· points ×2</span>
+              <span className={`inline-flex items-center gap-1.5 ${estJoker ? 'font-semibold' : 'text-slate-400'}`}>
+                <IconeJoker taille={26} /> Mon joker ici{' '}
+                <span className="text-slate-500">· points ×2</span>
               </span>
             </label>
 

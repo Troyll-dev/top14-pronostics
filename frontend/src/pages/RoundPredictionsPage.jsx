@@ -4,6 +4,7 @@ import api from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 import TeamCrest from '../components/TeamCrest';
 import SelecteurJournee from '../components/SelecteurJournee';
+import IconeJoker from '../components/IconeJoker';
 
 /**
  * La couleur d'une cellule du tableau.
@@ -166,6 +167,23 @@ export default function RoundPredictionsPage() {
   const byUserMatch = {};
   for (const p of predictions) byUserMatch[`${p.user.id}-${p.matchId}`] = p;
 
+  /**
+   * Cette journée porte-t-elle des marques ?
+   *
+   * Le bouffon et l'étoile se posent en haut des cellules, et il faut leur
+   * réserver la place — sinon ils mordent sur le score. Mais réserver cette
+   * place dans **toutes** les cellules de toutes les journées coûterait une
+   * vingtaine de pixels par ligne pour rien sur les journées d'avant la mise en
+   * vigueur des multiplicateurs, où il n'y a strictement rien à montrer.
+   *
+   * La hauteur reste en revanche la même pour toutes les cellules d'une même
+   * journée, y compris celles qui ne portent aucune marque. C'est le point à ne
+   * pas rater : les scores se lisent en colonne, d'un joueur à l'autre, et des
+   * cellules de hauteurs différentes casseraient cet alignement — ce qui est
+   * précisément pour ça que ces marques sont en coin et non à côté du score.
+   */
+  const marques = !!afficheMatchId || predictions.some((p) => p.joker);
+
   return (
     <div className="max-w-6xl mx-auto px-4 py-6">
       <div className="flex items-baseline justify-between gap-3 mb-1">
@@ -278,9 +296,23 @@ export default function RoundPredictionsPage() {
                           <td key={m.id} className="px-0.5 py-0.5">
                             <div
                               style={styleCellule(p)}
-                              className="relative rounded py-1 text-center font-display text-[12px] tabular-nums leading-tight"
+                              className={`relative rounded ${marques ? 'pt-[21px] pb-1' : 'py-1'} text-center font-display text-[12px] tabular-nums leading-tight`}
                             >
-                              {/* Le joker, sur la cellule elle-même.
+                              {/* Le joker et l'affiche, en coin de cellule.
+
+                                  Ils étaient à neuf pixels, la taille d'une
+                                  note de bas de page : on devinait une tache
+                                  plutôt qu'on ne lisait un symbole. Treize
+                                  pixels les rendent identifiables sans qu'ils
+                                  mordent sur le score, qui est centré et laisse
+                                  une quinzaine de pixels libres de chaque côté.
+
+                                  La légère ombre portée les détache des quatre
+                                  fonds de cellule, dont deux sont clairs : sans
+                                  elle, un symbole sombre sur le vert franc ou le
+                                  bleu vif se confondait avec le décor.
+
+                                  Le joker, sur la cellule elle-même.
 
                                   Il n'apparaissait qu'accolé aux points gagnés,
                                   donc seulement une fois la journée notée. Or
@@ -294,10 +326,10 @@ export default function RoundPredictionsPage() {
                                   colonne, d'un joueur à l'autre. */}
                               {p?.joker && !estAffiche && (
                                 <span
-                                  className="absolute top-0 right-0.5 text-[9px] leading-none"
+                                  className="absolute -top-1 right-0 leading-none drop-shadow-[0_1px_2px_rgba(0,0,0,.45)]"
                                   title="Joker : points doublés"
                                 >
-                                  🃏
+                                  <IconeJoker taille={26} />
                                 </span>
                               )}
 
@@ -328,7 +360,7 @@ export default function RoundPredictionsPage() {
                                   compte dans le calcul des points. */}
                               {estAffiche && !p?.joker && (
                                 <span
-                                  className="absolute top-0 right-0.5 text-[9px] leading-none"
+                                  className="absolute -top-0.5 right-0.5 text-[19px] leading-none drop-shadow-[0_1px_2px_rgba(0,0,0,.45)]"
                                   title="Affiche de la journée : points triplés"
                                 >
                                   ⭐
@@ -380,7 +412,9 @@ export default function RoundPredictionsPage() {
                 {libelle} +{n}
               </span>
             ))}
-            <span className="flex items-center gap-1.5">🃏 Joker : points doublés</span>
+            <span className="flex items-center gap-1.5">
+              <IconeJoker taille={22} /> Joker : points doublés
+            </span>
             <span className="flex items-center gap-1.5">⭐ Affiche : points triplés</span>
           </div>
         </>
