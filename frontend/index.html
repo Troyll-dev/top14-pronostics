@@ -14,12 +14,23 @@
 
          `apple-mobile-web-app-capable` fait disparaître la barre d'adresse une
          fois l'appli posée sur l'écran d'accueil — c'est elle qui transforme le
-         site en application. Le `black-translucent` étend le contenu sous la
-         barre d'état ; c'est pour cela que le viewport porte `viewport-fit=cover`
-         et que les barres de l'interface tiennent compte des zones sûres. -->
+         site en application.
+
+         La barre d'état est `black` et non `black-translucent`, et c'est une
+         correction. Le mode translucide étend le contenu sous l'heure et la
+         batterie : la barre de navigation du site s'y retrouvait cachée, et ne
+         réapparaissait qu'en tirant la page vers le bas. Ce mode suppose que
+         toute l'interface tienne compte des zones sûres de l'iPhone, ce qui
+         n'est pas le cas ici — et ne vaut pas la peine de l'être pour gagner
+         vingt pixels de décor.
+
+         `black` donne une barre noire à texte blanc, lisible sur les deux
+         thèmes, et le contenu commence proprement en dessous. `viewport-fit`
+         reste à `cover` : il sert encore en bas, pour que le bandeau de mise à
+         jour ne se glisse pas sous la barre de navigation du téléphone. -->
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <meta name="apple-mobile-web-app-title" content="Top 14 Pronos" />
     <meta name="theme-color" content="#014224" />
 
