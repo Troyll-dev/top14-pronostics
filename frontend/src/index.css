@@ -219,11 +219,27 @@
            py-2 px-4 rounded-md transition-colors duration-200;
   }
 
-  /* Bandeau de navigation */
+  /* Bandeau de navigation.
+
+     Le rembourrage haut vaut zero dans un navigateur ordinaire et prend la
+     hauteur de la barre d'etat quand l'application est installee sur l'ecran
+     d'accueil d'un iPhone.
+
+     C'est necessaire parce que `viewport-fit=cover`, que reclame l'installation,
+     fait passer la page en plein ecran sur les telephones a encoche : le
+     contenu commence alors sous l'heure et la batterie, et cette barre-ci s'y
+     retrouvait cachee. On la voyait reapparaitre en tirant la page vers le bas,
+     puis disparaitre a nouveau — le rebond la decalait, rien de plus.
+
+     Le degrade vert remplit la zone ainsi reservee, donc la barre d'etat se
+     pose sur le vert du bandeau au lieu de flotter sur le contenu. Et comme
+     `env()` vaut zero partout ailleurs, rien ne change sur ordinateur ni dans
+     Safari hors installation. */
   .nav-band {
     background: linear-gradient(180deg, rgb(var(--band-a)), rgb(var(--band-b)));
     border-bottom: 3px solid rgb(var(--a-500));
     box-shadow: 0 3px 16px rgb(0 0 0 / .28);
+    padding-top: env(safe-area-inset-top, 0px);
   }
   .nav-tx { color: rgb(var(--band-tx)); }
   .nav-dim { color: rgb(var(--band-dim)); }
