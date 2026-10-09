@@ -4,6 +4,7 @@ import MatchCard from '../components/MatchCard';
 import { matchState, useNow } from '../utils/matchState';
 import SelecteurJournee from '../components/SelecteurJournee';
 import Bob from '../components/Bob';
+import IconeJoker from '../components/IconeJoker';
 
 const DRAFT_KEY = 't14-brouillons';
 const DRAFT_TTL = 30 * 24 * 3600 * 1000; // un mois
@@ -47,8 +48,12 @@ function RappelJoker({ matches, regles }) {
 
   return (
     <div className="mt-4 pt-4 border-t border-slate-800">
-      <p className="font-display text-[11.5px] font-bold uppercase tracking-wider text-slate-500">
-        🃏 Mon joker de la journée
+      {/* Le bouffon plutôt que l'emoji, comme partout ailleurs. Vingt pixels
+          ici et non vingt-six : il accompagne un intitulé de onze pixels et
+          demi, et une image deux fois plus haute que son texte ne l'accompagne
+          plus, elle le remplace. */}
+      <p className="flex items-center gap-1.5 font-display text-[11.5px] font-bold uppercase tracking-wider text-slate-500">
+        <IconeJoker taille={20} /> Mon joker de la journée
       </p>
       <p className="text-[12.5px] mt-1.5">
         {pose ? (
