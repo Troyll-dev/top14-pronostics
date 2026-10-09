@@ -1,4 +1,5 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Navbar from './components/Navbar';
 import JoueursDecor from './components/JoueursDecor';
@@ -16,6 +17,35 @@ import ProfilePage from './pages/ProfilePage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import AdminPage from './pages/AdminPage';
+
+/**
+ * Remonter en haut a chaque changement de page.
+ *
+ * Sans ca, le navigateur garde la position de defilement d'une page a l'autre :
+ * on quittait le classement, qui est long, a mi-hauteur, et le championnat
+ * s'ouvrait au milieu de son tableau. Le titre n'avait pas disparu, il etait
+ * simplement au-dessus de ce qu'on voyait — ce qui est la pire forme du defaut,
+ * puisque rien n'indique qu'il faut remonter.
+ *
+ * C'est le comportement normal d'une application a page unique : il n'y a pas de
+ * chargement de document, donc rien ne remet le defilement a zero. Un navigateur
+ * le fait tout seul sur un site classique ; ici il faut le demander.
+ *
+ * `behavior: 'instant'` et non `smooth` : un changement de page doit etre
+ * instantane. Une remontee animee sur une page longue donne une seconde de
+ * defilement pendant laquelle on voit passer le contenu de la page qu'on vient
+ * de quitter, ce qui ressemble a un bug.
+ *
+ * Le composant ne rend rien : il n'existe que pour son effet. Il est monte a
+ * l'interieur du routeur, seul endroit ou `useLocation` a un sens.
+ */
+function HautDePage() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, [pathname]);
+  return null;
+}
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth();
@@ -42,6 +72,8 @@ function AppRoutes() {
       {/* Le bandeau de mise a jour, hors de toute route : une nouvelle version
           peut arriver a n'importe quel moment, y compris sur la page de
           connexion. */}
+      <HautDePage />
+
       <MiseAJour />
 
       {user && <Navbar />}
