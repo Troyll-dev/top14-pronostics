@@ -56,15 +56,54 @@ export default function SelecteurJournee({ rounds, valeur, onChange, className =
   }, [mesurer, rounds]);
 
   /**
-   * La pastille choisie est amenee dans le champ.
+   * La pastille choisie est amenee au centre de la bande.
    *
    * Ouvrir la J18 montrait le debut de la liste, donc J1, donc l'impression que
-   * rien n'etait selectionne. `block: 'nearest'` est important : sans lui, le
-   * navigateur fait aussi defiler la page verticalement pour amener l'element,
-   * et la page sauterait a chaque changement de journee.
+   * rien n'etait selectionne.
+   *
+   * ---------------------------------------------------------------------------
+   * Pourquoi ce n'est plus `scrollIntoView`
+   * ---------------------------------------------------------------------------
+   *
+   * C'etait `scrollIntoView({ block: 'nearest', inline: 'center' })`, et le
+   * `block: 'nearest'` etait cense empecher la page de bouger verticalement. Il
+   * ne le fait pas. « Nearest » ne veut pas dire « ne touche pas a l'axe
+   * vertical », il veut dire « fais le moins de defilement possible pour que
+   * l'element soit visible » — et quand l'element n'est pas visible du tout, le
+   * minimum consiste justement a faire defiler la page jusqu'a lui.
+   *
+   * Sur la page du championnat, ce selecteur se trouve sous un tableau de
+   * quatorze clubs, donc hors de l'ecran a l'arrivee. La page descendait toute
+   * seule pour l'amener dans le champ, et l'on atterrissait au milieu du
+   * classement. De facon intermittente, qui plus est : selon que le tableau
+   * avait fini de se charger ou non au moment ou l'effet se declenchait, la
+   * page descendait plus ou moins, ou pas du tout. Un defaut qui ne se montre
+   * qu'une fois sur deux coute bien plus cher a trouver qu'un defaut franc.
+   *
+   * Le remede est de ne plus rien demander au navigateur. On mesure l'ecart
+   * entre la pastille et le bord de la bande, et on deplace `scrollLeft`
+   * nous-memes. Un `scrollLeft` n'affecte que son propre conteneur : aucun
+   * ancetre n'est touche, donc la page ne peut plus bouger, ou que le selecteur
+   * se trouve.
+   *
+   * `getBoundingClientRect` plutot que `offsetLeft` : `offsetLeft` se compte a
+   * partir du premier ancetre positionne, qui n'est pas forcement la bande, et
+   * donnerait un resultat faux le jour ou quelqu'un ajoute un `relative` plus
+   * haut. La difference des deux rectangles, elle, ne depend d'aucun contexte.
+   *
+   * Le `Math.max/min` n'est pas decoratif : sans borne, le navigateur ramene
+   * silencieusement `scrollLeft` dans les limites, et `mesurer` lirait une
+   * valeur differente de celle qu'on vient d'ecrire.
    */
   useEffect(() => {
-    actif.current?.scrollIntoView({ block: 'nearest', inline: 'center' });
+    const bande = piste.current;
+    const pastille = actif.current;
+    if (!bande || !pastille) return;
+
+    const ecart = pastille.getBoundingClientRect().left - bande.getBoundingClientRect().left;
+    const vise = bande.scrollLeft + ecart - (bande.clientWidth - pastille.offsetWidth) / 2;
+    bande.scrollLeft = Math.max(0, Math.min(vise, bande.scrollWidth - bande.clientWidth));
+
     mesurer();
   }, [valeur, mesurer]);
 
