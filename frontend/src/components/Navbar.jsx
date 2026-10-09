@@ -72,31 +72,37 @@ export default function Navbar() {
   /**
    * L'ordre des onglets.
    *
-   * « Classement » est passe juste apres « Accueil », et ce n'est pas un detail
-   * d'alphabet : ce sont les deux pages qu'on ouvre sans rien avoir a y faire,
-   * pour regarder ou l'on en est. Les trois suivantes — mes pronos, tous les
-   * pronos, le championnat — demandent au contraire une intention. Les deux
-   * premieres places sont les plus faciles a atteindre au pouce, autant y mettre
-   * ce qu'on consulte le plus.
+   * Il suit le fil d'une journée de championnat plutôt qu'un classement par
+   * importance. On arrive sur l'accueil, on va voir qui joue qui et dans quel
+   * état sont les clubs — le championnat —, on pose ses pronostics, on regarde
+   * ceux des autres, et c'est seulement après les matchs qu'on va au classement
+   * voir ce que tout cela a donné. Le Comptoir ferme la marche parce qu'on y
+   * passe quand on a fini, et l'administration en dernier parce qu'elle ne
+   * concerne qu'une personne.
+   *
+   * Le classement était en deuxième position dans une version précédente, au
+   * motif qu'on le consulte souvent sans rien y faire. C'était un autre
+   * raisonnement, pas un meilleur : celui-ci a l'avantage de se deviner, donc
+   * de ne pas avoir à être appris.
    *
    * « Comptoir » remplace « Vestiaire ». L'adresse reste `/chat` : la changer
-   * casserait les liens deja envoyes par courriel sans rien apporter — une
-   * adresse n'est pas un libelle, personne ne la lit.
+   * casserait les liens déjà envoyés par courriel sans rien apporter — une
+   * adresse n'est pas un libellé, personne ne la lit.
    *
-   * Les emojis restent, faute de mieux pour l'instant. On a essaye les icones
-   * 3D et elles ne tiennent pas ici : elles sont vert fonce et or, la barre est
-   * vert fonce, donc la moitie d'entre elles s'y fondent — il faudrait leur
-   * poser une pastille claire sous chacune, c'est-a-dire leur fabriquer le fond
-   * clair pour lequel elles ont ete dessinees. La vraie reponse sera un jeu
-   * d'icones tracees, monochromes, qui prennent la couleur du texte ; en
-   * attendant, un emoji dependant du systeme vaut mieux qu'une tache verte.
+   * Les emojis restent, faute de mieux pour l'instant. On a essayé les icônes
+   * 3D et elles ne tiennent pas ici : elles sont vert foncé et or, la barre est
+   * vert foncé, donc la moitié d'entre elles s'y fondent — il faudrait leur
+   * poser une pastille claire sous chacune, c'est-à-dire leur fabriquer le fond
+   * clair pour lequel elles ont été dessinées. La vraie réponse sera un jeu
+   * d'icônes tracées, monochromes, qui prennent la couleur du texte ; en
+   * attendant, un emoji dépendant du système vaut mieux qu'une tache verte.
    */
   const links = [
     { to: '/', icon: '🏠', label: 'Accueil' },
-    { to: '/classement', icon: '🏆', label: 'Classement' },
+    { to: '/top14', icon: '🏉', label: 'Championnat' },
     { to: '/pronostics', icon: '📅', label: 'Mes pronos' },
     { to: '/pronos', icon: '👥', label: 'Tous les pronos' },
-    { to: '/top14', icon: '🏉', label: 'Championnat' },
+    { to: '/classement', icon: '🏆', label: 'Classement' },
     { to: '/chat', icon: '💬', label: 'Comptoir', badge: unread },
     { to: '/admin', icon: '⚙️', label: 'Admin' },
   ];
