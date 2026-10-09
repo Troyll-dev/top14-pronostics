@@ -6,6 +6,7 @@ import api from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 import TeamCrest from '../components/TeamCrest';
 import Bandeau from '../components/Bandeau';
+import FaceAFace from '../components/FaceAFace';
 import { matchState, STATE, STATE_CHIP, useNow } from '../utils/matchState';
 
 function pointsTone(points) {
@@ -145,7 +146,12 @@ export default function HomePage() {
           Il arrive avant le salut plutôt qu'après : c'est la première chose
           qu'on voit en ouvrant l'appli, et une page qui commence par une
           tablée de copains dit mieux de quoi il s'agit qu'un titre. */}
-      <Bandeau nom="accueil" className="mb-5" />
+      {/* « accueil-pub » et non « accueil » : changer l'image en gardant le nom
+          du fichier ne suffit pas. Un fichier statique déjà téléchargé sous ce
+          nom reste servi par le navigateur et par le cache de Vercel, qui ne
+          vont pas demander s'il a changé — on y a perdu une heure sur la
+          vignette des copains. Nouvelle image, nouveau nom. */}
+      <Bandeau nom="accueil-pub" className="mb-5" />
 
       <h1 className="font-display text-[26px] font-extrabold leading-none mb-1">
         Salut {user?.username} 🏉
@@ -191,40 +197,11 @@ export default function HomePage() {
               <p className="text-[11px] uppercase tracking-wide text-slate-500 mb-2">
                 Prochain coup d'envoi
               </p>
-              {/* Les deux équipes côte à côte, la date en dessous.
-
-                  Tout tenait sur une seule ligne — nom, écusson, nom, écusson,
-                  date — et la ligne cédait. L'autoriser à se replier n'a rien
-                  arrangé : les deux noms étant dans un même paragraphe, ils se
-                  sont empilés du même côté, et l'on ne voyait plus qui recevait
-                  qui.
-
-                  La rencontre reprend donc la disposition de la carte de match :
-                  deux colonnes symétriques, chaque nom contre son écusson, le
-                  tiret au milieu. C'est la seule forme qui dise d'elle-même que
-                  ce sont deux équipes qui s'opposent. La date descend d'une
-                  ligne, puisqu'elle n'a pas besoin d'être lue en même temps. */}
-              <div className="flex items-center gap-2">
-                <div className="flex-1 min-w-0 flex items-center justify-end gap-2">
-                  <span className="break-words text-right font-display font-bold text-[13.5px] sm:text-[14.5px] leading-tight">
-                    {nextMatch.homeTeam.name}
-                  </span>
-                  <TeamCrest team={nextMatch.homeTeam} size={22} />
-                </div>
-
-                <span className="shrink-0 text-slate-500 text-[13px]">—</span>
-
-                <div className="flex-1 min-w-0 flex items-center gap-2">
-                  <TeamCrest team={nextMatch.awayTeam} size={22} />
-                  <span className="break-words font-display font-bold text-[13.5px] sm:text-[14.5px] leading-tight">
-                    {nextMatch.awayTeam.name}
-                  </span>
-                </div>
-              </div>
-
-              <p className="mt-1.5 text-center text-[12px] italic text-slate-500 first-letter:uppercase">
-                {format(new Date(nextMatch.kickoff), "EEEE d MMMM · HH'h'mm", { locale: fr })}
-              </p>
+              {/* Le face-à-face vit dans son propre composant depuis que « Mes
+                  pronos » en a eu besoin pour son rappel de joker. Il a demandé
+                  trois essais pour tenir avec des noms longs ; le recopier
+                  aurait garanti qu'une des deux copies finisse par dériver. */}
+              <FaceAFace match={nextMatch} taille={22} />
             </div>
           )}
         </div>

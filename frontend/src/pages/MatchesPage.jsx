@@ -5,6 +5,7 @@ import { matchState, useNow } from '../utils/matchState';
 import SelecteurJournee from '../components/SelecteurJournee';
 import Bob from '../components/Bob';
 import IconeJoker from '../components/IconeJoker';
+import FaceAFace from '../components/FaceAFace';
 
 const DRAFT_KEY = 't14-brouillons';
 const DRAFT_TTL = 30 * 24 * 3600 * 1000; // un mois
@@ -55,15 +56,19 @@ function RappelJoker({ matches, regles }) {
       <p className="flex items-center gap-1.5 font-display text-[11.5px] font-bold uppercase tracking-wider text-slate-500">
         <IconeJoker taille={20} /> Mon joker de la journée
       </p>
-      <p className="text-[12.5px] mt-1.5">
-        {pose ? (
-          <span className="font-display font-bold">
-            {pose.homeTeam.name} – {pose.awayTeam.name}
-          </span>
-        ) : (
-          <span className="text-slate-500">pas encore posé</span>
-        )}
-      </p>
+      {/* La rencontre, présentée comme « Prochain coup d'envoi » sur l'accueil :
+          deux colonnes symétriques, chaque nom contre son écusson, la date en
+          dessous. Elle était écrite en texte courant, deux noms séparés d'un
+          tiret — ça disait les mêmes mots mais ça ne montrait pas une affiche.
+
+          Écussons à 20 plutôt qu'à 22 : ce bloc est un rappel à l'intérieur d'un
+          récapitulatif, pas le sujet de la page. Un cran en dessous suffit à le
+          dire. */}
+      {pose ? (
+        <FaceAFace match={pose} taille={20} className="mt-2.5" />
+      ) : (
+        <p className="text-[12.5px] mt-1.5 text-slate-500">pas encore posé</p>
+      )}
       <p className="text-[11.5px] text-slate-500 mt-1">
         {engage
           ? 'La rencontre a commencé : il n\'est plus déplaçable.'
