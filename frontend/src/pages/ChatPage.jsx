@@ -131,7 +131,7 @@ export default function ChatPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6">
-      <h1 className="font-display text-[26px] font-extrabold leading-none mb-1">💬 Le vestiaire</h1>
+      <h1 className="font-display text-[26px] font-extrabold leading-none mb-1">💬 Le Comptoir</h1>
       <p className="text-xs italic text-slate-500 mb-5">
         Entre nous · {messages.length} message{messages.length > 1 ? 's' : ''}
       </p>

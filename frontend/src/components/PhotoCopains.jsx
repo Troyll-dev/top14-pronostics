@@ -6,7 +6,7 @@ import './PhotoCopains.css';
  * La bande de copains, epinglee a cote du titre.
  *
  * Elle n'apparait que sur les pages listees dans PAGES : l'accueil, le
- * classement et le vestiaire. Ailleurs — « Mes pronos », « Tous les pronos »,
+ * classement et le Comptoir. Ailleurs — « Mes pronos », « Tous les pronos »,
  * le championnat — les en-tetes portent deja des pastilles, des selecteurs de
  * journee ou des liens, et la vignette leur disputait la place. Ces trois
  * pages-la sont celles ou l'on regarde les copains plutot que le championnat,

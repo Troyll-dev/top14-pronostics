@@ -69,23 +69,61 @@ export default function Navbar() {
 
   useEffect(() => { if (pathname === '/chat') setUnread(0); }, [pathname]);
 
+  /**
+   * L'ordre des onglets.
+   *
+   * « Classement » est passe juste apres « Accueil », et ce n'est pas un detail
+   * d'alphabet : ce sont les deux pages qu'on ouvre sans rien avoir a y faire,
+   * pour regarder ou l'on en est. Les trois suivantes — mes pronos, tous les
+   * pronos, le championnat — demandent au contraire une intention. Les deux
+   * premieres places sont les plus faciles a atteindre au pouce, autant y mettre
+   * ce qu'on consulte le plus.
+   *
+   * « Comptoir » remplace « Vestiaire ». L'adresse reste `/chat` : la changer
+   * casserait les liens deja envoyes par courriel sans rien apporter — une
+   * adresse n'est pas un libelle, personne ne la lit.
+   *
+   * Les emojis restent, faute de mieux pour l'instant. On a essaye les icones
+   * 3D et elles ne tiennent pas ici : elles sont vert fonce et or, la barre est
+   * vert fonce, donc la moitie d'entre elles s'y fondent — il faudrait leur
+   * poser une pastille claire sous chacune, c'est-a-dire leur fabriquer le fond
+   * clair pour lequel elles ont ete dessinees. La vraie reponse sera un jeu
+   * d'icones tracees, monochromes, qui prennent la couleur du texte ; en
+   * attendant, un emoji dependant du systeme vaut mieux qu'une tache verte.
+   */
   const links = [
     { to: '/', icon: '🏠', label: 'Accueil' },
+    { to: '/classement', icon: '🏆', label: 'Classement' },
     { to: '/pronostics', icon: '📅', label: 'Mes pronos' },
     { to: '/pronos', icon: '👥', label: 'Tous les pronos' },
     { to: '/top14', icon: '🏉', label: 'Championnat' },
-    { to: '/classement', icon: '🏆', label: 'Classement' },
-    { to: '/chat', icon: '💬', label: 'Vestiaire', badge: unread },
+    { to: '/chat', icon: '💬', label: 'Comptoir', badge: unread },
     { to: '/admin', icon: '⚙️', label: 'Admin' },
   ];
 
   return (
     <nav className="nav-band sticky top-0 z-50">
       <div className="max-w-5xl mx-auto px-2 sm:px-4 flex items-center justify-between h-14 gap-1 sm:gap-2">
-        <Link to="/" className="nav-tx font-display font-bold text-base tracking-wide flex items-center gap-2 shrink-0">
+        {/* Le titre du site, et il ne mene plus a l'accueil.
+
+            Il etait un lien vers `/`, et l'onglet « Accueil » se trouvait juste
+            a sa droite : deux commandes collees qui faisaient la meme chose. Sur
+            telephone c'etait franchement etrange, puisque les libelles y sont
+            masques — on voyait un ballon et une maison cote a cote, menant au
+            meme endroit, sur la portion d'ecran la plus chere qui soit.
+
+            Entre retirer l'onglet et desactiver le logo, c'est l'onglet qui
+            reste : il est nomme, il s'allume quand on est sur la page, et il se
+            trouve la ou l'on cherche les pages. Le logo, lui, redevient ce qu'il
+            dit etre — une enseigne.
+
+            Un `span` et non un `Link` desactive : un lien qu'on neutralise reste
+            focalisable au clavier et garde son curseur de main, donc il promet
+            encore quelque chose. Autant qu'il cesse d'etre un lien. */}
+        <span className="nav-tx font-display font-bold text-base tracking-wide flex items-center gap-2 shrink-0 select-none">
           <span>🏉</span>
           <span className="hidden lg:inline">Top 14 Pronos</span>
-        </Link>
+        </span>
 
         {/* Bande d'onglets defilante.
 

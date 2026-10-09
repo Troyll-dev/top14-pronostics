@@ -151,7 +151,7 @@ export default function LoginPage() {
             )}
 
             <button type="submit" className="btn-primary w-full" disabled={loading}>
-              {loading ? 'Un instant…' : 'Entrer dans le vestiaire'}
+              {loading ? 'Un instant…' : 'Entrer au Comptoir'}
             </button>
           </form>
 

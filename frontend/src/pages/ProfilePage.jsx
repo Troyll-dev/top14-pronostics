@@ -221,7 +221,7 @@ export default function ProfilePage() {
           placeholder="Ton pseudo"
         />
         <p className="text-[11.5px] text-slate-500 mt-2">
-          De 2 à 20 caractères. Il apparaît dans le classement, les pronos et le vestiaire.
+          De 2 à 20 caractères. Il apparaît dans le classement, les pronos et le Comptoir.
           Tes anciens messages et pronostics suivent automatiquement.
         </p>
 
