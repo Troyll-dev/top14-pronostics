@@ -1,7 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Navbar from './components/Navbar';
-import PhotoCopains from './components/PhotoCopains';
 import JoueursDecor from './components/JoueursDecor';
 import MiseAJour from './components/MiseAJour';
 import WelcomePage from './pages/WelcomePage';
@@ -51,11 +50,15 @@ function AppRoutes() {
           au-dessus, sans quoi il passerait derriere les joueurs. */}
       {user && <JoueursDecor />}
 
-      {/* Conteneur relatif : il sert de repere a la vignette, qui est en
-          position absolue et defile donc avec la page au lieu de rester
-          collee a l'ecran. Le z-10 le place devant le filigrane. */}
+      {/* Conteneur relatif, et le z-10 qui place le contenu devant le
+          filigrane des joueurs.
+
+          Il servait aussi de repere a la vignette des copains, qui etait en
+          position absolue : c'est lui qui la faisait defiler avec la page au
+          lieu de rester collee a l'ecran. La vignette a ete retiree, mais le
+          `relative` reste — il ne coute rien et une position absolue finira
+          bien par en avoir besoin. */}
       <div className="relative z-10">
-        {user && <PhotoCopains />}
         <Routes>
           <Route path="/bienvenue" element={<PublicRoute><WelcomePage /></PublicRoute>} />
           <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
