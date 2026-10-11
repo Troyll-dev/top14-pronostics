@@ -28,6 +28,21 @@ function daySeparator(date) {
   return format(date, 'EEEE d MMMM', { locale: fr });
 }
 
+/**
+ * De quoi savoir si la liste a vraiment change.
+ *
+ * L'interrogation du serveur rend un nouveau tableau toutes les six secondes,
+ * meme quand personne n'a rien dit. Pour React, un nouveau tableau est un
+ * changement : tout effet qui depend de `messages` repart donc six fois par
+ * minute, qu'il y ait du nouveau ou non. Cette empreinte — le nombre de
+ * messages et l'identifiant du dernier — ne change, elle, que lorsqu'il s'est
+ * reellement passe quelque chose.
+ */
+function empreinte(messages) {
+  if (!messages.length) return 'vide';
+  return `${messages.length}:${messages[messages.length - 1].id}`;
+}
+
 export default function ChatPage() {
   const { user } = useAuth();
 
@@ -37,11 +52,16 @@ export default function ChatPage() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
 
-  const bottomRef = useRef(null);
   const scrollerRef = useRef(null);
   // On ne recolle en bas que si l'on y etait deja : sinon relire un vieux
   // message serait impossible, la liste sauterait a chaque interrogation.
   const stick = useRef(true);
+
+  // Les deux effets ci-dessous ne doivent agir que sur du nouveau. Chacun garde
+  // sa propre empreinte : avec une seule partagee, le premier a s'executer
+  // la mettrait a jour et le second ne ferait jamais rien.
+  const vuDefilement = useRef(null);
+  const vuLecture = useRef(null);
 
   const onScroll = () => {
     const el = scrollerRef.current;
@@ -80,13 +100,48 @@ export default function ChatPage() {
   }, [fetchMessages]);
 
   // Tant que la page est ouverte, tout ce qui arrive est considere comme lu.
+  // Garde sur l'empreinte : sans elle, on reecrivait le repere et on diffusait
+  // l'evenement « salon lu » toutes les six secondes sans raison.
   useEffect(() => {
     if (!messages.length) return;
+    const e = empreinte(messages);
+    if (e === vuLecture.current) return;
+    vuLecture.current = e;
     markChatSeen(messages[messages.length - 1].createdAt);
   }, [messages]);
 
+  /**
+   * Recoller en bas de la conversation.
+   *
+   * Ce que faisait cet effet avant, et pourquoi il fallait le changer :
+   *
+   * **`scrollIntoView` ne defile pas que le cadre de la conversation.** Il
+   * remonte toute la chaine des parents defilables jusqu'a la page elle-meme,
+   * et deplace donc aussi la fenetre. Sur telephone, clavier ouvert, la page
+   * bougeait sous le doigt et la zone de saisie sortait de l'ecran : on tapait
+   * un message et il disparaissait. C'est le meme piege que sur le selecteur de
+   * journee du championnat, ou un `scrollIntoView` innocent faisait ouvrir la
+   * page au milieu du tableau. Donner l'ordre au cadre lui-meme, par
+   * `scrollTop`, ne peut toucher que lui.
+   *
+   * **Il repartait toutes les six secondes.** L'interrogation rend un nouveau
+   * tableau meme quand rien n'a change, et l'effet ne regardait que l'identite
+   * de ce tableau. Le defilement forcé revenait donc six fois par minute, y
+   * compris pendant qu'on ecrivait. L'empreinte supprime ce declenchement a
+   * vide : on ne recolle en bas que lorsqu'un message est reellement arrive.
+   *
+   * Le repere invisible en fin de liste n'a plus lieu d'etre : on vise
+   * directement le bas du cadre.
+   */
   useEffect(() => {
-    if (stick.current) bottomRef.current?.scrollIntoView({ block: 'end' });
+    const el = scrollerRef.current;
+    if (!el || !messages.length) return;
+
+    const e = empreinte(messages);
+    if (e === vuDefilement.current) return;
+    vuDefilement.current = e;
+
+    if (stick.current) el.scrollTop = el.scrollHeight;
   }, [messages]);
 
   const send = async () => {
@@ -222,12 +277,29 @@ export default function ChatPage() {
               );
             })
           )}
-          <div ref={bottomRef} />
         </div>
 
         {/* Saisie */}
         <div className="border-t border-slate-800 p-3">
           <div className="flex items-end gap-2">
+            {/* Seize pixels sur telephone, et ce n'est pas un choix esthetique.
+
+                iOS applique une regle sans exception : quand le curseur entre
+                dans un champ dont le texte fait moins de 16 pixels, Safari
+                zoome la page pour le rendre lisible. A 13,5 pixels, ecrire un
+                message agrandissait donc tout le site — et comme l'application
+                installee n'a ni barre d'adresse ni geste pour revenir en
+                arriere, le zoom restait : la barre du haut depassait a gauche,
+                celle du bas se trouvait rognee, et il fallait faire glisser la
+                page de cote pour retrouver ses reperes.
+
+                La preuve etait dans « Mes pronos » : les cases de score y sont
+                a 16 pixels pile, et cette page ne zoome jamais.
+
+                Au-dela de `sm` — donc sur tablette et ordinateur, ou aucun
+                clavier ne s'ouvre et ou ce zoom n'existe pas — on revient a
+                13,5 pixels, qui est la taille des bulles de la conversation :
+                la zone de saisie doit ressembler a ce qu'elle produit. */}
             <textarea
               value={draft}
               onChange={(e) => setDraft(e.target.value.slice(0, MAX_LENGTH))}
@@ -235,7 +307,7 @@ export default function ChatPage() {
               rows={1}
               placeholder="Ton message… (Entrée pour envoyer)"
               className="flex-1 resize-none bg-slate-950 border-[1.5px] border-slate-800 rounded-md px-3 py-2
-                         text-[13.5px] text-white placeholder:text-slate-600
+                         text-[16px] sm:text-[13.5px] text-white placeholder:text-slate-600
                          focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/25 transition-colors"
             />
             <button
