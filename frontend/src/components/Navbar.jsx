@@ -7,6 +7,43 @@ import Avatar from './Avatar';
 const SEEN_KEY = 't14-chat-vu';
 const UNREAD_MS = 20000;
 
+/**
+ * Une icone de la barre.
+ *
+ * Les emojis ont tenu jusqu'ici faute de mieux, avec deux defauts : ils ne sont
+ * pas dessines par le site mais par le systeme — donc pas le meme dessin sur un
+ * iPhone, sur Android et sur Windows —, et sept emojis sans rapport entre eux ne
+ * forment pas une famille.
+ *
+ * Une premiere serie d'icones 3D a ete essayee et ecartee : elles etaient vert
+ * fonce et or sur une barre vert foncé, donc la moitie d'entre elles s'y
+ * fondaient. Celles-ci sont dominees par l'or et la creme, et c'est toute la
+ * difference — le contraste existe sans qu'on ait a leur poser une pastille
+ * claire dessous.
+ *
+ * Vingt-quatre pixels, mesures : en dessous, la maison et les supporters
+ * deviennent des taches. `srcSet` donne la version 96 aux ecrans a forte
+ * densite, qui en demandent 72 pour un affichage a 24.
+ *
+ * `alt=""` : le libelle est a cote sur grand ecran, et le `title` de l'onglet le
+ * porte sur telephone. Faire lire deux fois la meme chose n'aide personne.
+ */
+function IconeNav({ nom, taille = 24 }) {
+  return (
+    <img
+      src={`/nav/${nom}-48.webp`}
+      srcSet={`/nav/${nom}-48.webp 48w, /nav/${nom}-96.webp 96w`}
+      sizes={`${taille}px`}
+      alt=""
+      width={taille}
+      height={taille}
+      decoding="async"
+      className="shrink-0 select-none"
+      style={{ width: taille, height: taille }}
+    />
+  );
+}
+
 export default function Navbar() {
   const { user, logout } = useAuth();
   const { pathname } = useLocation();
@@ -89,46 +126,67 @@ export default function Navbar() {
    * casserait les liens déjà envoyés par courriel sans rien apporter — une
    * adresse n'est pas un libellé, personne ne la lit.
    *
-   * Les emojis restent, faute de mieux pour l'instant. On a essayé les icônes
-   * 3D et elles ne tiennent pas ici : elles sont vert foncé et or, la barre est
-   * vert foncé, donc la moitié d'entre elles s'y fondent — il faudrait leur
-   * poser une pastille claire sous chacune, c'est-à-dire leur fabriquer le fond
-   * clair pour lequel elles ont été dessinées. La vraie réponse sera un jeu
-   * d'icônes tracées, monochromes, qui prennent la couleur du texte ; en
-   * attendant, un emoji dépendant du système vaut mieux qu'une tache verte.
+   * Le titre « Top 14 Pronos » a disparu de la barre. Il n'etait deja plus un
+   * lien — l'onglet « Accueil » fait ce travail —, donc il ne servait plus qu'a
+   * decorer, et il decorait au prix d'une centaine de pixels sur la seule ligne
+   * de l'ecran ou la place manque vraiment : avec lui, « Admin » se faisait
+   * rogner. Le ballon reste, comme enseigne.
    */
   const links = [
-    { to: '/', icon: '🏠', label: 'Accueil' },
-    { to: '/top14', icon: '🏉', label: 'Championnat' },
-    { to: '/pronostics', icon: '📅', label: 'Mes pronos' },
-    { to: '/pronos', icon: '👥', label: 'Tous les pronos' },
-    { to: '/classement', icon: '🏆', label: 'Classement' },
-    { to: '/chat', icon: '💬', label: 'Comptoir', badge: unread },
-    { to: '/admin', icon: '⚙️', label: 'Admin' },
+    { to: '/', icone: 'accueil', label: 'Accueil' },
+    { to: '/top14', icone: 'championnat', label: 'Championnat' },
+    { to: '/pronostics', icone: 'mes-pronos', label: 'Mes pronos' },
+    { to: '/pronos', icone: 'tous-les-pronos', label: 'Résultats' },
+    { to: '/classement', icone: 'classement', label: 'Classement' },
+    { to: '/chat', icone: 'comptoir', label: 'Comptoir', badge: unread },
+    { to: '/admin', icone: 'admin', label: 'Admin' },
   ];
+
 
   return (
     <nav className="nav-band sticky top-0 z-50">
       <div className="max-w-5xl mx-auto px-2 sm:px-4 flex items-center justify-between h-14 gap-1 sm:gap-2">
-        {/* Le titre du site, et il ne mene plus a l'accueil.
+        {/* L'enseigne : le ballon et le nom du site.
 
-            Il etait un lien vers `/`, et l'onglet « Accueil » se trouvait juste
-            a sa droite : deux commandes collees qui faisaient la meme chose. Sur
-            telephone c'etait franchement etrange, puisque les libelles y sont
-            masques — on voyait un ballon et une maison cote a cote, menant au
-            meme endroit, sur la portion d'ecran la plus chere qui soit.
+            Elle a ete retiree, puis remise, et les deux decisions etaient bonnes
+            au moment ou elles ont ete prises — ce qui merite d'etre consigne,
+            sinon quelqu'un refera le chemin dans un sens ou dans l'autre.
 
-            Entre retirer l'onglet et desactiver le logo, c'est l'onglet qui
-            reste : il est nomme, il s'allume quand on est sur la page, et il se
-            trouve la ou l'on cherche les pages. Le logo, lui, redevient ce qu'il
-            dit etre — une enseigne.
+            Retiree parce qu'elle coutait une centaine de pixels sur la seule
+            ligne de l'ecran ou la place manque : avec elle, « Admin » se faisait
+            rogner. Et parce que son ballon etait identique a l'icone de l'onglet
+            « Championnat », ce qui donnait, sur telephone ou les libelles sont
+            masques, deux ballons voisins dont un seul cliquable.
 
-            Un `span` et non un `Link` desactive : un lien qu'on neutralise reste
-            focalisable au clavier et garde son curseur de main, donc il promet
-            encore quelque chose. Autant qu'il cesse d'etre un lien. */}
-        <span className="nav-tx font-display font-bold text-base tracking-wide flex items-center gap-2 shrink-0 select-none">
-          <span>🏉</span>
-          <span className="hidden lg:inline">Top 14 Pronos</span>
+            Remise parce que les deux raisons ont disparu. « Tous les pronos »
+            est devenu « Resultats », ce qui a rendu la place manquante ; et
+            l'onglet Championnat est devenu un bouclier, donc le ballon ne
+            designe plus que le site.
+
+            Elle ne mene nulle part : c'est l'onglet « Accueil » qui fait ce
+            travail, il est nomme et il s'allume. Un `span` et non un `Link`
+            desactive — un lien qu'on neutralise reste focalisable au clavier et
+            garde son curseur de main, donc il promet encore quelque chose.
+
+            **Un seul seuil pour les deux.** Le ballon et le titre
+            apparaissent ensemble a partir de `lg`, en meme temps que les
+            libelles des onglets, et disparaissent ensemble en dessous. Un
+            ballon seul, sans le nom qu'il accompagne, ne dit rien de plus que
+            la page elle-meme.
+
+            Ce qui l'impose, c'est le telephone : la bande d'onglets y defile,
+            et les trente pixels du ballon lui etaient pris — les deux
+            extremites de la bande, l'accueil et l'engrenage, se retrouvaient
+            rognees par le bord. Une image decorative ne prend pas la place
+            d'une commande, surtout sur l'ecran ou la place est la plus chere.
+
+            Il y a eu un reglage intermediaire, le ballon des `md` et le titre
+            des `lg`, pour que l'iPad garde une enseigne. Deux seuils pour une
+            seule chose, c'est une regle de plus a retenir pour pas grand-chose :
+            abandonne. */}
+        <span className="nav-tx font-display font-bold text-base tracking-wide hidden lg:flex items-center gap-2 shrink-0 select-none">
+          <IconeNav nom="logo" taille={24} />
+          <span>Top 14 Pronos</span>
         </span>
 
         {/* Bande d'onglets defilante.
@@ -166,7 +224,7 @@ export default function Navbar() {
                   : 'nav-dim hover:bg-white/10'
               }`}
             >
-              <span>{l.icon}</span>
+              <IconeNav nom={l.icone} taille={24} />
               <span className="hidden lg:inline">{l.label}</span>
 
               {l.badge > 0 && pathname !== l.to && (

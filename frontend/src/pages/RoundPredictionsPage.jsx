@@ -187,7 +187,7 @@ export default function RoundPredictionsPage() {
   return (
     <div className="max-w-6xl mx-auto px-4 py-6">
       <div className="flex items-baseline justify-between gap-3 mb-1">
-        <h1 className="font-display text-[26px] font-extrabold leading-none">Tous les pronos</h1>
+        <h1 className="font-display text-[26px] font-extrabold leading-none">Résultats</h1>
         <Link to="/pronostics" className="text-sm text-slate-500 hover:text-amber-500 transition-colors whitespace-nowrap">
           ← Mes pronos
         </Link>
