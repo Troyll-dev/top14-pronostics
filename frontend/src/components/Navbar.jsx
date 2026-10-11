@@ -8,6 +8,26 @@ const SEEN_KEY = 't14-chat-vu';
 const UNREAD_MS = 20000;
 
 /**
+ * Hauteur de la rangée d'onglets du bas, hors zone de sécurité.
+ *
+ * Elle est écrite ici et nulle part ailleurs, parce que deux endroits en
+ * dépendent : la barre elle-même, et le vide qu'il faut réserver sous le
+ * contenu des pages pour que le dernier élément ne se retrouve pas dessous.
+ * `App.jsx` l'importe pour poser ce vide. Si l'un des deux était recopié à la
+ * main, le jour où la hauteur change, le dernier match de la liste passerait
+ * sous la barre sans que personne ne comprenne pourquoi.
+ */
+export const HAUTEUR_BARRE_BAS = 58;
+
+/**
+ * Le vide à réserver sous le contenu : la barre, la zone de sécurité du
+ * téléphone, et huit pixels d'air pour que le contenu ne vienne pas coller au
+ * filet.
+ */
+export const RESERVE_BARRE_BAS =
+  `calc(${HAUTEUR_BARRE_BAS}px + env(safe-area-inset-bottom, 0px) + 8px)`;
+
+/**
  * Une icone de la barre.
  *
  * Les emojis ont tenu jusqu'ici faute de mieux, avec deux defauts : ils ne sont
@@ -28,7 +48,7 @@ const UNREAD_MS = 20000;
  * `alt=""` : le libelle est a cote sur grand ecran, et le `title` de l'onglet le
  * porte sur telephone. Faire lire deux fois la meme chose n'aide personne.
  */
-function IconeNav({ nom, taille = 24 }) {
+function IconeNav({ nom, taille = 24, style }) {
   return (
     <img
       src={`/nav/${nom}-48.webp`}
@@ -39,8 +59,21 @@ function IconeNav({ nom, taille = 24 }) {
       height={taille}
       decoding="async"
       className="shrink-0 select-none"
-      style={{ width: taille, height: taille }}
+      style={{ width: taille, height: taille, ...style }}
     />
+  );
+}
+
+/** La pastille rouge des messages non lus. */
+function Pastille({ n, className = '' }) {
+  return (
+    <span
+      className={`absolute min-w-[17px] h-[17px] px-1 rounded-full bg-red-500 text-white
+                  font-display text-[10px] font-bold leading-[17px] text-center
+                  tabular-nums ${className}`}
+    >
+      {n > 99 ? '99' : n}
+    </span>
   );
 }
 
@@ -114,8 +147,7 @@ export default function Navbar() {
    * état sont les clubs — le championnat —, on pose ses pronostics, on regarde
    * ceux des autres, et c'est seulement après les matchs qu'on va au classement
    * voir ce que tout cela a donné. Le Comptoir ferme la marche parce qu'on y
-   * passe quand on a fini, et l'administration en dernier parce qu'elle ne
-   * concerne qu'une personne.
+   * passe quand on a fini.
    *
    * Le classement était en deuxième position dans une version précédente, au
    * motif qu'on le consulte souvent sans rien y faire. C'était un autre
@@ -126,147 +158,237 @@ export default function Navbar() {
    * casserait les liens déjà envoyés par courriel sans rien apporter — une
    * adresse n'est pas un libellé, personne ne la lit.
    *
-   * Le titre « Top 14 Pronos » a disparu de la barre. Il n'etait deja plus un
-   * lien — l'onglet « Accueil » fait ce travail —, donc il ne servait plus qu'a
-   * decorer, et il decorait au prix d'une centaine de pixels sur la seule ligne
-   * de l'ecran ou la place manque vraiment : avec lui, « Admin » se faisait
-   * rogner. Le ballon reste, comme enseigne.
+   * **Une seule liste pour les deux barres.** C'est tout l'intérêt de n'avoir
+   * qu'un composant : la barre du haut et celle du bas parcourent le même
+   * tableau. Un onglet ajouté dans six mois apparaîtra des deux côtés sans
+   * qu'on ait à y penser — alors que deux composants séparés auraient dérivé
+   * l'un de l'autre au premier ajout, et c'est toujours celui qu'on ne teste
+   * pas, le téléphone, qui serait resté en arrière.
+   *
+   * L'administration est à part, en bas de ce fichier : elle ne concerne qu'une
+   * personne, et elle ne mérite donc pas un septième des onglets du téléphone.
    */
-  const links = [
+  const pages = [
     { to: '/', icone: 'accueil', label: 'Accueil' },
     { to: '/top14', icone: 'championnat', label: 'Championnat' },
     { to: '/pronostics', icone: 'mes-pronos', label: 'Mes pronos' },
     { to: '/pronos', icone: 'tous-les-pronos', label: 'Résultats' },
     { to: '/classement', icone: 'classement', label: 'Classement' },
     { to: '/chat', icone: 'comptoir', label: 'Comptoir', badge: unread },
-    { to: '/admin', icone: 'admin', label: 'Admin' },
   ];
 
+  const admin = { to: '/admin', icone: 'admin', label: 'Admin' };
+  const onglets = [...pages, admin];
 
   return (
-    <nav className="nav-band sticky top-0 z-50">
-      <div className="max-w-5xl mx-auto px-2 sm:px-4 flex items-center justify-between h-14 gap-1 sm:gap-2">
-        {/* L'enseigne : le ballon et le nom du site.
+    <>
+      {/* =====================================================================
+          LA BARRE DU HAUT
 
-            Elle a ete retiree, puis remise, et les deux decisions etaient bonnes
-            au moment ou elles ont ete prises — ce qui merite d'etre consigne,
-            sinon quelqu'un refera le chemin dans un sens ou dans l'autre.
+          Sur ordinateur et sur tablette, elle porte tout : l'enseigne, les
+          sept onglets, le theme, le profil et la deconnexion. C'est la barre
+          que le site a toujours eue, et elle ne change pas — a partir de `lg`,
+          ce fichier se comporte exactement comme avant.
 
-            Retiree parce qu'elle coutait une centaine de pixels sur la seule
-            ligne de l'ecran ou la place manque : avec elle, « Admin » se faisait
-            rogner. Et parce que son ballon etait identique a l'icone de l'onglet
-            « Championnat », ce qui donnait, sur telephone ou les libelles sont
-            masques, deux ballons voisins dont un seul cliquable.
+          Sur telephone, elle perd ses onglets : ils sont descendus en bas. Il
+          lui reste l'enseigne et les trois commandes de droite, qui n'ont rien
+          a faire dans une barre d'onglets — le theme et la deconnexion ne sont
+          pas des pages, et les ranger parmi les pages aurait fait neuf cibles
+          la ou six tiennent deja juste.
 
-            Remise parce que les deux raisons ont disparu. « Tous les pronos »
-            est devenu « Resultats », ce qui a rendu la place manquante ; et
-            l'onglet Championnat est devenu un bouclier, donc le ballon ne
-            designe plus que le site.
+          Ce qui se gagne au passage : l'enseigne redevient visible sur
+          telephone. Elle avait ete masquee en dessous de `lg` parce que ses
+          trente pixels etaient pris sur la bande d'onglets defilante, qui s'en
+          trouvait rognee aux deux bouts. La bande n'est plus la ; la place est
+          libre ; le site a de nouveau un nom sur l'ecran ou on le regarde le
+          plus souvent.
+          ===================================================================== */}
+      <nav className="nav-band sticky top-0 z-50">
+        <div className="max-w-5xl mx-auto px-2 sm:px-4 flex items-center justify-between h-14 gap-1 sm:gap-2">
+          {/* L'enseigne ne mene nulle part : c'est l'onglet « Accueil » qui fait
+              ce travail, il est nomme et il s'allume. Un `span` et non un
+              `Link` desactive — un lien qu'on neutralise reste focalisable au
+              clavier et garde son curseur de main, donc il promet encore
+              quelque chose. */}
+          {/* `whitespace-nowrap` : a exactement 1024 pixels de large — le seuil
+              `lg` lui-meme —, les sept onglets avec leurs libelles remplissent
+              la barre au pixel pres, et « Top 14 Pronos » se repliait alors sur
+              deux lignes, ce qui etirait la barre. Personne n'a un ecran de
+              1024 pile, mais une fenetre redimensionnee y passe. */}
+          <span className="nav-tx font-display font-bold text-base tracking-wide flex items-center gap-2 shrink-0 select-none whitespace-nowrap">
+            <IconeNav nom="logo" taille={24} />
+            <span>Top 14 Pronos</span>
+          </span>
 
-            Elle ne mene nulle part : c'est l'onglet « Accueil » qui fait ce
-            travail, il est nomme et il s'allume. Un `span` et non un `Link`
-            desactive — un lien qu'on neutralise reste focalisable au clavier et
-            garde son curseur de main, donc il promet encore quelque chose.
+          {/* Les onglets, a partir de `lg` seulement.
+              Plus de `overflow-x-auto` ni de `min-w-0` : la bande defilante
+              n'existait que pour le telephone, qui a maintenant sa propre
+              barre. Au-dessus de `lg` tout tient, et tout tenait deja. */}
+          <div className="hidden lg:flex items-center gap-0.5">
+            {onglets.map((l) => (
+              <Link
+                key={l.to}
+                to={l.to}
+                title={l.label}
+                className={`relative shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
+                  pathname === l.to
+                    ? 'tab-on font-semibold shadow-[inset_0_-2px_0_rgba(0,0,0,.18)]'
+                    : 'nav-dim hover:bg-white/10'
+                }`}
+              >
+                <IconeNav nom={l.icone} taille={24} />
+                <span>{l.label}</span>
 
-            **Un seul seuil pour les deux.** Le ballon et le titre
-            apparaissent ensemble a partir de `lg`, en meme temps que les
-            libelles des onglets, et disparaissent ensemble en dessous. Un
-            ballon seul, sans le nom qu'il accompagne, ne dit rien de plus que
-            la page elle-meme.
+                {l.badge > 0 && pathname !== l.to && (
+                  <Pastille n={l.badge} className="-top-0.5 -right-0.5" />
+                )}
+              </Link>
+            ))}
+          </div>
 
-            Ce qui l'impose, c'est le telephone : la bande d'onglets y defile,
-            et les trente pixels du ballon lui etaient pris — les deux
-            extremites de la bande, l'accueil et l'engrenage, se retrouvaient
-            rognees par le bord. Une image decorative ne prend pas la place
-            d'une commande, surtout sur l'ecran ou la place est la plus chere.
+          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+            {/* L'administration sur telephone.
+                Elle n'est pas dans la barre du bas : six onglets y tiennent,
+                sept les rendraient tous plus etroits que le pouce qui les
+                vise, et le septieme ne sert qu'a une personne. Un engrenage
+                dans la barre du haut lui va bien — c'est la que les reglages
+                se cherchent, et c'est la qu'elle ne gene personne. */}
+            <Link
+              to={admin.to}
+              title={admin.label}
+              className={`lg:hidden rounded-md px-1 py-1 transition-colors ${
+                pathname === admin.to ? 'tab-on' : 'hover:bg-white/10'
+              }`}
+            >
+              <IconeNav nom={admin.icone} taille={22} />
+            </Link>
 
-            Il y a eu un reglage intermediaire, le ballon des `md` et le titre
-            des `lg`, pour que l'iPad garde une enseigne. Deux seuils pour une
-            seule chose, c'est une regle de plus a retenir pour pas grand-chose :
-            abandonne. */}
-        <span className="nav-tx font-display font-bold text-base tracking-wide hidden lg:flex items-center gap-2 shrink-0 select-none">
-          <IconeNav nom="logo" taille={24} />
-          <span>Top 14 Pronos</span>
-        </span>
+            <button
+              onClick={toggleTheme}
+              title={theme === 'nuit' ? 'Passer en clair' : 'Passer en sombre'}
+              className="nav-dim hover:bg-white/10 rounded-md px-1.5 sm:px-2 py-1.5 text-sm transition-colors"
+            >
+              {theme === 'nuit' ? '☀️' : '🌙'}
+            </button>
 
-        {/* Bande d'onglets defilante.
+            {/* La pastille mène au profil : c'est l'endroit où on la cherche. */}
+            <Link
+              to="/profil"
+              title="Mon profil"
+              className="flex items-center gap-2 rounded-md px-0.5 sm:px-1 py-1 hover:bg-white/10 transition-colors shrink-0"
+            >
+              <Avatar user={user} size={32} />
+              <span className="nav-tx text-sm hidden lg:block">{user?.username}</span>
+            </Link>
 
-            Sept onglets plus le theme, l'avatar et la deconnexion ne tiennent
-            pas dans 375 px : la barre debordait et, comme elle est `sticky`,
-            c'est toute la page qui se decalait — il fallait la tirer a la main
-            pour atteindre la deconnexion.
+            <button
+              onClick={logout}
+              title="Se déconnecter"
+              className="nav-dim hover:text-red-400 text-sm px-1 shrink-0 transition-colors"
+            >
+              ↪
+            </button>
+          </div>
+        </div>
+      </nav>
 
-            `min-w-0` autorise cette bande a se retrecir : sans lui, une boite
-            flex refuse de descendre sous la largeur de son contenu et pousse
-            le reste dehors. `overflow-x-auto` la fait alors defiler seule, et
-            le defilement etant interne, la deconnexion reste en dehors, donc
-            toujours visible. La barre du defileur est masquee : on fait
-            glisser au doigt.
+      {/* =====================================================================
+          LA BARRE DU BAS — TELEPHONE UNIQUEMENT
 
-            L'interieur est en `w-max mx-auto` : centre quand tout tient,
-            defilable depuis le debut quand ca deborde.
+          Pourquoi en bas, et pourquoi seulement la : un telephone se tient a
+          une main, et le pouce atteint le bas de l'ecran sans que la main
+          bouge. Le haut, lui, demande de rattraper l'appareil. Sur un ecran de
+          1400 pixels le raisonnement s'inverse — six onglets etales tout en bas
+          seraient a un metre de la souris —, donc la barre du bas s'arrete a
+          `lg` et la barre du haut reprend son travail.
 
-            A partir de `lg` les libelles apparaissent et la barre retrouve
-            exactement son comportement d'origine : pas de retrecissement, pas
-            de defilement interne. C'est deliberé — sur grand ecran tout
-            s'affiche deja, et une bande defilante y cacherait des onglets qui
-            etaient visibles. */}
-        <div className="flex-1 min-w-0 overflow-x-auto lg:flex-none lg:min-w-fit lg:overflow-visible [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <div className="flex items-center gap-0.5 w-max mx-auto">
-          {links.map((l) => (
+          Ce qu'elle resout, et qui a occupe toute une journee : sept onglets
+          ne tenaient pas dans 375 pixels. On les a fait defiler, on a masque
+          les libelles, on a retire l'enseigne, on a renomme « Tous les pronos »
+          en « Resultats » pour gagner de la place. Chacune de ces decisions
+          etait juste, et toutes contournaient le meme probleme — une rangee
+          horizontale partagee avec le titre et trois commandes. Ici chaque
+          onglet recoit son icone ET son libelle, ce qu'aucun arrangement du
+          haut ne permettait, et il reste de la place.
+
+          `fixed` et non `sticky` : elle ne suit pas le contenu, elle reste. Le
+          vide necessaire sous les pages est pose par `App.jsx`, qui importe
+          `RESERVE_BARRE_BAS` — sans lui, le dernier match de chaque liste
+          passerait dessous et deviendrait incochable.
+
+          `env(safe-area-inset-bottom)` : sur les iPhone sans bouton, la barre
+          de gestes du systeme occupe le bas de l'ecran. Sans cette reserve, la
+          rangee d'onglets passe dessous et les six deviennent difficiles a
+          viser — c'est le pendant exact du `padding-top` de `.nav-band`, qui
+          avait sauve la barre du haut sur les telephones a encoche.
+
+          Le degrade est celui du haut, retourne (`0deg`), pour que le bord
+          clair regarde le contenu dans les deux cas. Les couleurs viennent des
+          memes variables, donc les deux themes suivent sans rien de plus.
+          ===================================================================== */}
+      <nav
+        className="lg:hidden fixed bottom-0 inset-x-0 z-50 flex items-stretch"
+        style={{
+          background: 'linear-gradient(0deg, rgb(var(--band-a)), rgb(var(--band-b)))',
+          borderTop: '3px solid rgb(var(--a-500))',
+          boxShadow: '0 -3px 16px rgb(0 0 0 / .28)',
+          paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+        }}
+      >
+        {pages.map((l) => {
+          const actif = pathname === l.to;
+          return (
             <Link
               key={l.to}
               to={l.to}
               title={l.label}
-              className={`relative shrink-0 flex items-center gap-1.5 px-1.5 sm:px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
-                pathname === l.to
-                  ? 'tab-on font-semibold shadow-[inset_0_-2px_0_rgba(0,0,0,.18)]'
-                  : 'nav-dim hover:bg-white/10'
-              }`}
+              aria-current={actif ? 'page' : undefined}
+              className={`relative flex-1 min-w-0 flex flex-col items-center justify-center gap-[3px]
+                          transition-colors ${actif ? 'nav-tx' : 'nav-dim'}`}
+              style={{ height: HAUTEUR_BARRE_BAS }}
             >
-              <IconeNav nom={l.icone} taille={24} />
-              <span className="hidden lg:inline">{l.label}</span>
-
-              {l.badge > 0 && pathname !== l.to && (
-                <span className="absolute -top-0.5 -right-0.5 min-w-[17px] h-[17px] px-1 rounded-full
-                                 bg-red-500 text-white font-display text-[10px] font-bold leading-[17px]
-                                 text-center tabular-nums">
-                  {l.badge > 99 ? '99' : l.badge}
-                </span>
+              {/* Le trait de l'onglet actif.
+                  Plutot qu'un aplat clair comme en haut : six aplats cote a
+                  cote sur une barre de 375 pixels donnent une mosaique, et
+                  l'onglet actif ne ressort plus de ses voisins. Un trait au
+                  bord du filet se lit d'un coup d'oeil et ne mange rien. */}
+              {actif && (
+                <span
+                  className="absolute top-0 left-[14%] right-[14%] h-[2px] rounded-b-sm"
+                  style={{ background: 'rgb(244 166 142)' }}
+                />
               )}
+
+              <span className="relative shrink-0">
+                <IconeNav nom={l.icone} taille={26} style={{ opacity: actif ? 1 : 0.78 }} />
+                {l.badge > 0 && !actif && (
+                  <Pastille n={l.badge} className="-top-1.5 -right-2.5" />
+                )}
+              </span>
+
+              {/* Le libelle, en taille fluide.
+                  Mesure dans un navigateur : a 10 pixels fixes, « Championnat »
+                  se fait couper en « Champion… » des 375 pixels de large. La
+                  taille fluide regle ca parce que la largeur d'un onglet et la
+                  taille du texte grandissent avec la meme unite — le rapport
+                  entre les deux ne depend donc pas du telephone. Le plancher a
+                  9 pixels protege les tres petits ecrans d'un texte illisible ;
+                  sur un iPhone SE de premiere generation « Championnat » y
+                  perdra sa fin, ce qui est le bon compromis : le mot reste
+                  reconnaissable, et l'icone est juste au-dessus.
+                  `text-ellipsis` plutot qu'un repli sur deux lignes : une barre
+                  d'onglets dont un seul libelle fait deux lignes se deforme
+                  entierement. */}
+              <span
+                className="block max-w-full px-0.5 text-center leading-none whitespace-nowrap overflow-hidden text-ellipsis"
+                style={{ fontSize: 'clamp(9px, 2.45vw, 11px)' }}
+              >
+                {l.label}
+              </span>
             </Link>
-          ))}
-        </div>
-        </div>
-
-        <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-          <button
-            onClick={toggleTheme}
-            title={theme === 'nuit' ? 'Passer en clair' : 'Passer en sombre'}
-            className="nav-dim hover:bg-white/10 rounded-md px-1.5 sm:px-2 py-1.5 text-sm transition-colors"
-          >
-            {theme === 'nuit' ? '☀️' : '🌙'}
-          </button>
-
-          {/* La pastille mène au profil : c'est l'endroit où on la cherche. */}
-          <Link
-            to="/profil"
-            title="Mon profil"
-            className="flex items-center gap-2 rounded-md px-0.5 sm:px-1 py-1 hover:bg-white/10 transition-colors shrink-0"
-          >
-            <Avatar user={user} size={32} />
-            <span className="nav-tx text-sm hidden lg:block">{user?.username}</span>
-          </Link>
-
-          <button
-            onClick={logout}
-            title="Se déconnecter"
-            className="nav-dim hover:text-red-400 text-sm px-1 shrink-0 transition-colors"
-          >
-            ↪
-          </button>
-        </div>
-      </div>
-    </nav>
+          );
+        })}
+      </nav>
+    </>
   );
 }

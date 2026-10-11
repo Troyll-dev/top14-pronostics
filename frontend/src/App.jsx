@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import Navbar from './components/Navbar';
+import Navbar, { RESERVE_BARRE_BAS } from './components/Navbar';
 import JoueursDecor from './components/JoueursDecor';
 import MiseAJour from './components/MiseAJour';
 import WelcomePage from './pages/WelcomePage';
@@ -110,6 +110,26 @@ function AppRoutes() {
           <Route path="/admin" element={<PrivateRoute><AdminPage /></PrivateRoute>} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
+
+        {/* Le vide sous le contenu, pour la barre d'onglets du bas.
+
+            Elle est `fixed` : elle ne pousse donc rien et se pose par-dessus ce
+            qui finit la page. Sans cette reserve, le dernier match de chaque
+            liste et le dernier message du Comptoir passent dessous — visibles a
+            moitie, et surtout incochables, ce qui est la forme la plus agacante
+            du defaut puisqu'on voit la case qu'on n'arrive pas a atteindre.
+
+            Un bloc vide plutot qu'un `padding-bottom` sur le conteneur : la
+            hauteur depend de `env(safe-area-inset-bottom)`, qu'une classe
+            Tailwind ne sait pas exprimer, et il fallait pouvoir l'annuler
+            au-dessus de `lg` ou la barre du bas n'existe pas — ce qu'un style
+            en ligne ne sait pas faire. `lg:hidden` sur un bloc regle les deux
+            d'un coup.
+
+            La hauteur vient de `Navbar.jsx`, qui la definit pour la barre
+            elle-meme. Les deux ne peuvent donc pas se desaccorder : si la barre
+            grandit un jour, ce vide grandit avec elle. */}
+        {user && <div className="lg:hidden" style={{ height: RESERVE_BARRE_BAS }} />}
       </div>
     </div>
   );
