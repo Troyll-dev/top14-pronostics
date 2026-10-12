@@ -30,6 +30,15 @@ function depuis(iso) {
   return `il y a ${j} jour${j > 1 ? 's' : ''}`;
 }
 
+/** « il y a 12 min », « il y a 3 h », « il y a 2 jours ». */
+function duree(min) {
+  if (min == null) return '';
+  if (min < 60) return `il y a ${min} min`;
+  const h = Math.round(min / 60);
+  if (h < 48) return `il y a ${h} h`;
+  return `il y a ${Math.round(h / 24)} jours`;
+}
+
 /**
  * La pastille d'état.
  *
@@ -164,9 +173,9 @@ function EtatDuSite() {
                   {!t.suivie && (
                     <span className="text-slate-600"> · sans seuil, normal hors saison</span>
                   )}
-                  {t.etat === 'attente' && (
+                  {t.etat === 'attente' && t.suivie && (
                     <span className="text-slate-600">
-                      {' '}· serveur redémarré il y a {t.depuisDemarrage} h
+                      {' '}· serveur redémarré {duree(t.minutesDeMarche)}
                     </span>
                   )}
                 </p>

@@ -66,11 +66,24 @@ async function taches() {
      * qui laisserait croire a une verification qui n'a pas lieu.
      */
     const marche = journal.joursDeMarche();
-    const tropTot = seuil !== null && marche < seuil;
+
+    /**
+     * Une tache sans seuil ne peut jamais etre « jamais vue ».
+     *
+     * C'est le cas des resultats : ils n'enregistrent une reussite que
+     * lorsqu'ils ont reellement travaille, donc hors week-end de championnat
+     * leur ligne reste vide — pendant toute une treve si besoin. Les peindre en
+     * rouge serait signaler comme panne le fonctionnement normal.
+     *
+     * La regle generale : on ne reproche un silence qu'a une tache dont on
+     * attend quelque chose a une date connue. Sans seuil, pas d'attente, donc
+     * pas de reproche.
+     */
+    const sansAttente = seuil === null || marche < seuil;
 
     let etat = 'ok';
     if (e?.lastErrorAt && (!e.lastSuccessAt || e.lastErrorAt > e.lastSuccessAt)) etat = 'echec';
-    else if (!e?.lastSuccessAt) etat = tropTot ? 'attente' : 'jamais';
+    else if (!e?.lastSuccessAt) etat = sansAttente ? 'attente' : 'jamais';
     else if (seuil !== null && jours !== null && jours > seuil) etat = 'retard';
 
     return {
@@ -80,7 +93,7 @@ async function taches() {
       suivie: seuil !== null,
       seuil,
       jours,
-      depuisDemarrage: Math.round(journal.joursDeMarche() * 24 * 10) / 10,
+      minutesDeMarche: Math.round(journal.joursDeMarche() * 24 * 60),
       lastSuccessAt: e?.lastSuccessAt || null,
       lastErrorAt: e?.lastErrorAt || null,
       lastError: e?.lastError || null,

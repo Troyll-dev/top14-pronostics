@@ -52,6 +52,7 @@ const LIBELLES = {
   compositions: 'Compositions d\'equipe',
   statistiques: 'Statistiques des clubs',
   horaires: 'Horaires et diffuseurs',
+  rappels: 'Rappels du vendredi',
   bilan: 'Bilan du lundi',
 };
 
