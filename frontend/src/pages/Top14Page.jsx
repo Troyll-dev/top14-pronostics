@@ -5,6 +5,7 @@ import api from '../api/client';
 import TeamCrest from '../components/TeamCrest';
 import { matchState, STATE, STATE_CHIP, useNow } from '../utils/matchState';
 import SelecteurJournee from '../components/SelecteurJournee';
+import Bandeau from '../components/Bandeau';
 
 function ResultDot({ res }) {
   const cls = {
@@ -269,6 +270,25 @@ export default function Top14Page() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
+      {/* Le bandeau du championnat.
+
+          Quatrième page à en porter un, après Bienvenue, Accueil et Classement,
+          et le composant est le même — c'est tout l'intérêt de l'avoir sorti de
+          WelcomePage : le masque en dégradé, l'arrondi à partir de `sm` et la
+          proportion 16/9 sont écrits une seule fois.
+
+          L'image d'origine était panoramique, du 2,67/1. On en a donc perdu un
+          tiers pour tenir dans le 16/9 des trois autres bandeaux, et c'est le
+          cadrage central qui a été retenu : il garde les deux écrans entiers —
+          le classement et les résultats, qui sont le sujet de cette page-ci —
+          et les deux tablées. Les cadrages de bord gardaient l'enseigne ou le
+          chien, mais coupaient un écran.
+
+          Garder l'image entière aurait demandé une proportion particulière pour
+          cette page : c'est précisément ce qui ferait qu'on ne reconnaîtrait
+          plus le même bandeau d'une page à l'autre. */}
+      <Bandeau nom="championnat-pub" className="mb-5" />
+
       <h1 className="font-display text-[26px] font-extrabold leading-none mb-1">Le championnat</h1>
       <p className="text-xs italic text-slate-500 mb-5">
         Saison {data?.season || '2026-2027'}
