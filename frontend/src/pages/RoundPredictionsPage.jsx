@@ -41,15 +41,30 @@ import IconeAffiche from '../components/IconeAffiche';
  * marqué » mais autre chose : la performance rare de la journée, qu'on veut
  * repérer d'un bout à l'autre du tableau.
  *
- * Le score exact est le seul fond **saturé** du tableau, blanc sur bleu vif :
- * les trois autres cases sont des pastels, donc celle-là saute aux yeux sans
- * qu'on la cherche. C'est voulu — une récompense rare doit se voir de loin, et
- * un pastel de plus se serait fondu dans les autres.
+ * La palette a été reprise : quatre teintes franches à la place des pastels.
+ * Les pastels tenaient leur promesse — ils se distinguaient — mais ils
+ * donnaient au tableau l'air d'une feuille de calcul, là où c'est la page qu'on
+ * ouvre le lundi matin pour savoir qui a gagné.
  *
- * Mesuré : contraste du texte 5,2 / 5,6 / 7,5 / 5,3 (seuil 4,5) et écart
- * perceptif entre fonds de 42 au minimum, sur une échelle où 20 suffit à parler
- * de teintes franchement différentes. Le bleu vif est à 92 de la case la plus
- * proche, autrement dit hors de toute confusion possible.
+ * Le rouge, le vert, le bleu et l'or se suivent maintenant du pire au meilleur,
+ * et l'or du score exact renvoie à l'or de l'étoile de l'affiche — les deux
+ * disent la même chose, « voilà ce qui rapporte le plus ».
+ *
+ * Le bleu a d'abord été un turquoise, et il a été changé parce qu'une nuance de
+ * vert ne dit pas « mieux que le vert » : deux teintes voisines se lisent comme
+ * deux variantes, pas comme deux rangs. Il faut quitter la famille pour que
+ * l'échelle se voie.
+ *
+ * L'encre est sombre sur les quatre, et ce n'est pas un choix de goût : mesuré,
+ * du blanc dessus donnerait 2,0 à 4,0 de contraste, c'est-à-dire illisible à
+ * partiellement lisible. L'encre sombre donne 4,8 / 5,8 / 6,0 / 9,4, toutes
+ * au-dessus du seuil de 4,5. Le rouge est la plus juste des quatre, et c'est
+ * normal : c'est le fond le plus sombre.
+ *
+ * Une limite à connaître : le rouge et le vert ont des luminosités proches, et
+ * une personne daltonienne — c'est un homme sur douze — peut les confondre. Ce
+ * qui sauve le tableau est que chaque case porte son gain en chiffres sous le
+ * score : la couleur accélère la lecture, elle ne la porte pas seule.
  *
  * Le repli sur `points` couvre les pronostics d'avant les multiplicateurs, dont
  * `basePoints` est nul : à cette époque les deux valeurs étaient égales.
@@ -62,10 +77,10 @@ import IconeAffiche from '../components/IconeAffiche';
 const OMBRE_COLONNE = '6px 0 8px -6px rgba(0,0,0,.45)';
 
 const CELLULE = {
-  3: { background: '#2563eb', color: '#ffffff', fontWeight: 800 },  // bleu vif    score exact
-  2: { background: '#4ade80', color: '#064e3b', fontWeight: 700 },  // vert franc  bon vainqueur, ecart proche
-  1: { background: '#bbf7d0', color: '#14532d', fontWeight: 700 },  // vert pale   bon vainqueur
-  0: { background: '#fca5a5', color: '#7f1d1d', fontWeight: 600 },  // rouge pale  rate
+  3: { background: '#E8AD35', color: '#0b1020', fontWeight: 800 },  // or        score exact
+  2: { background: '#648FE5', color: '#0b1020', fontWeight: 700 },  // bleu      bon vainqueur, ecart proche
+  1: { background: '#38A169', color: '#0b1020', fontWeight: 700 },  // vert      bon vainqueur
+  0: { background: '#D9534F', color: '#0b1020', fontWeight: 600 },  // rouge     rate
 };
 
 // Pronostic posé, match pas encore joué : neutre et discret, il n'y a rien à
