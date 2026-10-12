@@ -50,18 +50,27 @@ async function taches() {
      *
      *   echec    la derniere nouvelle est une erreur. On a un message.
      *   retard   elle a reussi, mais il y a trop longtemps.
-     *   jamais   rien, jamais. Sur un serveur qui tourne depuis des semaines,
-     *            c'est le signe d'un cron qui n'a pas ete demarre — ce qui est
-     *            arrive aux rappels du vendredi, et ne se voyait nulle part.
+     *   jamais   rien, jamais, sur un serveur qui tourne depuis plus longtemps
+     *            que le seuil de la tache. C'est alors le signe d'un cron qui
+     *            n'a pas ete demarre — ce qui est arrive aux rappels du
+     *            vendredi, et ne se voyait nulle part.
+     *   attente  rien encore, mais le serveur vient de redemarrer et la tache
+     *            n'a pas eu son tour. Ce n'est pas une panne, c'est une absence
+     *            de reponse — et les deux ne se peignent pas de la meme
+     *            couleur. Apres un deploiement a 11 h, les horaires de 6 h 20
+     *            sont dans ce cas jusqu'au lendemain matin.
      *   ok       elle a reussi recemment.
      *
      * `suivie: false` pour les resultats : ils n'ont pas de seuil, leur silence
      * hors saison etant normal. L'ecran le dit plutot que d'afficher un vert
      * qui laisserait croire a une verification qui n'a pas lieu.
      */
+    const marche = journal.joursDeMarche();
+    const tropTot = seuil !== null && marche < seuil;
+
     let etat = 'ok';
-    if (!e || !e.lastSuccessAt) etat = e?.lastErrorAt ? 'echec' : 'jamais';
-    else if (e.lastErrorAt && e.lastErrorAt > e.lastSuccessAt) etat = 'echec';
+    if (e?.lastErrorAt && (!e.lastSuccessAt || e.lastErrorAt > e.lastSuccessAt)) etat = 'echec';
+    else if (!e?.lastSuccessAt) etat = tropTot ? 'attente' : 'jamais';
     else if (seuil !== null && jours !== null && jours > seuil) etat = 'retard';
 
     return {
@@ -71,6 +80,7 @@ async function taches() {
       suivie: seuil !== null,
       seuil,
       jours,
+      depuisDemarrage: Math.round(journal.joursDeMarche() * 24 * 10) / 10,
       lastSuccessAt: e?.lastSuccessAt || null,
       lastErrorAt: e?.lastErrorAt || null,
       lastError: e?.lastError || null,

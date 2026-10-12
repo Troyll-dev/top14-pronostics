@@ -45,6 +45,28 @@ const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
 
+/**
+ * L'instant ou ce processus a demarre.
+ *
+ * Il sert a une seule chose, et elle est essentielle : savoir si une question a
+ * un sens avant d'y repondre. Une tache qui passe a 6 h 20 et un serveur
+ * redemarre a 11 h donnent une ligne de journal vide — mais cette tache n'est
+ * pas en panne, elle n'a simplement pas encore eu son tour.
+ *
+ * Sans ce repere, le premier matin qui suit un deploiement fait partir une
+ * alerte annoncant cinq pannes imaginaires. Et une alerte qui se trompe une
+ * fois sur deux ne se lit plus : on la classe, et le jour ou elle dit vrai,
+ * elle est classee avec les autres. Mieux vaut se taire que crier a tort.
+ *
+ * Railway redemarre le conteneur a chaque deploiement, donc ce repere se remet
+ * a zero souvent. C'est voulu : apres un deploiement, on ne sait reellement
+ * rien de l'etat des taches tant qu'elles n'ont pas eu l'occasion de passer.
+ */
+const DEMARRAGE = new Date();
+
+/** Depuis combien de jours ce processus tourne-t-il ? */
+const joursDeMarche = (now = new Date()) => (now - DEMARRAGE) / 86400000;
+
 /** Les taches connues. Le nom sert de cle, il ne change plus une fois ecrit. */
 const TACHES = {
   SAUVEGARDE: 'sauvegarde',
@@ -236,9 +258,25 @@ async function anomalies(now = new Date()) {
   const parNom = Object.fromEntries(etats.map((e) => [e.job, e]));
   const liste = [];
 
+  const marche = joursDeMarche(now);
+
   for (const [job, seuil] of Object.entries(SEUILS_JOURS)) {
     const e = parNom[job];
     const jours = joursDepuis(e?.lastSuccessAt, now);
+
+    /**
+     * Le serveur a-t-il tourne assez longtemps pour que la question se pose ?
+     *
+     * Si non, on se tait sur le retard — mais pas sur les echecs, qui restent
+     * signales plus bas : une erreur enregistree est une erreur, quelle que
+     * soit l'anciennete du processus.
+     *
+     * Le silence dure au plus le seuil de la tache, donc deux jours pour la
+     * plupart. C'est le prix a payer pour ne jamais crier a tort, et c'est le
+     * bon prix : une tache reellement morte le reste, et sera signalee le
+     * surlendemain.
+     */
+    if (marche < seuil && !e?.lastSuccessAt) continue;
 
     if (jours === null || jours > seuil) {
       liste.push({ job, type: 'muette', jours, seuil, jamais: !e?.lastSuccessAt });
@@ -260,7 +298,7 @@ async function anomalies(now = new Date()) {
 }
 
 module.exports = {
-  TACHES, SEUILS_JOURS,
+  TACHES, SEUILS_JOURS, DEMARRAGE, joursDeMarche,
   succes, echec, passe,
   dernier, toutes,
   joursDepuis, enRetard, anomalies,

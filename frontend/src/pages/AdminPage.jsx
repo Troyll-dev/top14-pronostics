@@ -33,19 +33,33 @@ function depuis(iso) {
 /**
  * La pastille d'état.
  *
- * Quatre couleurs pour quatre situations, et le gris en vaut la peine : une
- * tâche non suivie — les résultats, qui se taisent légitimement hors saison —
- * doit se distinguer d'une tâche vérifiée et saine. Un vert là-dessus
- * laisserait croire à un contrôle qui n'a pas lieu.
+ * Cinq situations, et deux d'entre elles méritent qu'on s'y arrête.
+ *
+ * « pas encore passée », en gris : le serveur vient de redémarrer et la tâche
+ * n'a pas eu son tour. Après un déploiement à 11 h, les horaires de 6 h 20 sont
+ * dans ce cas jusqu'au lendemain matin. Ce n'est pas une panne mais une absence
+ * de réponse, et les peindre en rouge toutes les deux ferait d'un écran de
+ * surveillance un écran qu'on apprend à ignorer.
+ *
+ * « actif » sans seuil, en vert pâle : les résultats se taisent légitimement
+ * hors saison, donc aucun retard ne leur est reproché. Le dire évite de laisser
+ * croire à un contrôle qui n'a pas lieu.
  */
 function Pastille({ etat, suivie }) {
   const styles = {
     ok: 'bg-green-500/20 text-green-400 border-green-500/40',
+    attente: 'bg-slate-500/20 text-slate-400 border-slate-500/40',
     retard: 'bg-amber-500/20 text-amber-400 border-amber-500/40',
     echec: 'bg-red-500/20 text-red-400 border-red-500/40',
     jamais: 'bg-red-500/20 text-red-400 border-red-500/40',
   };
-  const mots = { ok: suivie ? 'OK' : 'actif', retard: 'en retard', echec: 'en échec', jamais: 'jamais vue' };
+  const mots = {
+    ok: suivie ? 'OK' : 'actif',
+    attente: 'pas encore passée',
+    retard: 'en retard',
+    echec: 'en échec',
+    jamais: 'jamais vue',
+  };
   return (
     <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${styles[etat]}`}>
       {mots[etat]}
@@ -127,6 +141,8 @@ function EtatDuSite() {
         </div>
         <p className="text-[11.5px] text-slate-500 mb-4">
           Une alerte part chaque matin à 9 h 07, et seulement s'il y a quelque chose à dire.
+          Une tâche qui n'a pas encore eu son tour depuis le dernier déploiement n'est pas
+          comptée comme une anomalie.
         </p>
 
         <div className="divide-y divide-slate-800">
@@ -147,6 +163,11 @@ function EtatDuSite() {
                   )}
                   {!t.suivie && (
                     <span className="text-slate-600"> · sans seuil, normal hors saison</span>
+                  )}
+                  {t.etat === 'attente' && (
+                    <span className="text-slate-600">
+                      {' '}· serveur redémarré il y a {t.depuisDemarrage} h
+                    </span>
                   )}
                 </p>
                 {t.lastError && (
