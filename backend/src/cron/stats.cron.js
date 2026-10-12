@@ -1,5 +1,6 @@
 const cron = require('node-cron');
 const { syncStats } = require('../services/team-stats.service');
+const journal = require('../services/job-log.service');
 
 /**
  * Deux passes par jour, heure de Paris.
@@ -19,6 +20,25 @@ const { syncStats } = require('../services/team-stats.service');
  *
  * Une page de match joue ne changeant plus, chaque rencontre n'est lue qu'une
  * fois dans toute la saison : hors week-end cette passe ne fait rien du tout.
+ *
+ * ---------------------------------------------------------------------------
+ * CE QUI SE JOURNALISE, ET POURQUOI
+ * ---------------------------------------------------------------------------
+ *
+ * Cette tache est celle qui a donne son nom au probleme : trois matchs
+ * manquaient depuis la premiere journee, les moyennes de huit clubs sur
+ * quatorze etaient fausses, et l'erreur s'est signalee pendant cinq semaines
+ * dans une console que personne ne lit. Les journaux de Railway disparaissent
+ * au redemarrage du conteneur ; une ligne en base, non.
+ *
+ * `journal.passe` enregistre donc chaque passage. Une passe qui n'avait rien a
+ * lire compte comme une reussite : c'est ce qui permet de distinguer une tache
+ * muette parce qu'il n'y a rien a faire d'une tache muette parce qu'elle ne
+ * tourne plus — la seule question que la surveillance ait a trancher.
+ *
+ * Et `r.ok` a faux leve : le service avait signale l'erreur a la console et
+ * rendu la main comme si de rien n'etait, donc l'echec restait invisible. En
+ * levant, il devient une ligne d'echec en base, et l'alerte du matin le dira.
  */
 const HORAIRE = process.env.STATS_CRON || '43 7,23 * * *';
 
@@ -30,16 +50,14 @@ function startStatsCron() {
 
   cron.schedule(
     HORAIRE,
-    async () => {
-      try {
+    () =>
+      journal.passe(journal.TACHES.STATISTIQUES, async () => {
         const r = await syncStats();
-        if (r.reason) return;   // rien a lire : le cas courant, inutile de bavarder
+        if (r.reason) return { rien: r.reason };   // le cas courant, inutile de bavarder
         for (const c of r.changes) console.log(`[stats] ${c}`);
-        if (!r.ok) console.error('[stats] la passe s\'est terminee en erreur — voir au-dessus');
-      } catch (err) {
-        console.error('[stats] ECHEC :', err.message);
-      }
-    },
+        if (!r.ok) throw new Error('la passe s\'est terminee en erreur — voir les journaux');
+        return { changements: r.changes.length };
+      }),
     { timezone: 'Europe/Paris' }
   );
 

@@ -22,6 +22,7 @@ const { startScheduleCron } = require('./cron/schedule.cron');
 const { startRecapCron } = require('./cron/recap.cron');
 const { startCompositionCron } = require('./cron/composition.cron');
 const { startStatsCron } = require('./cron/stats.cron');
+const { startSanteCron } = require('./cron/sante.cron');
 
 const app = express();
 
@@ -89,6 +90,21 @@ app.listen(PORT, () => {
   startRecapCron();
   startCompositionCron();
   startStatsCron();
+
+  /**
+   * Et la tache qui surveille les autres.
+   *
+   * Elle est volontairement la derniere : elle ne produit rien, elle lit le
+   * journal que les precedentes remplissent et ecrit a l'administrateur quand
+   * l'une d'elles ne va pas. Rien ne part tant que tout va bien.
+   *
+   * Elle corrige le defaut qui a laisse le bug des statistiques vivre cinq
+   * semaines : une panne qui se signale dans un journal que personne ne lit ne
+   * se signale pas. L'oubli d'un appel dans cette liste meme — ce qui est deja
+   * arrive — devient d'ailleurs visible par ce biais, puisqu'une tache jamais
+   * demarree n'enregistre jamais rien.
+   */
+  startSanteCron();
 
   // Les liens de desinscription ont besoin d'un secret pour etre signes et de
   // l'adresse publique de l'API pour etre absolus. S'il en manque un, les

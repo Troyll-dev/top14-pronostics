@@ -1,5 +1,6 @@
 const cron = require('node-cron');
 const { syncCompositions } = require('../services/composition-sync.service');
+const journal = require('../services/job-log.service');
 
 /**
  * Quatre lectures par jour, heure de Paris.
@@ -20,6 +21,10 @@ const { syncCompositions } = require('../services/composition-sync.service');
  *
  * Aucun risque d'abimer un resultat : ce service n'ecrit que `composition` et
  * `compositionAt`, jamais sur une rencontre terminee.
+ *
+ * Chaque passage s'enregistre dans le journal, y compris quand il n'y a rien a
+ * lire : hors saison cette tache est muette pendant des mois, et sans cette
+ * trace on ne saurait pas distinguer « rien a faire » de « ne tourne plus ».
  */
 const HORAIRE = process.env.COMPOSITIONS_CRON || '17 8,12,18,22 * * *';
 
@@ -31,16 +36,14 @@ function startCompositionCron() {
 
   cron.schedule(
     HORAIRE,
-    async () => {
-      try {
+    () =>
+      journal.passe(journal.TACHES.COMPOSITIONS, async () => {
         const r = await syncCompositions();
-        if (r.reason) return console.log(`[compositions] ${r.reason}`);
+        if (r.reason) return { rien: r.reason };
         for (const c of r.changes) console.log(`[compositions] ${c}`);
-        if (!r.ok) console.error('[compositions] la passe s\'est terminee en erreur — voir au-dessus');
-      } catch (err) {
-        console.error('[compositions] ECHEC :', err.message);
-      }
-    },
+        if (!r.ok) throw new Error('la passe s\'est terminee en erreur — voir les journaux');
+        return { changements: r.changes.length };
+      }),
     { timezone: 'Europe/Paris' }
   );
 

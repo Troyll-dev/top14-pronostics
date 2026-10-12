@@ -1,5 +1,6 @@
 const cron = require('node-cron');
 const { envoyerRecap } = require('../services/recap.service');
+const journal = require('../services/job-log.service');
 
 /**
  * Lundi 8 h, heure de Paris.
@@ -17,6 +18,16 @@ const { envoyerRecap } = require('../services/recap.service');
  * la base, pas par le calendrier.
  *
  * Pour changer l'heure, une seule ligne — et la syntaxe est « minute heure ».
+ *
+ * Le passage s'enregistre meme quand il n'y a rien a raconter : c'est ce qui
+ * distingue un lundi de treve d'un bilan qui ne part plus. Le seuil d'alerte
+ * est a neuf jours, donc un lundi manque se voit des le mardi suivant.
+ *
+ * Les erreurs d'envoi individuelles — un joueur dont l'adresse rebondit — ne
+ * font pas echouer la tache : le bilan est parti aux sept autres, et declarer
+ * la passe en echec ferait croire que personne n'a rien recu. Elles restent
+ * dans le detail de la ligne, consultable quand on cherche pourquoi un tel ne
+ * recoit rien.
  */
 function startRecapCron() {
   if (process.env.RECAP === 'off') {
@@ -26,20 +37,26 @@ function startRecapCron() {
 
   cron.schedule(
     '0 8 * * 1',
-    async () => {
-      try {
+    () =>
+      journal.passe(journal.TACHES.BILAN, async () => {
         const r = await envoyerRecap();
-        if (r.raison) return console.log(`[bilan] ${r.raison}`);
+        if (r.raison) {
+          console.log(`[bilan] ${r.raison}`);
+          return { rien: r.raison };
+        }
         console.log(
           `[bilan] J${r.round} : ${r.envoyes.length} envoye(s)` +
           (r.ignores.length ? `, ${r.ignores.length} ignore(s)` : '') +
           (r.erreurs.length ? `, ${r.erreurs.length} erreur(s)` : '')
         );
         for (const e of r.erreurs) console.error(`[bilan] ${e}`);
-      } catch (err) {
-        console.error('[bilan] ECHEC :', err.message);
-      }
-    },
+        return {
+          journee: r.round,
+          envoyes: r.envoyes.length,
+          ignores: r.ignores.length,
+          erreurs: r.erreurs,
+        };
+      }),
     { timezone: 'Europe/Paris' }
   );
 

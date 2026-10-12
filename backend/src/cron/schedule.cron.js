@@ -1,5 +1,6 @@
 const cron = require('node-cron');
 const { syncSchedule } = require('../services/schedule-sync.service');
+const journal = require('../services/job-log.service');
 
 /**
  * Tous les jours a 6 h 20, heure de Paris.
@@ -15,6 +16,11 @@ const { syncSchedule } = require('../services/schedule-sync.service');
  *
  * La minute n'est pas ronde a dessein : les taches programmees a l'heure pile
  * se bousculent, et celle-ci n'a aucune raison d'attendre son tour.
+ *
+ * C'est la tache dont le silence est le plus dangereux : un horaire perime
+ * ferme la saisie des pronostics au mauvais moment, et rien a l'ecran ne dit
+ * que l'horaire affiche date d'il y a trois semaines. Elle passe une fois par
+ * jour, le seuil d'alerte est donc a deux jours.
  */
 function startScheduleCron() {
   if (process.env.HORAIRES === 'off') {
@@ -24,15 +30,13 @@ function startScheduleCron() {
 
   cron.schedule(
     '20 6 * * *',
-    async () => {
-      try {
+    () =>
+      journal.passe(journal.TACHES.HORAIRES, async () => {
         const r = await syncSchedule();
-        if (r.reason) return console.log(`[horaires] ${r.reason}`);
+        if (r.reason) return { rien: r.reason };
         for (const c of r.changes) console.log(`[horaires] ${c}`);
-      } catch (err) {
-        console.error('[horaires] ECHEC :', err.message);
-      }
-    },
+        return { changements: r.changes.length };
+      }),
     { timezone: 'Europe/Paris' }
   );
 

@@ -1,6 +1,7 @@
 const cron = require('node-cron');
 const { syncResults, shouldSync } = require('../services/results-sync.service');
 const { syncStandings, etatFraicheur } = require('../services/standings.service');
+const journal = require('../services/job-log.service');
 
 /**
  * Suivi des scores pendant les matchs.
@@ -49,6 +50,22 @@ function startResultsCron() {
   cron.schedule(
     RYTHME,
     async () => {
+      /**
+       * Celle-ci ne passe pas par `journal.passe`, et c'est le seul cas.
+       *
+       * Elle se declenche toutes les trois minutes, soit cinq cents fois par
+       * jour, et n'a rien a faire la plupart du temps. Enregistrer chacun de ces
+       * passages voudrait dire cinq cents ecritures quotidiennes pour une ligne
+       * dont on ne lit qu'une date — et surtout, ce serait inutile : ce qu'on
+       * veut savoir d'une tache si frequente, c'est si elle echoue, pas si elle
+       * a tourne il y a trois minutes.
+       *
+       * On n'enregistre donc une reussite que lorsqu'elle a reellement
+       * travaille. En consequence, cette tache n'a pas de seuil de retard dans
+       * la surveillance : son silence pendant la treve est normal. C'est le
+       * recalcul du classement, trois fois par jour et dans le meme processus,
+       * qui signale un serveur qui ne tourne plus.
+       */
       try {
         if (!(await shouldSync())) return;
 
@@ -62,8 +79,14 @@ function startResultsCron() {
           );
           await syncStandings();
         }
+
+        await journal.succes(journal.TACHES.RESULTATS, {
+          comptees: etat.comptees,
+          termines: etat.termines,
+        });
       } catch (err) {
         console.error('[cron] erreur resultats :', err.message);
+        await journal.echec(journal.TACHES.RESULTATS, err);
       }
     },
     { timezone: 'Europe/Paris' }
@@ -76,16 +99,14 @@ function startResultsCron() {
    * synchronisation — une correction a la main, par exemple — et donc sans
    * declencher le recalcul ci-dessus. Les minutes ne sont pas rondes a
    * dessein : les taches programmees a l'heure pile se bousculent.
+   *
+   * C'est aussi lui qui sert de pouls au serveur : il passe tous les jours,
+   * saison ou treve, et son silence pendant plus de deux jours veut dire que
+   * quelque chose de bien plus large qu'une source de donnees est tombe.
    */
   cron.schedule(
     '17 8,13,23 * * *',
-    async () => {
-      try {
-        await syncStandings();
-      } catch (err) {
-        console.error('[cron] erreur classement :', err.message);
-      }
-    },
+    () => journal.passe(journal.TACHES.CLASSEMENT, () => syncStandings()),
     { timezone: 'Europe/Paris' }
   );
 

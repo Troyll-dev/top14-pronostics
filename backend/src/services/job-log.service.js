@@ -9,7 +9,7 @@
  * d'avant.
  *
  * Une ligne par tache, ecrasee a chaque passage. On ne garde pas l'historique :
- * ce qu'on veut savoir, c'est l'etat presente, et un historique qu'on ne
+ * ce qu'on veut savoir, c'est l'etat present, et un historique qu'on ne
  * consulte jamais est une table qui grossit pour rien.
  *
  * Trois principes.
@@ -25,6 +25,20 @@
  * Et il tolere que la table n'existe pas encore. Entre le deploiement du code et
  * le passage du SQL, elle sera absente pendant quelques minutes. Pendant ce
  * temps le journal se tait au lieu de faire tomber ce qu'il observe.
+ *
+ * ---------------------------------------------------------------------------
+ * CE QUE « REUSSITE » VEUT DIRE ICI
+ * ---------------------------------------------------------------------------
+ *
+ * Une passe qui s'execute sans lever est une reussite, **meme si elle n'a rien
+ * trouve a faire**. C'est voulu, et c'est ce qui rend la surveillance possible.
+ *
+ * Si l'on n'enregistrait que les passes ayant change quelque chose, une tache
+ * muette serait indistinguable d'une tache morte : hors saison, les
+ * compositions n'ont rien a lire pendant trois mois, et on ne saurait pas si
+ * c'est normal ou si le cron ne tourne plus. En notant chaque passage, le
+ * journal repond a la question qui compte — la tache s'execute-t-elle encore ?
+ * — et le detail dit ce qu'elle a trouve.
  */
 
 const { PrismaClient } = require('@prisma/client');
@@ -38,7 +52,40 @@ const TACHES = {
   CLASSEMENT: 'classement',
   COMPOSITIONS: 'compositions',
   STATISTIQUES: 'statistiques',
+  HORAIRES: 'horaires',
   BILAN: 'bilan',
+};
+
+/**
+ * Au bout de combien de jours sans reussite une tache est-elle en panne ?
+ *
+ * Un seuil par tache, parce qu'elles n'ont pas le meme rythme, et toujours plus
+ * large que l'intervalle normal : un seuil trop serre produit de fausses
+ * alertes, et une alerte a laquelle on ne croit plus ne sert a rien.
+ *
+ *   sauvegarde    passe le lundi et le samedi ; plus grand intervalle normal
+ *                 cinq jours (lundi -> samedi), donc huit.
+ *   horaires      une fois par jour, donc deux.
+ *   compositions  quatre fois par jour, donc deux.
+ *   statistiques  deux fois par jour, donc deux.
+ *   classement    trois fois par jour par le filet de securite, donc deux.
+ *   bilan         le lundi, mais il ne dit rien les semaines sans journee
+ *                 terminee — il enregistre quand meme son passage, donc neuf.
+ *
+ * `resultats` n'a volontairement pas de seuil. La passe ne fait rien hors
+ * week-end de championnat, et n'enregistre donc une reussite que lorsqu'elle a
+ * reellement travaille : en treve, son silence est normal et un seuil
+ * declencherait une alerte chaque semaine. Elle reste surveillee par ses
+ * echecs, et le classement — qui passe trois fois par jour dans le meme
+ * processus — signale de toute facon un serveur qui ne tourne plus.
+ */
+const SEUILS_JOURS = {
+  [TACHES.SAUVEGARDE]: 8,
+  [TACHES.HORAIRES]: 2,
+  [TACHES.COMPOSITIONS]: 2,
+  [TACHES.STATISTIQUES]: 2,
+  [TACHES.CLASSEMENT]: 2,
+  [TACHES.BILAN]: 9,
 };
 
 /**
@@ -97,6 +144,30 @@ async function echec(job, err) {
   );
 }
 
+/**
+ * Enveloppe une passe : elle enregistre son resultat sans qu'on y pense.
+ *
+ * Ecrite parce que les six crons repetaient tous le meme `try / catch /
+ * journal.succes / journal.echec`, et qu'une repetition de cette sorte finit
+ * toujours par etre oubliee dans le septieme. Ici, instrumenter une nouvelle
+ * tache tient en une ligne.
+ *
+ * Elle ne relance pas l'erreur : un cron n'a personne a qui la rendre, et une
+ * exception non rattrapee dans un `setInterval` fait tomber le processus. Elle
+ * la journalise, l'ecrit en base, et la passe suivante retentera.
+ */
+async function passe(job, action) {
+  try {
+    const r = await action();
+    await succes(job, r && typeof r === 'object' ? r : undefined);
+    return r;
+  } catch (err) {
+    console.error(`[${job}] ECHEC :`, err.message);
+    await echec(job, err);
+    return null;
+  }
+}
+
 /** L'etat d'une tache, ou `null` si elle n'a jamais rien enregistre. */
 async function dernier(job) {
   return sansBruit(`lecture ${job}`, () => prisma.jobRun.findUnique({ where: { job } }));
@@ -135,4 +206,58 @@ function enRetard(etat, seuilJours) {
   return j === null || j > seuilJours;
 }
 
-module.exports = { TACHES, succes, echec, dernier, toutes, joursDepuis, enRetard };
+/**
+ * Ce qui ne va pas, en ce moment.
+ *
+ * Deux sortes d'anomalies, et il faut les distinguer parce qu'elles ne se
+ * reparent pas pareil :
+ *
+ *   « echec »  la tache tourne mais se termine en erreur. On a un message, donc
+ *              une piste. C'est le cas facile.
+ *
+ *   « muette » la tache n'a rien enregistre depuis trop longtemps. Soit le cron
+ *              ne se declenche plus, soit le serveur a redemarre sans relancer
+ *              la tache, soit l'appel a ete oublie dans `app.js` — ce qui est
+ *              deja arrive avec les rappels du vendredi. Pas de message
+ *              d'erreur, et c'est justement pour ca que ce cas-la ne se voyait
+ *              nulle part.
+ *
+ * Une tache jamais enregistree est muette, pas absente : sur un serveur qui
+ * tourne depuis plus longtemps que le plus grand des seuils, ne jamais avoir
+ * rien ecrit est une panne en soi. Le rapport dit quand meme « jamais », pour
+ * qu'on ne cherche pas une regression la ou il n'y a qu'un premier demarrage.
+ */
+async function anomalies(now = new Date()) {
+  const etats = await toutes();
+  const parNom = Object.fromEntries(etats.map((e) => [e.job, e]));
+  const liste = [];
+
+  for (const [job, seuil] of Object.entries(SEUILS_JOURS)) {
+    const e = parNom[job];
+    const jours = joursDepuis(e?.lastSuccessAt, now);
+
+    if (jours === null || jours > seuil) {
+      liste.push({ job, type: 'muette', jours, seuil, jamais: !e?.lastSuccessAt });
+      continue;
+    }
+    if (e?.lastErrorAt && (!e.lastSuccessAt || e.lastErrorAt > e.lastSuccessAt)) {
+      liste.push({ job, type: 'echec', message: e.lastError, quand: e.lastErrorAt });
+    }
+  }
+
+  // Les resultats n'ont pas de seuil (voir SEUILS_JOURS) mais leurs echecs
+  // comptent comme ceux des autres.
+  const r = parNom[TACHES.RESULTATS];
+  if (r?.lastErrorAt && (!r.lastSuccessAt || r.lastErrorAt > r.lastSuccessAt)) {
+    liste.push({ job: TACHES.RESULTATS, type: 'echec', message: r.lastError, quand: r.lastErrorAt });
+  }
+
+  return liste;
+}
+
+module.exports = {
+  TACHES, SEUILS_JOURS,
+  succes, echec, passe,
+  dernier, toutes,
+  joursDepuis, enRetard, anomalies,
+};
