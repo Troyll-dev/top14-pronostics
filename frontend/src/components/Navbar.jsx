@@ -263,12 +263,22 @@ export default function Navbar() {
               <IconeNav nom={admin.icone} taille={22} />
             </Link>
 
+            {/* Le bouton de theme montre la destination, pas l'etat courant :
+                en theme nuit il affiche le soleil, parce qu'un bouton promet
+                ce qu'il va faire. C'etait deja le cas avec les emojis, et c'est
+                la seule convention qui ne se discute pas — un interrupteur
+                marque « allumer » quand la lumiere est eteinte.
+
+                Les emojis ☀️ et 🌙 cedent la place a deux dessins du site. Un
+                emoji n'est pas dessine par la page mais par le systeme : il
+                n'avait donc pas le meme trait sur un iPhone, sur Android et sur
+                Windows, et surtout pas celui du reste de la barre. */}
             <button
               onClick={toggleTheme}
               title={theme === 'nuit' ? 'Passer en clair' : 'Passer en sombre'}
-              className="nav-dim hover:bg-white/10 rounded-md px-1.5 sm:px-2 py-1.5 text-sm transition-colors"
+              className="hover:bg-white/10 rounded-md px-1 py-1 transition-colors"
             >
-              {theme === 'nuit' ? '☀️' : '🌙'}
+              <IconeNav nom={theme === 'nuit' ? 'soleil' : 'lune'} taille={22} />
             </button>
 
             {/* La pastille mène au profil : c'est l'endroit où on la cherche. */}
