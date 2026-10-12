@@ -53,6 +53,7 @@ const TACHES = {
   COMPOSITIONS: 'compositions',
   STATISTIQUES: 'statistiques',
   HORAIRES: 'horaires',
+  RAPPELS: 'rappels',
   BILAN: 'bilan',
 };
 
@@ -69,6 +70,8 @@ const TACHES = {
  *   compositions  quatre fois par jour, donc deux.
  *   statistiques  deux fois par jour, donc deux.
  *   classement    trois fois par jour par le filet de securite, donc deux.
+ *   rappels       le vendredi, et il ne dit rien les semaines sans journee a
+ *                 venir — il enregistre quand meme son passage, donc neuf.
  *   bilan         le lundi, mais il ne dit rien les semaines sans journee
  *                 terminee — il enregistre quand meme son passage, donc neuf.
  *
@@ -85,6 +88,7 @@ const SEUILS_JOURS = {
   [TACHES.COMPOSITIONS]: 2,
   [TACHES.STATISTIQUES]: 2,
   [TACHES.CLASSEMENT]: 2,
+  [TACHES.RAPPELS]: 9,
   [TACHES.BILAN]: 9,
 };
 
