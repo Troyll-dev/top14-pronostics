@@ -210,15 +210,46 @@ export default function Navbar() {
               `Link` desactive — un lien qu'on neutralise reste focalisable au
               clavier et garde son curseur de main, donc il promet encore
               quelque chose. */}
-          {/* `whitespace-nowrap` : a exactement 1024 pixels de large — le seuil
+          {/* L'enseigne ramene a l'accueil.
+
+              Elle ne l'a pas toujours fait, et les deux decisions etaient
+              bonnes a leur moment — ce qui merite d'etre consigne, sinon
+              quelqu'un refera le chemin dans un sens ou dans l'autre.
+
+              Elle etait un `span` tant que les onglets vivaient dans cette
+              barre : « Accueil » etait son voisin immediat, nomme et allume
+              quand on y est. Deux chemins cote a cote vers la meme page, dont
+              un muet, c'etait un de trop — et un titre cliquable sans rien qui
+              l'indique est une promesse qu'on ne tient qu'a moitie.
+
+              Les onglets sont descendus en bas sur telephone : l'enseigne est
+              desormais seule dans son coin, et ce coin-la est l'endroit ou tout
+              le monde clique pour revenir au debut. La convention est si
+              repandue qu'elle n'a pas besoin d'etre apprise, et elle met le
+              retour a l'accueil a portee du pouce sans rien coûter a la barre
+              du bas.
+
+              Sur grand ecran l'onglet « Accueil » reste a cote, donc la
+              redondance revient — mais elle ne gene plus : c'est la meme
+              redondance que sur tous les sites, et personne ne s'en est jamais
+              plaint.
+
+              `hover:opacity-80` plutot qu'un fond au survol : l'enseigne n'est
+              pas un onglet et ne doit pas se mettre a leur ressembler.
+
+              `whitespace-nowrap` : a exactement 1024 pixels de large — le seuil
               `lg` lui-meme —, les sept onglets avec leurs libelles remplissent
               la barre au pixel pres, et « Top 14 Pronos » se repliait alors sur
               deux lignes, ce qui etirait la barre. Personne n'a un ecran de
               1024 pile, mais une fenetre redimensionnee y passe. */}
-          <span className="nav-tx font-display font-bold text-base tracking-wide flex items-center gap-2 shrink-0 select-none whitespace-nowrap">
+          <Link
+            to="/"
+            title="Retour à l'accueil"
+            className="nav-tx font-display font-bold text-base tracking-wide flex items-center gap-2 shrink-0 select-none whitespace-nowrap rounded-md hover:opacity-80 transition-opacity"
+          >
             <IconeNav nom="logo" taille={24} />
             <span>Top 14 Pronos</span>
-          </span>
+          </Link>
 
           {/* Les onglets, a partir de `lg` seulement.
               Plus de `overflow-x-auto` ni de `min-w-0` : la bande defilante
