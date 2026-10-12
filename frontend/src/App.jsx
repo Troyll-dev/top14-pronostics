@@ -17,6 +17,8 @@ import ProfilePage from './pages/ProfilePage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import AdminPage from './pages/AdminPage';
+import ConfirmerEmailPage from './pages/ConfirmerEmailPage';
+import BandeauVerification from './components/BandeauVerification';
 
 /**
  * Remonter en haut a chaque changement de page.
@@ -78,6 +80,15 @@ function AppRoutes() {
 
       {user && <Navbar />}
 
+      {/* Le rappel de confirmation d'adresse.
+
+          Juste sous la barre de navigation, et non dans une page : il concerne
+          le compte, pas l'endroit ou l'on se trouve, et il doit se voir quelle
+          que soit la page ouverte. Il ne rend rien tant que l'adresse est
+          confirmee — c'est-a-dire, apres la migration, pour tout le monde sauf
+          les futures inscriptions. */}
+      {user && <BandeauVerification />}
+
       {/* Le filigrane est fixe en z-0 : le contenu doit donc etre eleve
           au-dessus, sans quoi il passerait derriere les joueurs. */}
       {user && <JoueursDecor />}
@@ -100,6 +111,11 @@ function AppRoutes() {
               arrive souvent depuis un autre appareil. */}
           <Route path="/mot-de-passe-oublie" element={<ForgotPasswordPage />} />
           <Route path="/reinitialiser" element={<ResetPasswordPage />} />
+
+          {/* Confirmation d'adresse : publique comme les deux lignes au-dessus,
+              et pour la meme raison — on ouvre ces liens-la depuis sa boite,
+              souvent sur un autre appareil que celui ou l'on s'est inscrit. */}
+          <Route path="/confirmer" element={<ConfirmerEmailPage />} />
           <Route path="/" element={<PrivateRoute><HomePage /></PrivateRoute>} />
           <Route path="/pronostics" element={<PrivateRoute><MatchesPage /></PrivateRoute>} />
           <Route path="/top14" element={<PrivateRoute><Top14Page /></PrivateRoute>} />

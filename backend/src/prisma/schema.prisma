@@ -18,6 +18,28 @@ model User {
   avatarRing   String?       @db.VarChar(7)   // null = liseré d'accent, "none" = aucun, sinon #RRGGBB
   createdAt    DateTime      @default(now())
 
+  /// L'adresse a-t-elle été vérifiée ?
+  ///
+  /// Une faute de frappe à l'inscription est la seule panne qui ne se signale
+  /// nulle part : le joueur ne reçoit ni rappel, ni bilan, ni lien de mot de
+  /// passe oublié, et personne ne s'en aperçoit — les courriels partent sans
+  /// erreur vers une adresse qui n'existe pas. On envoie donc un lien à
+  /// l'inscription, et tant qu'il n'est pas suivi, ce champ reste faux.
+  ///
+  /// Il ne ferme aucune porte, et c'est délibéré : entre amis, verrouiller un
+  /// compte parce que son propriétaire n'a pas cliqué sur un lien serait
+  /// absurde. Il sert à afficher un bandeau dans l'application — le seul
+  /// endroit où une adresse fautive peut être corrigée, puisque par définition
+  /// le courriel n'arrive pas — et à lister les retardataires côté
+  /// administration.
+  ///
+  /// Faux par défaut, donc pour les inscriptions à venir. Les joueurs déjà là
+  /// sont passés à vrai par la migration : leurs adresses fonctionnent, c'est
+  /// prouvé chaque vendredi, et leur poser un bandeau serait leur reprocher
+  /// une faute qu'ils n'ont pas commise.
+  emailVerifie   Boolean     @default(false)
+  emailVerifieAt DateTime?
+
   /// Ce que le joueur accepte de recevoir, et s'il joue encore.
   ///
   /// Les deux premiers sont vrais par defaut : on s'inscrit pour jouer, donc on
@@ -141,8 +163,8 @@ model Message {
   @@map("messages")
 }
 
-/// Jetons a usage unique envoyes par e-mail, pour la reinitialisation de mot
-/// de passe.
+/// Jetons a usage unique envoyes par e-mail : reinitialisation de mot de passe,
+/// et verification d'adresse a l'inscription.
 ///
 /// On ne garde que l'empreinte SHA-256 du jeton, jamais le jeton lui-meme.
 /// Ainsi une fuite de la base ne permet pas de prendre la main sur un compte,
@@ -163,6 +185,7 @@ model AuthToken {
 
 enum TokenKind {
   PASSWORD_RESET
+  EMAIL_VERIFY
 }
 
 /// Instantané du classement Top 14, relu périodiquement sur une source externe.

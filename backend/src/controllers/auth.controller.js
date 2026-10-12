@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const { PrismaClient } = require('@prisma/client');
 const { validationResult } = require('express-validator');
 const { estAdmin } = require('../middleware/admin.middleware');
+const verification = require('../services/verification.service');
 
 const prisma = new PrismaClient();
 
@@ -23,7 +24,9 @@ const AVATAR_COLORS = [
  *
  * Ecrite une fois et partagee par les deux routes : c'est la seule facon qu'une
  * troisieme colonne ajoutee un jour n'apparaisse pas dans l'une et pas dans
- * l'autre.
+ * l'autre. `emailVerifie` en est la preuve immediate : ajoute ici, il arrive
+ * des la premiere milliseconde, et le bandeau de verification ne clignote donc
+ * pas apres coup.
  */
 const profilPublic = (user) => ({
   id: user.id,
@@ -35,6 +38,7 @@ const profilPublic = (user) => ({
   mailRappels: user.mailRappels,
   mailBilan: user.mailBilan,
   enPause: user.enPause,
+  emailVerifie: user.emailVerifie,
   // Calcule, jamais stocke : la liste des administrateurs vit dans
   // l'environnement. L'ecran s'en sert pour ne pas proposer une page qui lui
   // sera refusee — la vraie porte est cote serveur, celle-ci n'est que de la
@@ -64,6 +68,24 @@ exports.register = async (req, res) => {
     const color = AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)];
     const user = await prisma.user.create({
       data: { username, email, password: hashed, avatarColor: color },
+    });
+
+    /**
+     * Le courriel de verification part, mais l'inscription ne l'attend pas.
+     *
+     * Deux raisons de ne pas mettre `await` devant et de ne pas laisser une
+     * erreur remonter. La premiere est le temps : l'envoi prend parfois deux
+     * secondes, et ce sont deux secondes pendant lesquelles quelqu'un qui vient
+     * de cliquer sur « Creer mon compte » regarde un bouton qui ne repond pas.
+     * La seconde est plus importante : si Brevo est en panne, l'inscription
+     * echouerait alors que le compte est deja cree en base — le joueur verrait
+     * une erreur, reessaierait, et se heurterait a « pseudo deja utilise ».
+     *
+     * Le compte existe, le joueur entre, et le bandeau lui dira que son adresse
+     * n'est pas confirmee avec de quoi redemander un lien. Rien n'est perdu.
+     */
+    verification.envoyer(user).then((r) => {
+      if (!r.envoye) console.error(`[verification] ${user.username} : ${r.raison}`);
     });
 
     const token = generateToken(user.id);
@@ -103,4 +125,81 @@ exports.login = async (req, res) => {
 exports.me = async (req, res) => {
   const { password, ...user } = req.user;
   res.json({ ...user, admin: estAdmin(req.user) });
+};
+
+/**
+ * Confirmation depuis le lien recu par courriel.
+ *
+ * Route publique, et ce n'est pas un oubli : le lien s'ouvre souvent depuis le
+ * telephone alors qu'on s'est inscrit depuis l'ordinateur, donc sans session.
+ * Exiger une connexion ici rendrait la confirmation penible precisement pour
+ * ceux qui en ont le plus besoin.
+ *
+ * Le jeton suffit a prouver qu'on releve la boite : c'est tout ce qu'on
+ * verifie, et il ne donne acces a rien d'autre.
+ *
+ * Toujours 200, meme en cas d'echec, avec un `ok` et un motif : l'ecran a
+ * quatre phrases a dire — confirme, deja confirme, lien expire, lien inconnu —
+ * et un code d'erreur HTTP n'en porte aucune.
+ */
+exports.confirmerEmail = async (req, res) => {
+  try {
+    const r = await verification.confirmer(req.body?.jeton);
+    res.json(r);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ ok: false, raison: 'serveur' });
+  }
+};
+
+/**
+ * Redemander un lien, et au besoin corriger l'adresse.
+ *
+ * Les deux dans la meme route, parce que c'est le meme geste vu du joueur :
+ * « je n'ai rien recu ». Tantot l'adresse est bonne et le courriel s'est perdu,
+ * tantot elle est fautive — et dans ce second cas, renvoyer un lien a la meme
+ * adresse ne servirait a rien. Le bandeau affiche donc l'adresse, modifiable,
+ * et cette route accepte la nouvelle.
+ *
+ * Changer d'adresse remet `emailVerifie` a faux : la nouvelle n'est pas plus
+ * prouvee que l'ancienne tant que personne n'a clique.
+ *
+ * Deux refus : une adresse deja prise par un autre compte, et une adresse
+ * identique a l'actuelle quand le compte est deja verifie — ce dernier cas
+ * n'arrive pas depuis le bandeau, qui ne s'affiche pas alors, mais une route
+ * ne doit pas se fier a l'ecran qui l'appelle.
+ */
+exports.renvoyerVerification = async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+  try {
+    let user = req.user;
+    const demandee = (req.body?.email || '').trim().toLowerCase();
+
+    if (demandee && demandee !== user.email.toLowerCase()) {
+      const prise = await prisma.user.findFirst({
+        where: { email: { equals: demandee, mode: 'insensitive' }, NOT: { id: user.id } },
+      });
+      if (prise) return res.status(409).json({ error: 'Cette adresse est déjà utilisée' });
+
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: { email: demandee, emailVerifie: false, emailVerifieAt: null },
+      });
+    } else if (user.emailVerifie) {
+      return res.status(400).json({ error: 'Cette adresse est déjà confirmée' });
+    }
+
+    const r = await verification.envoyer(user);
+    if (!r.envoye) {
+      console.error(`[verification] renvoi ${user.username} : ${r.raison}`);
+      return res.status(502).json({ error: "L'envoi a échoué, réessaie dans un moment" });
+    }
+
+    res.json({ ok: true, email: user.email });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
 };
