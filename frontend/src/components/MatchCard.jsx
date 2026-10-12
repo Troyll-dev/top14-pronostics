@@ -8,6 +8,7 @@ import { matchState, STATE, STATE_CHIP } from '../utils/matchState';
 import CompositionsMatch from './CompositionsMatch';
 import FormeClubs from './FormeClubs';
 import IconeJoker from './IconeJoker';
+import IconeAffiche from './IconeAffiche';
 
 /**
  * La case de score.
@@ -437,11 +438,21 @@ export default function MatchCard({
             Fonds pleins et non teintés : un aplat violet ou ambre avec du texte
             blanc ou noir se lit sur les deux thèmes. La version précédente
             posait du violet clair sur un voile transparent — correct sur fond
-            nuit, illisible sur le fond crème. */}
+            nuit, illisible sur le fond crème.
+
+            Les deux pastilles portent désormais leur dessin plutôt qu'un emoji,
+            et le même dans toute l'application : le bouffon pour le joker, le
+            calendrier étoilé pour l'affiche. Un emoji est dessiné par le
+            système, donc différent sur chaque appareil — pour un symbole qui
+            porte une règle du jeu, c'est une mauvaise propriété. */}
         <span className="flex items-center gap-1.5 flex-wrap justify-end">
           {estAffiche && (
-            <span title="Match de la semaine : tous les points de cette rencontre sont multipliés par 3" style={PASTILLE.affiche}>
-              ⭐ Affiche ×3
+            <span
+              title="Match de la semaine : tous les points de cette rencontre sont multipliés par 3"
+              style={PASTILLE.affiche}
+              className="inline-flex items-center gap-1"
+            >
+              <IconeAffiche taille={20} /> Affiche ×3
             </span>
           )}
           {estJoker && (
@@ -652,8 +663,9 @@ export default function MatchCard({
 
       {reglesActives && estAffiche && !isFinished && (
         <div className="relative z-10 mt-3 pt-3 border-t border-slate-800">
-          <p className="text-[11.5px] text-slate-500">
-            ⭐ Affiche de la journée : déjà multipliée par trois pour tout le monde, le joker ne s'y pose pas.
+          <p className="text-[11.5px] text-slate-500 flex items-start gap-1.5">
+            <IconeAffiche taille={16} className="mt-[1px]" />
+            <span>Affiche de la journée : déjà multipliée par trois pour tout le monde, le joker ne s'y pose pas.</span>
           </p>
         </div>
       )}

@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import TeamCrest from '../components/TeamCrest';
 import SelecteurJournee from '../components/SelecteurJournee';
 import IconeJoker from '../components/IconeJoker';
+import IconeAffiche from '../components/IconeAffiche';
 
 /**
  * La couleur d'une cellule du tableau.
@@ -342,6 +343,14 @@ export default function RoundPredictionsPage() {
                                   milieu des écussons et du score, à la taille
                                   d'une ligne d'en-tête, on ne la voyait pas.
 
+                                  C'était ensuite l'emoji ⭐, dessiné par le
+                                  système donc différent sur chaque appareil.
+                                  C'est maintenant le même dessin partout, à la
+                                  taille du bouffon qui lui fait face dans les
+                                  autres colonnes — les deux disent « cette case
+                                  rapporte plus », ils se présentent du même
+                                  poids.
+
                                   Répétée sur chaque ligne elle devient une
                                   colonne marquée, qu'on repère d'un coup d'œil
                                   en parcourant le tableau — et c'est bien de la
@@ -360,10 +369,10 @@ export default function RoundPredictionsPage() {
                                   compte dans le calcul des points. */}
                               {estAffiche && !p?.joker && (
                                 <span
-                                  className="absolute -top-0.5 right-0.5 text-[19px] leading-none drop-shadow-[0_1px_2px_rgba(0,0,0,.45)]"
+                                  className="absolute -top-1 right-0 leading-none drop-shadow-[0_1px_2px_rgba(0,0,0,.45)]"
                                   title="Affiche de la journée : points triplés"
                                 >
-                                  ⭐
+                                  <IconeAffiche taille={26} />
                                 </span>
                               )}
 
@@ -415,7 +424,9 @@ export default function RoundPredictionsPage() {
             <span className="flex items-center gap-1.5">
               <IconeJoker taille={22} /> Joker : points doublés
             </span>
-            <span className="flex items-center gap-1.5">⭐ Affiche : points triplés</span>
+            <span className="flex items-center gap-1.5">
+              <IconeAffiche taille={22} /> Affiche : points triplés
+            </span>
           </div>
         </>
       )}
