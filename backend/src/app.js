@@ -13,6 +13,7 @@ const userRoutes = require('./routes/user.routes');
 const backupRoutes = require('./routes/backup.routes');
 const reminderRoutes = require('./routes/reminder.routes');
 const recapRoutes = require('./routes/recap.routes');
+const santeRoutes = require('./routes/sante.routes');
 const desinscriptionRoutes = require('./routes/desinscription.routes');
 
 const { startResultsCron } = require('./cron/results.cron');
@@ -50,6 +51,15 @@ app.use('/api/users', userRoutes);
 app.use('/api/admin/backup', backupRoutes);
 app.use('/api/admin/reminders', reminderRoutes);
 app.use('/api/admin/recap', recapRoutes);
+
+/**
+ * L'etat des taches automatiques et des adresses non confirmees.
+ *
+ * Sous `/api/admin` comme les trois precedentes, et fermee par les memes
+ * verrous : elle expose les adresses de courriel des joueurs, ce qui n'est pas
+ * une information de jeu.
+ */
+app.use('/api/admin/sante', santeRoutes);
 
 /**
  * La desinscription, seule route publique a rendre du HTML.

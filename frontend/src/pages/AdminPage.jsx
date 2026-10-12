@@ -3,6 +3,216 @@ import { Link } from 'react-router-dom';
 import api from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 
+const dateHeure = new Intl.DateTimeFormat('fr-FR', {
+  weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+  timeZone: 'Europe/Paris',
+});
+
+const jourSeul = new Intl.DateTimeFormat('fr-FR', {
+  day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Paris',
+});
+
+/**
+ * « Il y a deux heures » plutôt que « mardi 12 nov. à 09:07 ».
+ *
+ * Pour une date de surveillance, l'âge est l'information utile et la date
+ * exacte ne l'est pas : on veut savoir si c'est récent, pas quel jour c'était.
+ * La date complète reste dans l'infobulle, pour le jour où on la cherche.
+ */
+function depuis(iso) {
+  if (!iso) return 'jamais';
+  const min = Math.round((Date.now() - new Date(iso)) / 60000);
+  if (min < 2) return "à l'instant";
+  if (min < 60) return `il y a ${min} min`;
+  const h = Math.round(min / 60);
+  if (h < 24) return `il y a ${h} h`;
+  const j = Math.round(h / 24);
+  return `il y a ${j} jour${j > 1 ? 's' : ''}`;
+}
+
+/**
+ * La pastille d'état.
+ *
+ * Quatre couleurs pour quatre situations, et le gris en vaut la peine : une
+ * tâche non suivie — les résultats, qui se taisent légitimement hors saison —
+ * doit se distinguer d'une tâche vérifiée et saine. Un vert là-dessus
+ * laisserait croire à un contrôle qui n'a pas lieu.
+ */
+function Pastille({ etat, suivie }) {
+  const styles = {
+    ok: 'bg-green-500/20 text-green-400 border-green-500/40',
+    retard: 'bg-amber-500/20 text-amber-400 border-amber-500/40',
+    echec: 'bg-red-500/20 text-red-400 border-red-500/40',
+    jamais: 'bg-red-500/20 text-red-400 border-red-500/40',
+  };
+  const mots = { ok: suivie ? 'OK' : 'actif', retard: 'en retard', echec: 'en échec', jamais: 'jamais vue' };
+  return (
+    <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${styles[etat]}`}>
+      {mots[etat]}
+    </span>
+  );
+}
+
+/**
+ * L'état du site : les tâches automatiques et les adresses non confirmées.
+ *
+ * ---------------------------------------------------------------------------
+ * POURQUOI CETTE CARTE EST LA PREMIÈRE DE LA PAGE
+ * ---------------------------------------------------------------------------
+ *
+ * Les deux formulaires du dessous — créer un match, saisir un résultat — ne
+ * servent presque jamais : les scores arrivent tout seuls, et une rencontre
+ * créée à la main est l'exception. Ce qu'on vient vraiment chercher ici, c'est
+ * l'état des choses, en général après avoir reçu l'alerte du matin.
+ *
+ * ---------------------------------------------------------------------------
+ * ELLE NE REMPLACE PAS L'ALERTE
+ * ---------------------------------------------------------------------------
+ *
+ * Et c'est important : une page ne se consulte que lorsqu'on soupçonne déjà un
+ * problème. C'est précisément le défaut qui a laissé le bug des statistiques
+ * vivre cinq semaines dans les journaux. L'alerte quotidienne vient te
+ * chercher ; cette page dit le détail une fois que tu es là.
+ */
+function EtatDuSite() {
+  const [data, setData] = useState(null);
+  const [erreur, setErreur] = useState('');
+  const [simulation, setSimulation] = useState(null);
+
+  useEffect(() => {
+    api.get('/admin/sante')
+      .then((r) => setData(r.data))
+      .catch((e) => setErreur(e.response?.data?.error || 'Lecture impossible'));
+  }, []);
+
+  const simuler = async () => {
+    setSimulation({ enCours: true });
+    try {
+      const r = await api.post('/admin/sante/simuler');
+      setSimulation(r.data);
+    } catch (e) {
+      setSimulation({ erreur: e.response?.data?.error || 'Simulation impossible' });
+    }
+  };
+
+  if (erreur) {
+    return (
+      <div className="card">
+        <h2 className="font-semibold mb-2">État du site</h2>
+        <p className="text-red-400 text-sm">{erreur}</p>
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="card">
+        <p className="text-slate-500 text-sm animate-pulse">Lecture de l'état…</p>
+      </div>
+    );
+  }
+
+  const ennuis = data.anomalies.length;
+
+  return (
+    <>
+      <div className="card">
+        <div className="flex items-baseline justify-between gap-3 mb-1">
+          <h2 className="font-semibold">Tâches automatiques</h2>
+          <span className={`text-[12px] ${ennuis ? 'text-red-400 font-semibold' : 'text-slate-500'}`}>
+            {ennuis
+              ? `${ennuis} anomalie${ennuis > 1 ? 's' : ''}`
+              : 'rien à signaler'}
+          </span>
+        </div>
+        <p className="text-[11.5px] text-slate-500 mb-4">
+          Une alerte part chaque matin à 9 h 07, et seulement s'il y a quelque chose à dire.
+        </p>
+
+        <div className="divide-y divide-slate-800">
+          {data.taches.map((t) => (
+            <div key={t.job} className="py-2.5 flex items-start gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-[13.5px]">{t.libelle}</span>
+                  <Pastille etat={t.etat} suivie={t.suivie} />
+                </div>
+                <p className="text-[12px] text-slate-500 mt-0.5">
+                  Dernière réussite{' '}
+                  <span title={t.lastSuccessAt ? dateHeure.format(new Date(t.lastSuccessAt)) : ''}>
+                    {depuis(t.lastSuccessAt)}
+                  </span>
+                  {t.suivie && t.seuil !== null && (
+                    <span className="text-slate-600"> · seuil {t.seuil} j</span>
+                  )}
+                  {!t.suivie && (
+                    <span className="text-slate-600"> · sans seuil, normal hors saison</span>
+                  )}
+                </p>
+                {t.lastError && (
+                  <p className="text-[12px] text-red-400 mt-1 break-words">
+                    {t.lastError}
+                    <span className="text-slate-600">
+                      {' '}({depuis(t.lastErrorAt)})
+                    </span>
+                  </p>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <button onClick={simuler} className="btn-primary !text-[13px] !py-1.5 !px-3">
+            Voir ce que l'alerte dirait
+          </button>
+          {simulation?.enCours && <span className="text-[12px] text-slate-500">Un instant…</span>}
+          {simulation?.erreur && <span className="text-[12px] text-red-400">{simulation.erreur}</span>}
+          {simulation && !simulation.enCours && !simulation.erreur && (
+            <p className="w-full text-[12.5px] whitespace-pre-wrap text-slate-400 border-l-2 border-slate-700 pl-3">
+              {simulation.anomalies?.length
+                ? simulation.texte
+                : "Rien ne partirait : toutes les tâches sont à jour."}
+            </p>
+          )}
+        </div>
+      </div>
+
+      <div className="card">
+        <h2 className="font-semibold mb-1">Adresses non confirmées</h2>
+        <p className="text-[11.5px] text-slate-500 mb-4">
+          Une adresse jamais confirmée peut être fautive — auquel cas ce joueur ne reçoit
+          plus aucun courriel, et ne le sait pas.
+        </p>
+
+        {data.nonConfirmes.length === 0 ? (
+          <p className="text-[13px] text-slate-500">
+            Tout le monde a confirmé la sienne.
+          </p>
+        ) : (
+          <ul className="divide-y divide-slate-800">
+            {data.nonConfirmes.map((u) => (
+              <li key={u.id} className="py-2.5">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-medium text-[13.5px]">{u.username}</span>
+                  {u.enPause && (
+                    <span className="rounded-full border border-slate-600 px-2 py-0.5 text-[11px] text-slate-400">
+                      en pause
+                    </span>
+                  )}
+                </div>
+                <p className="text-[12px] text-slate-500 break-all">
+                  {u.email} · inscrit le {jourSeul.format(new Date(u.createdAt))}
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </>
+  );
+}
+
 export default function AdminPage() {
   const { user } = useAuth();
   const [teams, setTeams] = useState([]);
@@ -81,6 +291,9 @@ export default function AdminPage() {
           {message}
         </div>
       )}
+
+      {/* L'état du site, en tête : c'est ce qu'on vient chercher. */}
+      <EtatDuSite />
 
       {/* Créer un match */}
       <div className="card">
