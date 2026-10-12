@@ -48,7 +48,7 @@ export const RESERVE_BARRE_BAS =
  * `alt=""` : le libelle est a cote sur grand ecran, et le `title` de l'onglet le
  * porte sur telephone. Faire lire deux fois la meme chose n'aide personne.
  */
-function IconeNav({ nom, taille = 24, style }) {
+function IconeNav({ nom, taille = 24, style, className = '' }) {
   return (
     <img
       src={`/nav/${nom}-48.webp`}
@@ -58,7 +58,7 @@ function IconeNav({ nom, taille = 24, style }) {
       width={taille}
       height={taille}
       decoding="async"
-      className="shrink-0 select-none"
+      className={`shrink-0 select-none ${className}`}
       style={{ width: taille, height: taille, ...style }}
     />
   );
@@ -322,12 +322,48 @@ export default function Navbar() {
               <span className="nav-tx text-sm hidden lg:block">{user?.username}</span>
             </Link>
 
+            {/* La deconnexion.
+
+                C'etait une fleche « ↪ » dessinee par la police du systeme, donc
+                differente sur chaque appareil et etrangere au trait du reste de
+                la barre. C'est maintenant une porte avec une fleche rouge, du
+                meme atelier que les onglets.
+
+                Ce qu'on perd en chemin, et qu'il faut avoir en tete : l'ancienne
+                fleche passait au rouge au survol, ce qui prevenait avant le clic.
+                Une image ne change pas de couleur ; le rouge est donc permanent.
+                La compensation est le `title`, et le fait que la porte ouverte
+                dise d'elle-meme ce qu'elle fait — ce que « ↪ » ne faisait pas.
+
+                Vingt-deux pixels comme l'engrenage et le theme, ses voisins. */}
             <button
               onClick={logout}
               title="Se déconnecter"
-              className="nav-dim hover:text-red-400 text-sm px-1 shrink-0 transition-colors"
+              className="group hover:bg-white/10 rounded-md px-1 py-1 shrink-0 transition-colors"
             >
-              ↪
+              {/* Le virage au rouge, par filtre colorimetrique.
+
+                  L'ancienne fleche « ↪ » passait au rouge au survol, ce qui
+                  prevenait avant le clic qu'on allait sortir. Une image ne
+                  change pas de couleur ; un filtre, si.
+
+                  `saturate` et `hue-rotate` poussent la brique de la fleche
+                  vers un rouge franc. Ce qu'il faut savoir, parce que ca ne se
+                  devine pas en lisant la ligne : un filtre s'applique a toute
+                  l'image, donc le bois et l'or s'orangent aussi. Mesure a 22
+                  pixels, l'effet se lit comme « l'icone s'allume », ce qui est
+                  le message voulu — mais ce n'est pas un recolorage de la seule
+                  fleche, et il ne faut pas le pousser plus loin sous peine de
+                  virer au fluorescent.
+
+                  `group` sur le bouton et `group-hover` sur l'image : c'est le
+                  bouton qu'on survole, l'image n'est qu'une partie de sa
+                  surface. */}
+              <IconeNav
+                nom="deconnexion"
+                taille={22}
+                className="transition duration-150 group-hover:saturate-200 group-hover:-hue-rotate-15 group-hover:brightness-110"
+              />
             </button>
           </div>
         </div>
