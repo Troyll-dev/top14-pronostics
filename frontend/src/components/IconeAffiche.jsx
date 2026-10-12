@@ -28,15 +28,38 @@
  * disent la même chose — « cette case rapporte plus » — et se présentent donc du
  * même poids.
  *
- * Une étoile seule, et c'est le point qui a demandé un essai. La première
- * version posait un calendrier **et** une étoile dans le même cadre : à 16
- * pixels, les deux objets se confondaient en une tache dorée dont on ne
- * distinguait plus rien, et il ne restait que la couleur pour la reconnaître.
- * C'est la règle qu'on a vérifiée trois fois sur ce site — deux objets dans une
- * icône ne survivent pas en dessous de 24 pixels.
+ * Une étoile dorée portant un ballon en son centre, et il a fallu trois essais
+ * pour y arriver.
  *
- * Le calendrier n'ajoutait d'ailleurs aucun sens : ce qui est marqué, c'est
- * l'affiche de la journée, pas une date.
+ * La première version posait un calendrier **à côté** d'une étoile : à 16
+ * pixels les deux objets se confondaient en une tache dorée, et le calendrier
+ * n'ajoutait aucun sens — ce qui est marqué, c'est l'affiche de la journée, pas
+ * une date. La deuxième était une étoile seule : lisible partout, sauf sur la
+ * pastille ambre de la carte de match, où l'or sur l'or donnait un contraste
+ * de 1,15, autrement dit deux couleurs quasi identiques.
+ *
+ * Celle-ci règle le contraste sans filtre et sans toucher au fond : le ballon
+ * crème fait un cœur clair, la couronne dorée un pourtour, et l'étoile a donc
+ * deux valeurs au lieu d'une. C'est ce contraste interne qui la détache de
+ * l'ambre.
+ *
+ * Elle semble contredire la règle vérifiée trois fois sur ce site — deux objets
+ * dans une icône ne survivent pas en dessous de 24 pixels — et l'exception
+ * s'explique : le second objet n'est pas posé à côté du premier, il est
+ * concentrique. La silhouette extérieure reste une étoile pure, donc la forme
+ * ne se brouille pas ; seul le remplissage change. À 16 pixels le ballon n'est
+ * plus qu'un point clair et le tricolore a disparu, mais l'étoile reste une
+ * étoile, et c'était tout l'enjeu.
+ *
+ * ---------------------------------------------------------------------------
+ * Le nom du fichier change avec le dessin
+ * ---------------------------------------------------------------------------
+ *
+ * `affiche-ballon-*` et non `affiche-*`. Les deux versions précédentes ont
+ * partagé le même nom, et le navigateur comme le cache de Vercel ont continué
+ * de servir l'ancienne image : on a cherché un défaut de déploiement là où il
+ * n'y avait qu'un fichier gardé en mémoire. Nouveau dessin, nouveau nom — c'est
+ * la règle du projet depuis les bandeaux de septembre.
  *
  * `srcSet` donne la version 96 aux écrans à forte densité : à 26 pixels
  * d'affichage, un téléphone récent en demande 78.
@@ -47,8 +70,8 @@
 export default function IconeAffiche({ taille = 26, className = '' }) {
   return (
     <img
-      src="/nav/affiche-48.webp"
-      srcSet="/nav/affiche-48.webp 48w, /nav/affiche-96.webp 96w"
+      src="/nav/affiche-ballon-48.webp"
+      srcSet="/nav/affiche-ballon-48.webp 48w, /nav/affiche-ballon-96.webp 96w"
       sizes={`${taille}px`}
       alt=""
       width={taille}
