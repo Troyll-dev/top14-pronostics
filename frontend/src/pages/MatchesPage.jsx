@@ -6,6 +6,7 @@ import SelecteurJournee from '../components/SelecteurJournee';
 import Bob from '../components/Bob';
 import IconeJoker from '../components/IconeJoker';
 import FaceAFace from '../components/FaceAFace';
+import Bandeau from '../components/Bandeau';
 
 const DRAFT_KEY = 't14-brouillons';
 const DRAFT_TTL = 30 * 24 * 3600 * 1000; // un mois
@@ -146,14 +147,6 @@ export default function MatchesPage() {
   useEffect(() => { setBulkResult(null); setJokerErreur(null); }, [currentRound]);
 
   /**
-   * Poser, déplacer ou retirer le joker — un seul geste pour les trois.
-   *
-   * On relit ensuite les matchs et les règles plutôt que de deviner le nouvel
-   * état : le serveur peut avoir refusé, ou avoir déplacé le joker depuis un
-   * autre match. Deux requêtes de plus sur un clic rare, contre un écran qui
-   * ment.
-   */
-  /**
    * Poser, déplacer ou retirer le joker.
    *
    * Le serveur expose une bascule sur un match : l'appeler sur la rencontre où
@@ -282,6 +275,28 @@ export default function MatchesPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6">
+      {/* Le bandeau de la page.
+
+          Quatrième page à en porter un, et la première à ne pas être en 16/9.
+
+          La raison tient à ce qu'on vient y faire. Sur Bienvenue, l'Accueil ou
+          le Classement, on regarde : une grande image donne le ton et ne gêne
+          personne. Ici on saisit sept scores, et un bandeau de 220 pixels sur un
+          téléphone repousse le premier match sous la ligne de flottaison — on
+          commence par faire défiler, ce qui est une drôle de façon d'entrer dans
+          une page de saisie.
+
+          L'image étant panoramique, la garder dans ses proportions règle les
+          deux problèmes à la fois : rien n'est coupé — ni le poulpe au centre,
+          ni les deux tablées — et le bandeau fait la moitié de la hauteur. Le
+          `ratio` est passé en propriété ; les trois autres pages n'ont rien
+          changé et gardent le 16/9 par défaut.
+
+          8/3 et non 2.667 : c'est la proportion exacte de l'image, 2048 sur 768,
+          et l'écrire en fraction évite qu'un arrondi fasse apparaître un cheveu
+          de fond sur l'un des bords. */}
+      <Bandeau nom="mes-pronos-pub" ratio={8 / 3} className="mb-5" />
+
       {/* Le nom de la page, au-dessus du titre.
 
           Cette page était la seule à ne pas se nommer : les autres annoncent
