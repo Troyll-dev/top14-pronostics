@@ -22,6 +22,18 @@ exports.getLeaderboard = async (req, res) => {
 
   try {
     const users = await prisma.user.findMany({
+      /*
+       * Les comptes qui ne sont pas tenus par une personne n'entrent pas dans le
+       * classement. Il n'y en a qu'un — Bob, qui signe le message de bienvenue
+       * au Comptoir — et il n'a aucun pronostic : sans ce filtre il figurerait
+       * en bas de liste avec zero point, ce qui ferait croire a un copain qui
+       * n'a jamais joue.
+       *
+       * Le filtre est ici et non dans le calcul, contrairement a `enPause` : un
+       * joueur en pause doit rester visible, grise ; un robot ne doit pas
+       * apparaitre du tout.
+       */
+      where: { bot: false },
       select: {
         id: true,
         username: true,
@@ -127,7 +139,13 @@ exports.getLeaderboard = async (req, res) => {
   }
 };
 
-// GET /api/leaderboard/round/:round — classement d'une journée spécifique
+/*
+ * GET /api/leaderboard/round/:round — classement d'une journee specifique
+ *
+ * Pas de filtre sur les robots ici, et ce n'est pas un oubli : ce classement
+ * part des pronostics et non des comptes. Bob n'en pose aucun, il ne peut donc
+ * pas y apparaitre.
+ */
 exports.getRoundLeaderboard = async (req, res) => {
   const { round } = req.params;
 

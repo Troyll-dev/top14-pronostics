@@ -63,6 +63,10 @@ const prisma = new PrismaClient();
 exports.liste = async (req, res) => {
   try {
     const users = await prisma.user.findMany({
+      // Bob n'est pas un joueur : on ne le met pas en pause, on ne le supprime
+      // pas, et le proposer dans cette liste n'offrirait que des boutons sans
+      // usage. Il reste visible la ou il parle, c'est-a-dire au Comptoir.
+      where: { bot: false },
       select: {
         id: true,
         username: true,

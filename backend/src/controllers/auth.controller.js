@@ -5,6 +5,7 @@ const { validationResult } = require('express-validator');
 const { estAdmin } = require('../middleware/admin.middleware');
 const verification = require('../services/verification.service');
 const bannissement = require('../services/bannissement.service');
+const bobSalon = require('../services/bob-salon.service');
 
 const prisma = new PrismaClient();
 
@@ -109,6 +110,20 @@ exports.register = async (req, res) => {
     verification.envoyer(user).then((r) => {
       if (!r.envoye) console.error(`[verification] ${user.username} : ${r.raison}`);
     });
+
+    /**
+     * Et Bob annonce l'arrivee au Comptoir, sans `await` lui non plus.
+     *
+     * Meme raison que pour le courriel : l'inscription ne doit dependre de rien
+     * d'accessoire. Un salon indisponible ne doit pas empecher quelqu'un
+     * d'entrer, et le service ne jette jamais de toute facon.
+     *
+     * C'est le seul endroit d'ou part ce message, et c'est voulu : il annonce
+     * une arrivee, pas une connexion. Le jour ou l'inscription passera par une
+     * validation de ta part, c'est ici que la ligne se deplacera — l'annonce
+     * devra attendre que le joueur soit vraiment accepte.
+     */
+    bobSalon.bienvenue(user);
 
     const token = generateToken(user.id);
     res.status(201).json({ token, user: profilPublic(user) });

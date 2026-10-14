@@ -58,6 +58,19 @@ model User {
   enPause      Boolean       @default(false)
   pauseAt      DateTime?                       // quand, pour pouvoir le dire
 
+  /// Ce compte est-il tenu par une personne ?
+  ///
+  /// Un seul le porte : Bob le poulpe, qui signe le message de bienvenue dans
+  /// le salon. Un message a besoin d'un auteur qui existe en base — c'est ce
+  /// qui lui donne sa pastille et son pseudo — donc Bob a un compte, inerte :
+  /// mot de passe aleatoire que personne ne connait, aucun courriel, en pause.
+  ///
+  /// Ce champ existe pour une seule raison : un compte apparait dans le
+  /// classement, et un poulpe a zero point au bas du classement des copains
+  /// serait absurde. `leaderboard.controller.js` et la liste d'administration
+  /// l'ecartent donc.
+  bot          Boolean       @default(false)
+
   predictions  Prediction[]
   messages     Message[]
   avatar       UserAvatar?
