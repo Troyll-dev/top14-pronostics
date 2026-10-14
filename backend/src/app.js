@@ -14,6 +14,7 @@ const backupRoutes = require('./routes/backup.routes');
 const reminderRoutes = require('./routes/reminder.routes');
 const recapRoutes = require('./routes/recap.routes');
 const santeRoutes = require('./routes/sante.routes');
+const joueursRoutes = require('./routes/joueurs.routes');
 const desinscriptionRoutes = require('./routes/desinscription.routes');
 
 const { startResultsCron } = require('./cron/results.cron');
@@ -60,6 +61,16 @@ app.use('/api/admin/recap', recapRoutes);
  * une information de jeu.
  */
 app.use('/api/admin/sante', santeRoutes);
+
+/**
+ * La gestion des joueurs : liste, mise en pause, suppression, bannissement
+ * d'adresse.
+ *
+ * Meme famille et memes verrous que les quatre precedentes. Elle expose les
+ * adresses et les dates d'inscription de tout le monde, et elle efface — c'est
+ * la seule route du site capable de supprimer un compte.
+ */
+app.use('/api/admin/joueurs', joueursRoutes);
 
 /**
  * La desinscription, seule route publique a rendre du HTML.

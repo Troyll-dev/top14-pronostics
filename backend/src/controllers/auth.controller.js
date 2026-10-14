@@ -4,6 +4,7 @@ const { PrismaClient } = require('@prisma/client');
 const { validationResult } = require('express-validator');
 const { estAdmin } = require('../middleware/admin.middleware');
 const verification = require('../services/verification.service');
+const bannissement = require('../services/bannissement.service');
 
 const prisma = new PrismaClient();
 
@@ -57,6 +58,27 @@ exports.register = async (req, res) => {
 
   const { username, email, password } = req.body;
   try {
+    /**
+     * La porte d'entree.
+     *
+     * Le controle est ici et nulle part ailleurs : c'est le seul endroit ou un
+     * compte se cree. La connexion, elle, n'en tient pas compte — bannir une
+     * adresse ferme l'inscription, cela ne desactive pas un compte existant.
+     * Pour celui-la il y a la pause et la suppression.
+     *
+     * Le message de refus est volontairement sobre et ne dit pas « vous etes
+     * banni » : la personne concernee le sait deja, et quelqu'un qui tomberait
+     * la par hasard — une adresse bannie puis reattribuee, ca existe — n'a pas
+     * besoin d'etre accuse. Il donne de quoi te joindre, ce qui est la seule
+     * suite utile.
+     */
+    const porteFermee = await bannissement.bannie(email);
+    if (porteFermee) {
+      return res.status(403).json({
+        error: 'Cette adresse ne peut pas creer de compte. Contacte l\'organisateur si c\'est une erreur.',
+      });
+    }
+
     const existing = await prisma.user.findFirst({
       where: { OR: [{ email }, { username }] },
     });

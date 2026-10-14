@@ -247,3 +247,29 @@ model JobRun {
 
   @@map("job_runs")
 }
+
+/// Les adresses interdites d'inscription.
+///
+/// Elle ne contient pas des comptes mais des adresses : bannir ne touche aucun
+/// compte existant, cela ferme seulement la porte d'entree. Un compte se met en
+/// pause ou se supprime, ce sont deux autres gestes — voir
+/// `services/bannissement.service.js`, qui explique pourquoi les trois sont
+/// separes.
+///
+/// Deux colonnes pour une meme adresse, et c'est le coeur du sujet. `email` est
+/// la forme saisie, celle que l'administrateur reconnait dans la liste. `cle`
+/// est sa forme normalisee — minuscules, et chez Gmail les points et le
+/// `+suffixe` retires — et c'est elle qui porte l'unicite et la comparaison.
+/// Sans cette seconde colonne, `jean.dupont+rugby@gmail.com` reviendrait le
+/// lendemain du bannissement de `jeandupont@gmail.com`, qui est pourtant la
+/// meme boite.
+model AdresseBannie {
+  id        Int      @id @default(autoincrement())
+  email     String                            // telle que saisie, pour l'affichage
+  cle       String   @unique                  // normalisee, pour la comparaison
+  motif     String?  @db.VarChar(200)
+  parEmail  String?                           // qui a ferme la porte
+  createdAt DateTime @default(now())
+
+  @@map("adresses_bannies")
+}

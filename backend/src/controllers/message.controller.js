@@ -1,4 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
+const { estAdmin } = require('../middleware/admin.middleware');
+
 const prisma = new PrismaClient();
 
 const MAX_LENGTH = 1000;
@@ -107,7 +109,22 @@ exports.createMessage = async (req, res) => {
   }
 };
 
-// DELETE /api/messages/:id — chacun ne peut retirer que ses propres messages
+/**
+ * DELETE /api/messages/:id
+ *
+ * Chacun retire ses propres messages ; l'administrateur retire n'importe lequel.
+ *
+ * C'est la moderation, et elle tient en une ligne parce qu'elle n'avait pas
+ * besoin de plus. Le besoin : un message deplace n'oblige pas a s'en prendre a
+ * son auteur. Sans ce petit marteau, le seul outil disponible contre une parole
+ * de trop etait la suppression du compte ou la mise en pause — c'est-a-dire
+ * punir quelqu'un pour une phrase, faute de pouvoir retirer la phrase.
+ *
+ * Aucune trace n'est conservee, et c'est assumé : entre huit amis, un registre
+ * des messages effaces serait plus gênant que le message efface. Les autres
+ * voient la disparition au plus tard six secondes apres, le salon etant relu en
+ * entier a chaque interrogation.
+ */
 exports.deleteMessage = async (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (Number.isNaN(id)) return res.status(400).json({ error: 'Identifiant invalide' });
@@ -115,7 +132,8 @@ exports.deleteMessage = async (req, res) => {
   try {
     const message = await prisma.message.findUnique({ where: { id } });
     if (!message) return res.status(404).json({ error: 'Message introuvable' });
-    if (message.userId !== req.user.id) {
+
+    if (message.userId !== req.user.id && !estAdmin(req.user)) {
       return res.status(403).json({ error: 'Ce message n est pas le tien' });
     }
 
