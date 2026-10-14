@@ -5,6 +5,7 @@ import api from '../api/client';
 import TeamCrest from '../components/TeamCrest';
 import { matchState, STATE, STATE_CHIP, useNow } from '../utils/matchState';
 import SelecteurJournee from '../components/SelecteurJournee';
+import Bandeau from '../components/Bandeau';
 
 function ResultDot({ res }) {
   const cls = {
@@ -269,6 +270,24 @@ export default function Top14Page() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
+      {/* Le bandeau de la page, en 3/1 et non en 16/9.
+
+          L'image est panoramique — la salle du pub sur toute sa largeur, de
+          l'enseigne « Au chien de talus » au comptoir — et la recouper en 16/9
+          aurait demandé d'en jeter un tiers par le côté, donc de choisir entre
+          l'enseigne et le chien. Elle est posée telle quelle, à sa proportion,
+          comme celle de « Mes pronos » : c'est pour ça que `ratio` existe.
+
+          Les 85 pixels retirés en bas de l'image d'origine ne sont pas un
+          cadrage mais un gain de hauteur : le bandeau se fond dans la page par
+          un dégradé sur son quart inférieur, et ces pixels-là étaient déjà
+          estompés. On les perd sans rien perdre.
+
+          Le résultat fait le tiers de la largeur en hauteur, contre 56 % pour
+          un 16/9 : sur un téléphone, le classement reste à portée de pouce
+          au lieu d'être repoussé sous la ligne de flottaison. */}
+      <Bandeau nom="championnat-chien" ratio={3} className="mb-5" />
+
       <h1 className="font-display text-[26px] font-extrabold leading-none mb-1">Le championnat</h1>
       <p className="text-xs italic text-slate-500 mb-5">
         Saison {data?.season || '2026-2027'}
