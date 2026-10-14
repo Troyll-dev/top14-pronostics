@@ -243,6 +243,498 @@ function EtatDuSite() {
   );
 }
 
+/**
+ * ---------------------------------------------------------------------------
+ * LES JOUEURS
+ * ---------------------------------------------------------------------------
+ *
+ * Trois gestes qui se ressemblent de loin et n'ont rien a voir de pres :
+ *
+ *   la pause sort quelqu'un du classement et des courriels, sans rien effacer,
+ *   et se defait d'un clic ;
+ *   la suppression efface le compte et tout ce qui s'y rattache ;
+ *   le bannissement ferme l'inscription a une adresse, sans toucher aux comptes.
+ *
+ * L'ecran les tient volontairement a des distances differentes de la main. La
+ * pause est un bouton ordinaire. La suppression demande de retaper le pseudo,
+ * apres avoir lu ce qu'elle emporte. Les bannissements vivent dans leur propre
+ * bloc, plus bas, parce qu'ils ne parlent pas des memes objets — ce sont des
+ * adresses, pas des gens.
+ *
+ * Le chiffre avant la confirmation est le coeur du dispositif. Supprimer un
+ * intrus inscrit la veille et supprimer un copain de cinq mois sont le meme
+ * clic ; seule la phrase « 142 pronostics et 31 messages » distingue les deux,
+ * et elle le fait sans qu'on ait a reflechir.
+ */
+function LigneJoueur({ j, onPause, onSupprimer, occupe }) {
+  return (
+    <div className="py-3 border-b border-slate-800 last:border-0">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div className="min-w-0">
+          <p className="font-display text-[14px] font-bold flex items-center gap-2 flex-wrap">
+            {j.username}
+            {j.moi && <span className="chip-accent text-[10px] px-1.5 py-0.5 rounded-full">toi</span>}
+            {j.admin && !j.moi && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-400">admin</span>
+            )}
+            {j.enPause && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-400">en pause</span>
+            )}
+            {!j.emailVerifie && (
+              <span
+                className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-500"
+                title="Le lien de confirmation n'a jamais été suivi"
+              >
+                adresse non confirmée
+              </span>
+            )}
+          </p>
+          <p className="text-[11.5px] text-slate-500 break-all">{j.email}</p>
+          <p className="text-[11.5px] text-slate-500 mt-0.5">
+            inscrit {depuis(j.createdAt)} · {j.pronostics} pronostic{j.pronostics > 1 ? 's' : ''} ·{' '}
+            {j.messages} message{j.messages > 1 ? 's' : ''}
+            {j.dernierMessageAt && <> · dernier message {depuis(j.dernierMessageAt)}</>}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3 shrink-0">
+          <button
+            onClick={() => onPause(j)}
+            disabled={occupe || (j.admin && !j.moi)}
+            className="text-[12.5px] text-slate-400 hover:text-amber-500 transition-colors disabled:opacity-40 disabled:hover:text-slate-400"
+            title={j.admin && !j.moi ? 'On ne met pas un autre administrateur en pause' : undefined}
+          >
+            {j.enPause ? 'Réactiver' : 'Mettre en pause'}
+          </button>
+          <button
+            onClick={() => onSupprimer(j)}
+            disabled={occupe || j.moi || j.admin}
+            className="text-[12.5px] text-slate-500 hover:text-red-400 transition-colors disabled:opacity-40 disabled:hover:text-slate-500"
+            title={j.moi ? 'Pas ton propre compte' : j.admin ? 'Retire son adresse d’ADMIN_EMAILS d’abord' : undefined}
+          >
+            Supprimer
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * La confirmation d'une suppression.
+ *
+ * Elle affiche ce qui va disparaitre, exige le pseudo retape a l'identique, et
+ * propose de bannir l'adresse dans le meme geste — case cochee par defaut,
+ * parce que c'est presque toujours la meme intention : on ne supprime pas un
+ * intrus pour le voir revenir le lendemain.
+ *
+ * Retaper le pseudo n'est pas une formalite decorative. C'est la seule garantie
+ * contre le clic sur la mauvaise ligne, qui est l'erreur reelle ici — bien plus
+ * probable que de vouloir supprimer sans le vouloir.
+ */
+function ConfirmationSuppression({ cible, onAnnuler, onConfirmer, occupe }) {
+  const [saisie, setSaisie] = useState('');
+  const [bannir, setBannir] = useState(true);
+  const [motif, setMotif] = useState('');
+
+  const pret = saisie.trim() === cible.username;
+
+  return (
+    <div
+      className="mt-3 rounded-lg p-3.5"
+      style={{ backgroundColor: 'rgba(239,68,68,.07)', border: '1px solid rgba(239,68,68,.28)' }}
+    >
+      <p className="text-[13.5px] font-display font-semibold mb-1">
+        Supprimer définitivement {cible.username} ?
+      </p>
+
+      {cible.consequences ? (
+        <p className="text-[12.5px] text-slate-400 leading-relaxed mb-3">
+          Ce compte a <b>{cible.consequences.pronostics} pronostic
+          {cible.consequences.pronostics > 1 ? 's' : ''}</b> et{' '}
+          <b>{cible.consequences.messages} message
+          {cible.consequences.messages > 1 ? 's' : ''}</b>. Tout disparaît, y compris
+          sa photo et ses rappels.
+          {cible.consequences.journees.length > 0 && (
+            <>
+              {' '}Les classements des journées {cible.consequences.journees.join(', ')} seront
+              recalculés sans lui.
+            </>
+          )}
+        </p>
+      ) : (
+        <p className="text-[12.5px] text-slate-500 mb-3">Lecture de ce que ça emporte…</p>
+      )}
+
+      <label className="flex items-start gap-2.5 text-[12.5px] text-slate-400 mb-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={bannir}
+          onChange={(e) => setBannir(e.target.checked)}
+          className="mt-0.5 w-4 h-4 accent-amber-500 cursor-pointer"
+        />
+        <span>
+          Bannir aussi <b className="break-all">{cible.email}</b> — l’adresse ne pourra plus
+          créer de compte.
+        </span>
+      </label>
+
+      {bannir && (
+        <input
+          value={motif}
+          onChange={(e) => setMotif(e.target.value.slice(0, 200))}
+          placeholder="Motif (facultatif, pour t’en souvenir)"
+          className="w-full bg-slate-950 border-[1.5px] border-slate-800 rounded-md px-3 py-1.5 mb-2
+                     text-[13px] text-white placeholder:text-slate-600
+                     focus:outline-none focus:border-amber-500 transition-colors"
+        />
+      )}
+
+      <p className="text-[12px] text-slate-500 mb-1.5">
+        Retape <b>{cible.username}</b> pour confirmer.
+      </p>
+      <input
+        value={saisie}
+        onChange={(e) => setSaisie(e.target.value)}
+        placeholder={cible.username}
+        className="w-full bg-slate-950 border-[1.5px] border-slate-800 rounded-md px-3 py-1.5 mb-3
+                   text-[13px] text-white placeholder:text-slate-600
+                   focus:outline-none focus:border-red-400 transition-colors"
+      />
+
+      <div className="flex items-center gap-3 flex-wrap">
+        <button
+          onClick={() => onConfirmer({ bannir, motif })}
+          disabled={!pret || occupe}
+          className="font-display text-[13px] font-semibold px-3.5 py-2 rounded border
+                     border-red-400/40 text-red-400 hover:bg-red-400/10 transition-colors
+                     disabled:opacity-40 disabled:hover:bg-transparent"
+        >
+          {occupe ? '…' : 'Supprimer définitivement'}
+        </button>
+        <button
+          onClick={onAnnuler}
+          className="text-[13px] text-slate-500 hover:text-amber-500 transition-colors"
+        >
+          Annuler
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function LesJoueurs() {
+  const [joueurs, setJoueurs] = useState(null);
+  const [erreur, setErreur] = useState('');
+  const [occupe, setOccupe] = useState(false);
+  const [cible, setCible] = useState(null);     // la suppression en cours de confirmation
+
+  const charger = () =>
+    api.get('/admin/joueurs')
+      .then((r) => { setJoueurs(r.data); setErreur(''); })
+      .catch((e) => setErreur(e.response?.data?.error || 'Lecture impossible'));
+
+  useEffect(() => { charger(); }, []);
+
+  const basculerPause = async (j) => {
+    setOccupe(true);
+    try {
+      await api.patch(`/admin/joueurs/${j.id}/pause`, { enPause: !j.enPause });
+      await charger();
+    } catch (e) {
+      setErreur(e.response?.data?.error || 'Changement impossible');
+    } finally {
+      setOccupe(false);
+    }
+  };
+
+  /**
+   * Ouvrir la confirmation, puis aller chercher les chiffres.
+   *
+   * Dans cet ordre, et pas l'inverse : le panneau s'ouvre tout de suite avec
+   * « Lecture de ce que ça emporte… », et les chiffres arrivent. Attendre la
+   * reponse pour ouvrir donnerait un bouton qui ne repond pas pendant une
+   * seconde, et on recliquerait.
+   */
+  const demanderSuppression = async (j) => {
+    setCible({ ...j, consequences: null });
+    try {
+      const r = await api.get(`/admin/joueurs/${j.id}/consequences`);
+      setCible((c) => (c && c.id === j.id ? { ...c, consequences: r.data } : c));
+    } catch {
+      setCible((c) => (c && c.id === j.id ? { ...c, consequences: { pronostics: '?', messages: '?', journees: [] } } : c));
+    }
+  };
+
+  const supprimer = async ({ bannir, motif }) => {
+    setOccupe(true);
+    try {
+      await api.delete(`/admin/joueurs/${cible.id}`, { data: { bannir, motif } });
+      setCible(null);
+      await charger();
+      window.dispatchEvent(new CustomEvent('bannissements-changes'));
+    } catch (e) {
+      setErreur(e.response?.data?.error || 'Suppression impossible');
+    } finally {
+      setOccupe(false);
+    }
+  };
+
+  return (
+    <div className="card">
+      <h2 className="rule-label mb-1">Les joueurs</h2>
+      <p className="text-[11.5px] text-slate-500 mb-2">
+        La pause retire du classement et des courriels sans rien effacer, et se défait.
+        La suppression, elle, efface tout.
+      </p>
+
+      {erreur && <p className="text-[12.5px] text-red-400 mb-2">{erreur}</p>}
+
+      {!joueurs ? (
+        <p className="text-[13px] text-slate-500 animate-pulse py-3">Lecture…</p>
+      ) : (
+        <>
+          {joueurs.map((j) => (
+            <div key={j.id}>
+              <LigneJoueur
+                j={j}
+                occupe={occupe}
+                onPause={basculerPause}
+                onSupprimer={demanderSuppression}
+              />
+              {cible?.id === j.id && (
+                <ConfirmationSuppression
+                  cible={cible}
+                  occupe={occupe}
+                  onAnnuler={() => setCible(null)}
+                  onConfirmer={supprimer}
+                />
+              )}
+            </div>
+          ))}
+          <p className="text-[11px] italic text-slate-600 mt-3">
+            {joueurs.length} compte{joueurs.length > 1 ? 's' : ''} ·{' '}
+            {joueurs.filter((j) => j.enPause).length} en pause
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * ---------------------------------------------------------------------------
+ * LES ADRESSES BANNIES
+ * ---------------------------------------------------------------------------
+ *
+ * Un bloc a part, parce qu'il ne parle pas des memes objets : ce sont des
+ * adresses, pas des gens. Une adresse bannie n'a pas forcement eu de compte, et
+ * un compte supprime n'implique pas que son adresse soit fermee.
+ *
+ * La liste se recharge aussi quand une suppression vient d'en ajouter une —
+ * d'ou l'evenement ecoute plus bas. Sans lui, on supprimerait un intrus en
+ * cochant « bannir », et le bloc d'en dessous continuerait d'afficher une liste
+ * vide : on douterait d'avoir bien coche.
+ */
+function AdressesBannies() {
+  const [liste, setListe] = useState(null);
+  const [email, setEmail] = useState('');
+  const [motif, setMotif] = useState('');
+  const [erreur, setErreur] = useState('');
+  const [avis, setAvis] = useState('');
+  const [occupe, setOccupe] = useState(false);
+
+  const charger = () =>
+    api.get('/admin/joueurs/bannissements')
+      .then((r) => setListe(r.data))
+      .catch((e) => setErreur(e.response?.data?.error || 'Lecture impossible'));
+
+  useEffect(() => {
+    charger();
+    const relire = () => charger();
+    window.addEventListener('bannissements-changes', relire);
+    return () => window.removeEventListener('bannissements-changes', relire);
+  }, []);
+
+  const bannir = async (e) => {
+    e.preventDefault();
+    setOccupe(true);
+    setErreur('');
+    setAvis('');
+    try {
+      const r = await api.post('/admin/joueurs/bannissements', { email, motif });
+      setEmail('');
+      setMotif('');
+      await charger();
+      // Le piege a eviter : croire qu'on vient d'expulser quelqu'un alors qu'on
+      // a seulement ferme la porte d'entree. Si un compte porte cette adresse,
+      // on le dit tout de suite.
+      if (r.data.comptesExistants?.length) {
+        setAvis(
+          `Attention : ${r.data.comptesExistants.map((c) => c.username).join(', ')} ` +
+          'utilise cette adresse. Son compte existe toujours — le bannissement ne ferme que l’inscription.'
+        );
+      }
+    } catch (e2) {
+      setErreur(e2.response?.data?.error || 'Bannissement impossible');
+    } finally {
+      setOccupe(false);
+    }
+  };
+
+  const lever = async (id) => {
+    setOccupe(true);
+    try {
+      await api.delete(`/admin/joueurs/bannissements/${id}`);
+      await charger();
+    } catch (e) {
+      setErreur(e.response?.data?.error || 'Impossible de lever');
+    } finally {
+      setOccupe(false);
+    }
+  };
+
+  return (
+    <div className="card">
+      <h2 className="rule-label mb-1">Adresses bannies</h2>
+      <p className="text-[11.5px] text-slate-500 mb-3">
+        Elles ne peuvent plus créer de compte. Les comptes existants ne sont pas touchés —
+        pour ceux-là, la pause ou la suppression.
+      </p>
+
+      <form onSubmit={bannir} className="flex gap-2 flex-wrap mb-3">
+        <input
+          type="email"
+          required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="adresse@exemple.fr"
+          className="flex-1 min-w-[180px] bg-slate-950 border-[1.5px] border-slate-800 rounded-md px-3 py-1.5
+                     text-[13px] text-white placeholder:text-slate-600
+                     focus:outline-none focus:border-amber-500 transition-colors"
+        />
+        <input
+          value={motif}
+          onChange={(e) => setMotif(e.target.value.slice(0, 200))}
+          placeholder="Motif (facultatif)"
+          className="flex-1 min-w-[140px] bg-slate-950 border-[1.5px] border-slate-800 rounded-md px-3 py-1.5
+                     text-[13px] text-white placeholder:text-slate-600
+                     focus:outline-none focus:border-amber-500 transition-colors"
+        />
+        <button type="submit" disabled={occupe} className="btn-primary text-[13px] py-1.5 shrink-0">
+          Bannir
+        </button>
+      </form>
+
+      {erreur && <p className="text-[12.5px] text-red-400 mb-2">{erreur}</p>}
+      {avis && <p className="text-[12.5px] text-amber-500 mb-2 leading-relaxed">{avis}</p>}
+
+      {!liste ? (
+        <p className="text-[13px] text-slate-500 animate-pulse">Lecture…</p>
+      ) : liste.length === 0 ? (
+        <p className="text-[12.5px] text-slate-500">Aucune adresse bannie.</p>
+      ) : (
+        liste.map((b) => (
+          <div key={b.id} className="flex items-start justify-between gap-3 py-2 border-b border-slate-800 last:border-0">
+            <div className="min-w-0">
+              <p className="text-[13px] font-display font-semibold break-all">{b.email}</p>
+              <p className="text-[11.5px] text-slate-500">
+                {depuis(b.createdAt)}
+                {b.motif && <> · {b.motif}</>}
+              </p>
+            </div>
+            <button
+              onClick={() => lever(b.id)}
+              disabled={occupe}
+              className="text-[12.5px] text-slate-500 hover:text-amber-500 transition-colors shrink-0"
+            >
+              Lever
+            </button>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
+/**
+ * ---------------------------------------------------------------------------
+ * LA MODERATION DU CHAT
+ * ---------------------------------------------------------------------------
+ *
+ * Le petit marteau, a cote des deux gros. Un message deplace ne justifie pas de
+ * s'en prendre a son auteur ; sans ce bloc, les seuls outils disponibles contre
+ * une parole de trop etaient la pause et la suppression de compte — punir
+ * quelqu'un pour une phrase, faute de pouvoir retirer la phrase.
+ *
+ * Les trente derniers messages suffisent : on modere ce qu'on vient de lire, pas
+ * les archives. La suppression est immediate et sans confirmation — un message
+ * efface par erreur se reecrit, ce qui n'est pas le cas d'un compte.
+ */
+function ModerationChat() {
+  const [messages, setMessages] = useState(null);
+  const [erreur, setErreur] = useState('');
+  const [occupe, setOccupe] = useState(false);
+
+  const charger = () =>
+    api.get('/messages?limit=30')
+      .then((r) => setMessages(r.data.slice().reverse()))
+      .catch((e) => setErreur(e.response?.data?.error || 'Lecture impossible'));
+
+  useEffect(() => { charger(); }, []);
+
+  const effacer = async (id) => {
+    setOccupe(true);
+    try {
+      await api.delete(`/messages/${id}`);
+      await charger();
+    } catch (e) {
+      setErreur(e.response?.data?.error || 'Suppression impossible');
+    } finally {
+      setOccupe(false);
+    }
+  };
+
+  return (
+    <div className="card">
+      <h2 className="rule-label mb-1">Modération du Comptoir</h2>
+      <p className="text-[11.5px] text-slate-500 mb-3">
+        Les trente derniers messages. Retirer un message ne touche pas à son auteur,
+        et la disparition arrive chez les autres dans les six secondes.
+      </p>
+
+      {erreur && <p className="text-[12.5px] text-red-400 mb-2">{erreur}</p>}
+
+      {!messages ? (
+        <p className="text-[13px] text-slate-500 animate-pulse">Lecture…</p>
+      ) : messages.length === 0 ? (
+        <p className="text-[12.5px] text-slate-500">Le salon est vide.</p>
+      ) : (
+        <div className="max-h-[22rem] overflow-y-auto pr-1">
+          {messages.map((m) => (
+            <div key={m.id} className="flex items-start justify-between gap-3 py-2 border-b border-slate-800 last:border-0">
+              <div className="min-w-0">
+                <p className="text-[11.5px] text-slate-500">
+                  {m.user?.username} · {depuis(m.createdAt)}
+                </p>
+                <p className="text-[13px] break-words">{m.body}</p>
+              </div>
+              <button
+                onClick={() => effacer(m.id)}
+                disabled={occupe}
+                className="text-[12.5px] text-slate-500 hover:text-red-400 transition-colors shrink-0"
+                title="Retirer ce message"
+              >
+                Retirer
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AdminPage() {
   const { user } = useAuth();
   const [teams, setTeams] = useState([]);
@@ -324,6 +816,15 @@ export default function AdminPage() {
 
       {/* L'état du site, en tête : c'est ce qu'on vient chercher. */}
       <EtatDuSite />
+
+      {/* Puis les gens : qui joue, qui dort, qui n'entre plus, et ce qui se dit
+          au Comptoir. Avant les formulaires de match, qui ne servent plus qu'en
+          depannage depuis que les horaires et les resultats arrivent seuls. */}
+      <LesJoueurs />
+
+      <AdressesBannies />
+
+      <ModerationChat />
 
       {/* Créer un match */}
       <div className="card">
