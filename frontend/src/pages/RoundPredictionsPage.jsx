@@ -6,6 +6,7 @@ import TeamCrest from '../components/TeamCrest';
 import SelecteurJournee from '../components/SelecteurJournee';
 import IconeJoker from '../components/IconeJoker';
 import IconeAffiche from '../components/IconeAffiche';
+import Bandeau from '../components/Bandeau';
 
 /**
  * La couleur d'une cellule du tableau.
@@ -202,6 +203,24 @@ export default function RoundPredictionsPage() {
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-6">
+      {/* Le bandeau de la page : la même salle que sur le Championnat, mais
+          tournée vers l'écran, un soir de Toulouse - La Rochelle à la 72e.
+
+          Même proportion que l'autre, 3/1, parce que l'image est panoramique et
+          qu'on ne va pas en jeter un tiers par le côté pour entrer dans un 16/9.
+          Les 86 pixels retirés en bas de l'originale tombaient de toute façon
+          sous le dégradé qui fond le bandeau dans la page.
+
+          `tailles` est la seule chose qui distingue cet appel des autres : cette
+          page est la plus large du site, et sans cette précision le navigateur
+          aurait étiré l'image de 1008 pixels sur une colonne de 1152. */}
+      <Bandeau
+        nom="resultats-chien"
+        ratio={3}
+        tailles="(min-width: 1184px) 1152px, 100vw"
+        className="mb-5"
+      />
+
       <div className="flex items-baseline justify-between gap-3 mb-1">
         <h1 className="font-display text-[26px] font-extrabold leading-none">Résultats</h1>
         <Link to="/pronostics" className="text-sm text-slate-500 hover:text-amber-500 transition-colors whitespace-nowrap">

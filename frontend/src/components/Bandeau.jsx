@@ -1,8 +1,8 @@
 /**
  * Le bandeau d'une page.
  *
- * Quatre pages en portent un — Bienvenue, Accueil, Classement, Mes pronos — et
- * il n'y en a qu'une implémentation. C'est l'objet de ce fichier : la première
+ * Six pages en portent un — Bienvenue, Accueil, Classement, Mes pronos,
+ * Championnat, Résultats — et il n'y en a qu'une implémentation. C'est l'objet de ce fichier : la première
  * version vivait dans WelcomePage, et les autres pages l'auraient recopiée.
  * Quatre copies d'un même réglage, ce sont quatre occasions pour l'une d'elles
  * de dériver sans qu'on s'en aperçoive — un arrondi ici, un dégradé là.
@@ -58,7 +58,31 @@
  * aucune information. Les décrire à un lecteur d'écran lui ferait perdre du
  * temps avant d'arriver au contenu.
  */
-export default function Bandeau({ nom, position = 'center 50%', ratio = 16 / 9, className = '' }) {
+/**
+ * ---------------------------------------------------------------------------
+ * LA LARGEUR ANNONCÉE AU NAVIGATEUR EST ELLE AUSSI RÉGLABLE
+ * ---------------------------------------------------------------------------
+ *
+ * `sizes` ne décrit pas une mise en page : c'est la promesse faite au
+ * navigateur de la largeur que l'image occupera, et il choisit dans `srcSet`
+ * d'après cette promesse — avant d'avoir lu la moindre feuille de style. Une
+ * promesse fausse se paie donc immédiatement, et dans les deux sens : trop
+ * basse, il télécharge une image trop petite et on voit la bouillie ; trop
+ * haute, il charge un fichier inutilement lourd.
+ *
+ * Les trois premières pages tiennent dans une colonne de 768 pixels, d'où la
+ * valeur d'origine. « Résultats » est en `max-w-6xl`, soit 1152 : le navigateur
+ * y aurait pris l'image de 1008 pour l'étirer sur 1152, c'est-à-dire la seule
+ * page du site où le bandeau aurait été flou. La valeur se règle donc par page,
+ * et reste à 768 pour toutes celles qui n'en disent rien.
+ */
+export default function Bandeau({
+  nom,
+  position = 'center 50%',
+  ratio = 16 / 9,
+  tailles = '(min-width: 768px) 768px, 100vw',
+  className = '',
+}) {
   // La hauteur déclarée suit la proportion demandée. Elle ne sert pas à
   // l'affichage — `aspect-ratio` s'en charge — mais à réserver la place avant
   // le chargement : une valeur fausse ici, et la page sauterait quand même.
@@ -77,7 +101,7 @@ export default function Bandeau({ nom, position = 'center 50%', ratio = 16 / 9, 
       <img
         src={`/${nom}-1008.webp`}
         srcSet={`/${nom}-672.webp 672w, /${nom}-1008.webp 1008w, /${nom}-1344.webp 1344w`}
-        sizes="(min-width: 768px) 768px, 100vw"
+        sizes={tailles}
         alt=""
         width={largeur}
         height={hauteur}
