@@ -49,7 +49,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'prompt',
-      includeAssets: ['apple-touch-icon.png'],
+      includeAssets: ['apple-touch-ballon.png'],
       manifest: {
         name: 'Top 14 Pronostics',
         short_name: 'Top 14 Pronos',
@@ -61,14 +61,23 @@ export default defineConfig({
         orientation: 'portrait',
         background_color: '#014224',
         theme_color: '#014224',
+        // Le ballon de l'enseigne, celui du titre et de l'onglet, sur le vert
+        // du site. Trois endroits montraient trois ballons differents ; il n'y
+        // en a plus qu'un.
+        //
+        // Les fichiers changent de nom en meme temps que de dessin, et c'est
+        // volontaire : un telephone qui a deja installe l'application garde son
+        // icone en cache sous le nom qu'il connait, et la remplacer sous le
+        // meme nom ne garantit rien. Un nom neuf, lui, n'a pas de cache.
         icons: [
-          { src: '/icone-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
-          { src: '/icone-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          { src: '/icone-ballon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: '/icone-ballon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
           // Android recadre les icones selon la forme choisie par l'utilisateur —
-          // rond, carre arrondi, goutte. Ces deux-la ont le dessin reduit a 80 %
-          // pour qu'aucun rognage ne morde dessus.
-          { src: '/icone-maskable-192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
-          { src: '/icone-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          // rond, carre arrondi, goutte. Seul le disque central est garanti, et
+          // ces deux-la ont donc le ballon reduit pour qu'aucun rognage ne lui
+          // morde les pointes.
+          { src: '/icone-ballon-maskable-192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
+          { src: '/icone-ballon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
       },
       workbox: {
