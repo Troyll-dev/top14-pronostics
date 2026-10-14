@@ -25,12 +25,43 @@
  * qu'un score se joue à deux : une attaque qui marque beaucoup contre une
  * défense qui encaisse peu doit atterrir entre les deux, pas à l'un des bouts.
  *
- * Puis l'avantage du terrain, six points, partagé : trois de plus pour le
- * recevant, trois de moins pour le visiteur. Six points, c'est l'ordre de
- * grandeur admis en rugby professionnel, et c'est bien ce qu'on observe sur les
- * journées déjà jouées. Les partager plutôt que les ajouter d'un seul côté
- * laisse le total du match à peu près juste — un match à domicile n'est pas un
- * match avec six points de plus au tableau, c'est un match penché.
+ * Puis l'avantage du terrain, huit points, partagé : quatre de plus pour le
+ * recevant, quatre de moins pour le visiteur. Les partager plutôt que les
+ * ajouter d'un seul côté laisse le total du match à peu près juste — un match à
+ * domicile n'est pas un match avec huit points de plus au tableau, c'est un
+ * match penché.
+ *
+ * C'était six, « l'ordre de grandeur admis en rugby professionnel », posé à la
+ * main et jamais vérifié. Le chiffre était trop bas, et il a fallu trois mesures
+ * pour s'en apercevoir — elles sont dans `scripts/bob-backtest.js`,
+ * `bob-calibrage.js` et `bob-avantage.js`, qui se relancent quand on veut.
+ *
+ * La première : sur les journées jouées, le receveur l'emporte dans 71 % des
+ * matchs, et aucune stratégie — ni les copains, ni un Elo, ni le classement — ne
+ * fait mieux que de parier le receveur à chaque fois. Bob, lui, n'était qu'à
+ * 69 %.
+ *
+ * La deuxième, et c'est elle qui donne le chiffre : Bob se trompait de -3,3
+ * points sur les receveurs et de +6,4 sur les visiteurs. Un écart signé,
+ * constant, dans le même sens des deux côtés — c'est-à-dire une constante mal
+ * réglée, et pas du bruit.
+ *
+ * La troisième a rejoué la saison avec huit valeurs d'avantage. Tout ce qui
+ * dépasse six fait mieux que six ; huit atteint 74 % de bons vainqueurs ; et
+ * deux colonnes que personne n'optimisait vont dans le même sens, l'erreur
+ * moyenne par équipe décroissant sans exception quand l'avantage monte.
+ *
+ * Pourquoi huit et pas douze, alors que les deux se valent dans le tableau : à
+ * huit, Bob parie le receveur trois fois sur quatre, donc il lui reste un quart
+ * de matchs où il pense autre chose — c'est là qu'il est encore un modèle. À
+ * douze il le parie neuf fois sur dix : ce n'est plus Bob, c'est « le receveur
+ * gagne » déguisé en poulpe. Et si le taux de victoires à domicile de cette
+ * saison, inhabituellement haut, redescend vers sa moyenne, huit encaissera
+ * bien mieux le retour de bâton.
+ *
+ * Trente-cinq matchs, donc : c'est peu, et le choix exact entre huit et dix ne
+ * se tranche pas à cette taille. Ce qui est établi, c'est que six était trop
+ * bas.
  *
  * ---------------------------------------------------------------------------
  * Pourquoi Bob tire aux dés
@@ -84,13 +115,19 @@ const SCORE_MAX = 200;
  * strictement rien à lire. Il faut bien qu'il écrive quelque chose, et 24 est la
  * moyenne de points par équipe et par match d'une saison de Top 14 — autrement
  * dit le pronostic le moins faux qu'on puisse faire en l'absence de toute
- * information. Avec l'avantage du terrain et le tirage, ça donne un 27-21
+ * information. Avec l'avantage du terrain et le tirage, ça donne un 28-20
  * environ, qui est un score de rugby plausible.
  */
 const SCORE_DEFAUT = 24;
 
-/** L'avantage du recevant, en points, partagé entre les deux équipes. */
-const AVANTAGE_DOMICILE = 6;
+/**
+ * L'avantage du recevant, en points, partagé entre les deux équipes.
+ *
+ * Mesuré, pas choisi — voir l'en-tête de ce fichier. À relancer quand la saison
+ * aura avancé : `node scripts/bob-avantage.js` rejoue tout et dit si huit tient
+ * toujours.
+ */
+const AVANTAGE_DOMICILE = 8;
 
 /** L'écart maximal, en points, entre l'estimation et le score écrit. */
 const ALEA = 3;
