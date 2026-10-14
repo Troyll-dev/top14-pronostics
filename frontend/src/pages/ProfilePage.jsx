@@ -221,7 +221,7 @@ export default function ProfilePage() {
           placeholder="Ton pseudo"
         />
         <p className="text-[11.5px] text-slate-500 mt-2">
-          De 2 à 20 caractères. Il apparaît dans le classement, les pronos et le Comptoir.
+          De 2 à 20 caractères. Il apparaît dans le classement, les pronos et le vestiaire.
           Tes anciens messages et pronostics suivent automatiquement.
         </p>
 
@@ -375,6 +375,8 @@ export default function ProfilePage() {
       <CourrielsSection />
 
       <SecuritySection />
+
+      <DeconnexionSection />
     </div>
   );
 }
@@ -608,6 +610,84 @@ function SecuritySection() {
           Tes autres appareils déjà connectés le restent : le jeton de session garde sa validité
           jusqu’à son expiration.
         </p>
+      </div>
+    </>
+  );
+}
+
+
+/**
+ * La deconnexion.
+ *
+ * Elle etait dans la barre du haut, collee a la pastille du profil. Deux
+ * cibles voisines, dont l'une se vise plusieurs fois par semaine et l'autre
+ * trois fois par an — et dont la seconde oblige a tout retaper. Sur telephone
+ * les deux boutons se touchaient presque. Le rapport entre la frequence
+ * d'usage et le prix de l'erreur ne tenait pas.
+ *
+ * Elle est donc ici, en bas de la page Profil, apres les reglages : c'est la
+ * convention de tous les sites, et c'est aussi l'endroit ou l'on va quand on
+ * veut faire quelque chose a son compte. Deux clics au lieu d'un, et c'est tout
+ * l'interet.
+ *
+ * Un fond rouge tres pale plutot qu'un bouton rouge plein : le bloc doit se
+ * reperer en descendant la page sans avoir l'air d'une alerte. Rien n'ici n'est
+ * dangereux — on se reconnecte — mais rien n'y est anodin non plus.
+ *
+ * Les couleurs sont en style direct et non en classes du projet : celles-ci
+ * basculent avec le theme, alors que ce fond-la doit rester le meme fond pale
+ * de jour comme de nuit. Meme raison que l'alerte de fraicheur du Championnat.
+ *
+ * Pas de confirmation : elle serait de trop maintenant que le bouton n'est plus
+ * a portee de pouce d'un lien qu'on utilise tous les jours. On ne fait pas
+ * payer deux fois la meme prudence.
+ */
+function DeconnexionSection() {
+  const { logout } = useAuth();
+
+  return (
+    <>
+      <h2 className="rule-label mt-8 mb-3">Quitter</h2>
+
+      <div
+        className="card"
+        style={{
+          backgroundColor: 'rgba(239, 68, 68, 0.07)',
+          borderColor: 'rgba(239, 68, 68, 0.28)',
+        }}
+      >
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="min-w-0 flex items-center gap-3">
+            {/* La meme porte que celle qui etait dans la barre : le geste change
+                d'endroit, pas de dessin. */}
+            <img
+              src="/nav/deconnexion-48.webp"
+              srcSet="/nav/deconnexion-48.webp 48w, /nav/deconnexion-96.webp 96w"
+              sizes="24px"
+              alt=""
+              width={24}
+              height={24}
+              decoding="async"
+              className="shrink-0 select-none"
+              style={{ width: 24, height: 24 }}
+            />
+            <div className="min-w-0">
+              <p className="text-[13.5px] font-display font-semibold">Se déconnecter</p>
+              <p className="text-[11.5px] text-slate-500 leading-relaxed">
+                Rien n&rsquo;est effacé&nbsp;: tes pronostics, tes points et tes messages
+                restent. Il faudra juste te reconnecter.
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={logout}
+            className="font-display text-[13px] font-semibold px-3.5 py-2 rounded border shrink-0
+                       border-red-400/40 text-red-400 hover:bg-red-400/10 transition-colors"
+          >
+            Se déconnecter
+          </button>
+        </div>
       </div>
     </>
   );

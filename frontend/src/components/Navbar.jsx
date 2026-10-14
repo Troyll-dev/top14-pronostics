@@ -78,7 +78,7 @@ function Pastille({ n, className = '' }) {
 }
 
 export default function Navbar() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const { pathname } = useLocation();
 
   const [theme, setTheme] = useState(
@@ -186,15 +186,14 @@ export default function Navbar() {
           LA BARRE DU HAUT
 
           Sur ordinateur et sur tablette, elle porte tout : l'enseigne, les
-          sept onglets, le theme, le profil et la deconnexion. C'est la barre
-          que le site a toujours eue, et elle ne change pas — a partir de `lg`,
-          ce fichier se comporte exactement comme avant.
+          sept onglets, le theme et le profil. La deconnexion y figurait aussi ;
+          elle est descendue dans la page Profil, voir plus bas.
 
           Sur telephone, elle perd ses onglets : ils sont descendus en bas. Il
-          lui reste l'enseigne et les trois commandes de droite, qui n'ont rien
-          a faire dans une barre d'onglets — le theme et la deconnexion ne sont
-          pas des pages, et les ranger parmi les pages aurait fait neuf cibles
-          la ou six tiennent deja juste.
+          lui reste l'enseigne et les commandes de droite, qui n'ont rien a
+          faire dans une barre d'onglets — le theme n'est pas une page, et le
+          ranger parmi les pages aurait fait une cible de plus la ou six
+          tiennent deja juste.
 
           Ce qui se gagne au passage : l'enseigne redevient visible sur
           telephone. Elle avait ete masquee en dessous de `lg` parce que ses
@@ -322,49 +321,21 @@ export default function Navbar() {
               <span className="nav-tx text-sm hidden lg:block">{user?.username}</span>
             </Link>
 
-            {/* La deconnexion.
+            {/* La deconnexion n'est plus ici.
 
-                C'etait une fleche « ↪ » dessinee par la police du systeme, donc
-                differente sur chaque appareil et etrangere au trait du reste de
-                la barre. C'est maintenant une porte avec une fleche rouge, du
-                meme atelier que les onglets.
+                Elle a longtemps occupe cette place, d'abord en fleche « ↪ »,
+                puis en porte dessinee. Elle est partie dans la page Profil, en
+                bas, apres les reglages.
 
-                Ce qu'on perd en chemin, et qu'il faut avoir en tete : l'ancienne
-                fleche passait au rouge au survol, ce qui prevenait avant le clic.
-                Une image ne change pas de couleur ; le rouge est donc permanent.
-                La compensation est le `title`, et le fait que la porte ouverte
-                dise d'elle-meme ce qu'elle fait — ce que « ↪ » ne faisait pas.
+                Ce qui l'a chassee : elle etait collee a la pastille du profil,
+                a quelques pixels d'un lien qu'on vise plusieurs fois par
+                semaine, pour une action qu'on fait trois fois par an et qui
+                oblige a tout retaper ensuite. Sur telephone, ou les deux
+                boutons se touchent presque, le rapport entre la frequence
+                d'usage et le prix de l'erreur etait indefendable.
 
-                Vingt-deux pixels comme l'engrenage et le theme, ses voisins. */}
-            <button
-              onClick={logout}
-              title="Se déconnecter"
-              className="group hover:bg-white/10 rounded-md px-1 py-1 shrink-0 transition-colors"
-            >
-              {/* Le virage au rouge, par filtre colorimetrique.
-
-                  L'ancienne fleche « ↪ » passait au rouge au survol, ce qui
-                  prevenait avant le clic qu'on allait sortir. Une image ne
-                  change pas de couleur ; un filtre, si.
-
-                  `saturate` et `hue-rotate` poussent la brique de la fleche
-                  vers un rouge franc. Ce qu'il faut savoir, parce que ca ne se
-                  devine pas en lisant la ligne : un filtre s'applique a toute
-                  l'image, donc le bois et l'or s'orangent aussi. Mesure a 22
-                  pixels, l'effet se lit comme « l'icone s'allume », ce qui est
-                  le message voulu — mais ce n'est pas un recolorage de la seule
-                  fleche, et il ne faut pas le pousser plus loin sous peine de
-                  virer au fluorescent.
-
-                  `group` sur le bouton et `group-hover` sur l'image : c'est le
-                  bouton qu'on survole, l'image n'est qu'une partie de sa
-                  surface. */}
-              <IconeNav
-                nom="deconnexion"
-                taille={22}
-                className="transition duration-150 group-hover:saturate-200 group-hover:-hue-rotate-15 group-hover:brightness-110"
-              />
-            </button>
+                Ce qu'on y perd, et qu'il faut assumer : deux clics au lieu
+                d'un. C'est exactement le but. */}
           </div>
         </div>
       </nav>
