@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 import Avatar, { bumpAvatarVersion, inkOn, initialsOf, ringShadow } from '../components/Avatar';
@@ -376,6 +377,8 @@ export default function ProfilePage() {
 
       <SecuritySection />
 
+      <AdministrationSection />
+
       <DeconnexionSection />
     </div>
   );
@@ -687,6 +690,70 @@ function DeconnexionSection() {
           >
             Se déconnecter
           </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+
+/**
+ * L'administration.
+ *
+ * Elle etait un engrenage dans la barre de navigation, et elle en est partie
+ * pour deux raisons.
+ *
+ * La premiere : administrer n'est pas naviguer. Les six onglets menent a des
+ * pages ou l'on joue ; celle-ci sert a regler le site, et ce qui regle le site
+ * se range avec ce qui regle son compte.
+ *
+ * La seconde est un defaut qu'on a trouve en deplacant la premiere : cet
+ * engrenage s'affichait pour tout le monde. Le serveur dit pourtant qui est
+ * administrateur — `user.admin`, calcule a chaque connexion a partir de la
+ * liste qui vit dans l'environnement — et la page elle-meme est gardee de son
+ * cote. Mais l'affichage ne posait jamais la question, et sept joueurs sur huit
+ * voyaient donc une porte qui ne leur aurait repondu que par un refus.
+ *
+ * Le test est ici, et c'est de la politesse, pas de la securite : la vraie
+ * porte reste cote serveur. Cacher un bouton n'a jamais protege une page.
+ */
+function AdministrationSection() {
+  const { user } = useAuth();
+
+  if (!user?.admin) return null;
+
+  return (
+    <>
+      <h2 className="rule-label mt-8 mb-3">Administration</h2>
+
+      <div className="card">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="min-w-0 flex items-center gap-3">
+            {/* Le meme engrenage que celui de la barre : il change de place,
+                pas de dessin. */}
+            <img
+              src="/nav/admin-48.webp"
+              srcSet="/nav/admin-48.webp 48w, /nav/admin-96.webp 96w"
+              sizes="24px"
+              alt=""
+              width={24}
+              height={24}
+              decoding="async"
+              className="shrink-0 select-none"
+              style={{ width: 24, height: 24 }}
+            />
+            <div className="min-w-0">
+              <p className="text-[13.5px] font-display font-semibold">Gérer le site</p>
+              <p className="text-[11.5px] text-slate-500 leading-relaxed">
+                L&rsquo;état des tâches automatiques, les journées, les joueurs. Visible
+                de toi seul.
+              </p>
+            </div>
+          </div>
+
+          <Link to="/admin" className="btn-primary text-[13px] py-2 shrink-0">
+            Ouvrir l&rsquo;administration
+          </Link>
         </div>
       </div>
     </>

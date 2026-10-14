@@ -165,8 +165,20 @@ export default function Navbar() {
    * l'un de l'autre au premier ajout, et c'est toujours celui qu'on ne teste
    * pas, le téléphone, qui serait resté en arrière.
    *
-   * L'administration est à part, en bas de ce fichier : elle ne concerne qu'une
-   * personne, et elle ne mérite donc pas un septième des onglets du téléphone.
+   * L'administration n'est plus dans cette liste, ni ailleurs dans ce fichier.
+   * Elle est passée dans la page Profil, et pour deux raisons.
+   *
+   * La première est qu'elle ne concerne qu'une personne : elle ne méritait pas
+   * un septième des onglets du téléphone, et elle occupait dans la barre du
+   * haut une place que rien d'autre ne vient réclamer.
+   *
+   * La seconde est un vrai défaut, découvert en déplaçant la première : cet
+   * engrenage était affiché à tout le monde. Le serveur dit pourtant depuis
+   * toujours qui est administrateur — `user.admin`, calculé à chaque connexion
+   * — et la page `/admin` est bien gardée de son côté. Mais la barre, elle, ne
+   * posait jamais la question : les sept autres joueurs voyaient donc un onglet
+   * qui ne leur aurait répondu que par un refus. Le test manquant est désormais
+   * dans la page Profil, qui n'affiche le bloc qu'aux administrateurs.
    */
   const pages = [
     { to: '/', icone: 'accueil', label: 'Accueil' },
@@ -177,8 +189,6 @@ export default function Navbar() {
     { to: '/chat', icone: 'comptoir', label: 'Comptoir', badge: unread },
   ];
 
-  const admin = { to: '/admin', icone: 'admin', label: 'Admin' };
-  const onglets = [...pages, admin];
 
   return (
     <>
@@ -186,7 +196,7 @@ export default function Navbar() {
           LA BARRE DU HAUT
 
           Sur ordinateur et sur tablette, elle porte tout : l'enseigne, les
-          sept onglets, le theme et le profil. La deconnexion y figurait aussi ;
+          six onglets, le theme et le profil. La deconnexion y figurait aussi ;
           elle est descendue dans la page Profil, voir plus bas.
 
           Sur telephone, elle perd ses onglets : ils sont descendus en bas. Il
@@ -255,7 +265,7 @@ export default function Navbar() {
               n'existait que pour le telephone, qui a maintenant sa propre
               barre. Au-dessus de `lg` tout tient, et tout tenait deja. */}
           <div className="hidden lg:flex items-center gap-0.5">
-            {onglets.map((l) => (
+            {pages.map((l) => (
               <Link
                 key={l.to}
                 to={l.to}
@@ -277,21 +287,9 @@ export default function Navbar() {
           </div>
 
           <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-            {/* L'administration sur telephone.
-                Elle n'est pas dans la barre du bas : six onglets y tiennent,
-                sept les rendraient tous plus etroits que le pouce qui les
-                vise, et le septieme ne sert qu'a une personne. Un engrenage
-                dans la barre du haut lui va bien — c'est la que les reglages
-                se cherchent, et c'est la qu'elle ne gene personne. */}
-            <Link
-              to={admin.to}
-              title={admin.label}
-              className={`lg:hidden rounded-md px-1 py-1 transition-colors ${
-                pathname === admin.to ? 'tab-on' : 'hover:bg-white/10'
-              }`}
-            >
-              <IconeNav nom={admin.icone} taille={22} />
-            </Link>
+            {/* L'engrenage de l'administration etait ici, affiche a tout le
+                monde et menant a une page refusee a sept joueurs sur huit. Il
+                est dans la page Profil, sous condition d'etre administrateur. */}
 
             {/* Le bouton de theme montre la destination, pas l'etat courant :
                 en theme nuit il affiche le soleil, parce qu'un bouton promet
