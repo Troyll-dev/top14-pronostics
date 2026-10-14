@@ -24,6 +24,7 @@ const { startScheduleCron } = require('./cron/schedule.cron');
 const { startRecapCron } = require('./cron/recap.cron');
 const { startCompositionCron } = require('./cron/composition.cron');
 const { startStatsCron } = require('./cron/stats.cron');
+const { startMeteoCron } = require('./cron/meteo.cron');
 const { startSanteCron } = require('./cron/sante.cron');
 
 const app = express();
@@ -111,6 +112,13 @@ app.listen(PORT, () => {
   startRecapCron();
   startCompositionCron();
   startStatsCron();
+
+  /*
+   * Le releve meteo. Il n'est pas vital — une rencontre sans meteo s'affiche
+   * sans meteo — mais il est surveille comme les autres : une tache qui ne
+   * tourne plus doit se voir, meme quand ce qu'elle produit est accessoire.
+   */
+  startMeteoCron();
 
   /**
    * Et la tache qui surveille les autres.

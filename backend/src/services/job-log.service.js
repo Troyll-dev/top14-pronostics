@@ -75,6 +75,7 @@ const TACHES = {
   COMPOSITIONS: 'compositions',
   STATISTIQUES: 'statistiques',
   HORAIRES: 'horaires',
+  METEO: 'meteo',
   RAPPELS: 'rappels',
   BILAN: 'bilan',
 };
@@ -89,6 +90,8 @@ const TACHES = {
  *   sauvegarde    passe le lundi et le samedi ; plus grand intervalle normal
  *                 cinq jours (lundi -> samedi), donc huit.
  *   horaires      une fois par jour, donc deux.
+ *   meteo         deux fois par jour, donc deux. Hors saison elle ne releve
+ *                 rien mais enregistre son passage, comme les autres.
  *   compositions  quatre fois par jour, donc deux.
  *   statistiques  deux fois par jour, donc deux.
  *   classement    trois fois par jour par le filet de securite, donc deux.
@@ -107,6 +110,7 @@ const TACHES = {
 const SEUILS_JOURS = {
   [TACHES.SAUVEGARDE]: 8,
   [TACHES.HORAIRES]: 2,
+  [TACHES.METEO]: 2,
   [TACHES.COMPOSITIONS]: 2,
   [TACHES.STATISTIQUES]: 2,
   [TACHES.CLASSEMENT]: 2,

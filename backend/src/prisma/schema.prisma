@@ -129,6 +129,22 @@ model Match {
   broadcaster  String?
   composition  Json?
   compositionAt  DateTime?
+
+  /// La meteo prevue a l'heure du coup d'envoi, relevee sur Open-Meteo.
+  ///
+  /// En JSON et non en colonnes separees : c'est un bloc qu'on affiche tel quel
+  /// et sur lequel on ne fait ni tri ni filtre. Le jour ou l'on voudrait
+  /// chercher « les matchs sous la pluie », ce serait a revoir — et ce jour n'a
+  /// aucune raison d'arriver.
+  ///
+  /// `meteoAt` dit quand le releve a ete fait, et il compte autant que la
+  /// prevision : celle de mardi pour samedi n'est pas celle de vendredi pour
+  /// samedi, et l'ecran doit pouvoir donner son age.
+  ///
+  /// Vide pour une rencontre lointaine, et ce n'est pas une panne : au-dela
+  /// d'une dizaine de jours, aucune prevision ne vaut rien.
+  meteo          Json?
+  meteoAt        DateTime?
   stats          Json?
   statsAt        DateTime?
   featured     Boolean       @default(false)
