@@ -172,6 +172,86 @@ function PointsChip({ prediction }) {
 }
 
 /**
+ * La météo du coup d'envoi.
+ *
+ * Elle se range à gauche de l'en-tête, avec la date et le diffuseur : ce sont
+ * les trois réponses à la même question — quand, sur quelle chaîne, et par quel
+ * temps. Et comme le diffuseur, elle disparaît une fois le match joué : savoir
+ * qu'il pleuvait n'apprend plus rien quand le score est connu, et la place
+ * revient à ce qui compte.
+ *
+ * Ce qu'elle dit et ce qu'elle tait. Température, temps, et vent — dans cet
+ * ordre, du plus attendu au plus décisif. La pluie n'apparaît que s'il y en a :
+ * « 0 mm » sur six cartes sur sept est du bruit, et l'absence de mention se lit
+ * très bien comme « il ne pleut pas ».
+ *
+ * Deux valeurs s'allument en ambre, et c'est tout l'intérêt d'afficher ça dans
+ * une appli de pronostics plutôt que dans un bulletin : un vent au-delà de
+ * vingt-cinq kilomètres-heure et une pluie au-delà d'un millimètre changent un
+ * match de rugby — les buteurs manquent, le jeu au pied devient un pari, les
+ * scores baissent. Le reste est une information de confort.
+ *
+ * « Météo bientôt » pour une rencontre lointaine. Sans cette mention, une carte
+ * sans météo à côté de six qui en ont une ressemble à une panne ; avec elle, on
+ * comprend qu'aucune prévision ne vaut rien à plus de dix jours. C'est la même
+ * règle que côté serveur, écrite ici au même endroit que ce qu'elle explique.
+ */
+function Meteo({ match, state }) {
+  if (state !== 'avenir') return null;
+
+  const commun =
+    'font-display text-[9.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 ' +
+    'rounded border whitespace-nowrap';
+
+  if (!match.meteo) {
+    const jours = (new Date(match.kickoff) - Date.now()) / 86400000;
+    if (jours <= 10) return null;   // relevée sous peu, inutile de l'annoncer
+    return (
+      <span
+        title="Aucune prévision fiable au-delà de dix jours : elle apparaîtra en approchant."
+        className={`${commun} bg-slate-800/40 text-slate-600 border-slate-800`}
+      >
+        météo bientôt
+      </span>
+    );
+  }
+
+  const { temperature, libelle, vent, pluie, heure } = match.meteo;
+  const venteux = vent >= 25;
+  const pluvieux = pluie >= 1;
+  const notable = venteux || pluvieux;
+
+  const quand = heure
+    ? new Date(heure).toLocaleString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+    : null;
+
+  const releve = match.meteoAt
+    ? new Date(match.meteoAt).toLocaleString('fr-FR', {
+        day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
+      })
+    : null;
+
+  return (
+    <span
+      title={
+        `Prévision à l'heure du coup d'envoi${quand ? ` (${quand})` : ''}` +
+        (releve ? `, relevée le ${releve}` : '')
+      }
+      className={`${commun} ${
+        notable
+          ? 'bg-amber-500/15 text-amber-500 border-amber-500/40'
+          : 'bg-slate-700/40 text-slate-400 border-slate-700'
+      }`}
+    >
+      {temperature}&nbsp;°C · {libelle}
+      {pluvieux && <> · {pluie}&nbsp;mm</>}
+      {' · '}
+      {vent}&nbsp;km/h
+    </span>
+  );
+}
+
+/**
  * Les scores saisis ne vivent plus dans cette carte mais dans MatchesPage,
  * qui les sauvegarde dans le navigateur et sait tout valider d'un coup.
  * La carte est donc pilotee par `draft` et remonte chaque frappe.
@@ -427,6 +507,7 @@ export default function MatchCard({
               📺 {match.broadcaster}
             </span>
           )}
+          <Meteo match={match} state={state} />
         </span>
 
         {/* À droite, ce qui concerne le pronostic : les multiplicateurs puis
