@@ -67,8 +67,14 @@ async function main() {
         console.log(`   ${stade.stade} : pas de prevision utilisable (trop loin, ou heure introuvable)\n`);
         continue;
       }
+      // Affiche en heure de Paris, comme le coup d'envoi juste au-dessus :
+      // c'est le seul moyen de verifier d'un coup d'oeil que les deux heures
+      // correspondent, ce qui est tout l'objet de cet essai.
+      const heure = new Date(meteo.heure).toLocaleString('fr-FR', {
+        timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
+      });
       console.log(
-        `   ${meteo.stade} · ${meteo.heure} · ${meteo.temperature} °C · ` +
+        `   ${meteo.stade} · ${heure} · ${meteo.temperature} °C · ` +
         `${meteo.pluie} mm · ${meteo.vent} km/h · ${meteo.libelle}\n`
       );
     } catch (err) {

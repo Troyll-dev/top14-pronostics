@@ -148,7 +148,23 @@ async function relever(match) {
     `?latitude=${stade.lat}&longitude=${stade.lon}` +
     '&hourly=temperature_2m,precipitation,wind_speed_10m,weather_code' +
     `&forecast_days=${Math.min(16, Math.max(1, jours))}` +
-    '&timezone=Europe%2FParis';
+    /*
+     * En UTC, et surtout pas en heure de Paris.
+     *
+     * Open-Meteo rend des horaires sans fuseau — « 2026-10-24T15:00 ». Demandes
+     * en heure de Paris, ils sont justes mais muets sur leur fuseau, et Node les
+     * relit alors dans celui du serveur : UTC sur Railway. Tout le releve se
+     * decalait donc de deux heures, ce qu'un essai reel a montre du premier coup
+     * — un match de 21 h se voyait attribuer la meteo de 19 h.
+     *
+     * Pire que l'erreur elle-meme : sa taille change deux fois par an avec
+     * l'heure d'ete, donc elle aurait semble se corriger toute seule fin octobre
+     * avant de revenir en mars.
+     *
+     * En UTC des deux cotes, il n'y a plus aucune conversion implicite. L'heure
+     * de Paris n'apparait qu'a l'affichage, comme pour les coups d'envoi.
+     */
+    '&timezone=UTC';
 
   const reponse = await fetch(url, { headers: { 'User-Agent': 'top14-pronostics' } });
   if (!reponse.ok) throw new Error(`Open-Meteo a repondu ${reponse.status}`);
@@ -157,13 +173,15 @@ async function relever(match) {
   const heures = data?.hourly?.time;
   if (!Array.isArray(heures) || !heures.length) return null;
 
-  // L'heure la plus proche du coup d'envoi. Les horaires arrivent en heure de
-  // Paris sans fuseau (« 2026-10-18T21:00 ») : on les lit comme tels, ce qui est
-  // coherent puisque `timezone=Europe/Paris` a ete demande.
+  // L'heure la plus proche du coup d'envoi. Le « Z » ajoute a la volee est ce
+  // qui rend la lecture non ambigue : sans lui, Node interprete une date sans
+  // fuseau dans celui du serveur, et c'est exactement le bug corrige ci-dessus.
+  const instant = (t) => new Date(`${t}Z`).getTime();
+
   let meilleur = 0;
   let distance = Infinity;
   for (let i = 0; i < heures.length; i++) {
-    const d = Math.abs(new Date(heures[i]).getTime() - coup.getTime());
+    const d = Math.abs(instant(heures[i]) - coup.getTime());
     if (d < distance) { distance = d; meilleur = i; }
   }
 
@@ -174,7 +192,9 @@ async function relever(match) {
 
   return {
     stade: stade.stade,
-    heure: heures[meilleur],
+    // L'instant, en UTC et explicitement date : l'ecran le formatera dans le
+    // fuseau du lecteur, comme il formate deja les coups d'envoi.
+    heure: new Date(instant(heures[meilleur])).toISOString(),
     temperature: Math.round(data.hourly.temperature_2m?.[meilleur]),
     pluie: Number(data.hourly.precipitation?.[meilleur] ?? 0),
     vent: Math.round(data.hourly.wind_speed_10m?.[meilleur]),
