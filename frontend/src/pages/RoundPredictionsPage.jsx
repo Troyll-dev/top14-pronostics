@@ -220,6 +220,18 @@ export default function RoundPredictionsPage() {
    * pour toutes les journees. C'est exactement ce qu'on voulait : les scores se
    * lisent en colonne d'un joueur a l'autre, et rien ne doit faire varier cette
    * hauteur d'une journee a l'autre.
+   *
+   * Reste la variation a l'interieur d'une meme ligne, qui est le defaut qu'on
+   * voit tout de suite : une case portant « +6 » sous son score compte une
+   * ligne de texte de plus que sa voisine, donc elle est plus haute, donc la
+   * ligne du tableau devient un escalier. Le contenu ne peut pas gouverner la
+   * hauteur — c'est au cadre de la fixer.
+   *
+   * `min-h-[34px]` est cette hauteur : celle du cas le plus charge, un score
+   * surmonte de sa marque et suivi de son gain. Toutes les cellules la prennent,
+   * y compris les vides, et leur contenu s'y centre verticalement. Les cases
+   * d'une meme ligne ont donc exactement la meme taille, qu'elles portent un
+   * joker, un gain, les deux ou rien.
    */
 
   return (
@@ -352,7 +364,8 @@ export default function RoundPredictionsPage() {
                           <td key={m.id} className="px-0.5 py-0.5">
                             <div
                               style={styleCellule(p)}
-                              className="relative rounded py-1 text-center font-display text-[12px] tabular-nums leading-tight"
+                              className="relative rounded py-1 min-h-[34px] flex flex-col items-center justify-center
+                                          text-center font-display text-[12px] tabular-nums leading-tight"
                             >
                               {/* Le joker et l'affiche, en coin de cellule.
 
@@ -432,30 +445,23 @@ export default function RoundPredictionsPage() {
                               )}
 
                               {p ? `${p.homeScorePred}–${p.awayScorePred}` : '—'}
-                              {/* Le gain, sous le pronostic — mais seulement
-                                  quand un multiplicateur l'a change.
+                              {/* Le gain, sous le pronostic, dans toutes les
+                                  cellules.
 
-                                  Il s'affichait partout, et partout sauf sur
-                                  sept cases il repetait ce que la couleur dit
-                                  deja : un fond vert vaut un point, inutile
-                                  d'ecrire « +1 » dessous. C'etait une ligne de
-                                  texte de plus dans chaque cellule, donc de la
-                                  hauteur prise a toutes les lignes du tableau
-                                  pour une information redondante.
+                                  Il a brievement ete reserve aux cases dont un
+                                  multiplicateur avait change la valeur, au
+                                  motif qu'ailleurs il repete ce que la couleur
+                                  dit deja. L'argument etait juste et la
+                                  conclusion fausse : un chiffre present une
+                                  fois sur sept se lit comme une exception a
+                                  decoder, alors que le meme chiffre partout se
+                                  lit comme une colonne de comptes qu'on
+                                  additionne de l'oeil jusqu'au total de droite.
 
-                                  Sur une case jouee en joker ou sur l'affiche,
-                                  en revanche, la couleur ne suffit plus : rien
-                                  ne laisse deviner « +6 » sur un fond bleu. Le
-                                  chiffre ne s'affiche donc que la ou il apprend
-                                  quelque chose.
-
-                                  La comparaison se fait sur `basePoints` : s'il
-                                  est absent — pronostics d'avant les
-                                  multiplicateurs — les deux valeurs sont egales
-                                  par construction, et rien ne s'affiche, ce qui
-                                  est correct puisque rien n'etait multiplie. */}
-                              {p && p.points !== null && p.points !== undefined &&
-                                p.points !== (p.basePoints ?? p.points) && (
+                                  Et il ne coute plus rien en hauteur depuis que
+                                  les cellules ont une taille fixe : c'etait la
+                                  vraie raison de le retirer, elle a disparu. */}
+                              {p && p.points !== null && p.points !== undefined && (
                                 <div className="text-[9.5px] font-bold opacity-80">
                                   +{p.points}
                                 </div>
