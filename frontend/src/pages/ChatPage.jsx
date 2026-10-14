@@ -4,6 +4,7 @@ import { fr } from 'date-fns/locale';
 import api from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 import Avatar from '../components/Avatar';
+import Bandeau from '../components/Bandeau';
 
 const SEEN_KEY = 't14-chat-vu';
 const POLL_MS = 6000;
@@ -186,6 +187,25 @@ export default function ChatPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6">
+      {/* Le bandeau du Comptoir : la tablée du pub, vue depuis le bar.
+
+          En 4/3, c'est-à-dire la proportion de l'image elle-même, et non une
+          bande découpée dedans. Une bande aurait été plus discrète au-dessus
+          des messages, mais elle coupait des visages : ici tout le monde est
+          entier, du type au maillot vert jusqu'aux deux filles de droite, et
+          c'est une image qui ne vaut que par ses douze têtes.
+
+          Ce que ça coûte, et c'est assumé : sur un téléphone le bandeau fait
+          les trois quarts de la largeur en hauteur, donc il faut faire défiler
+          pour atteindre le premier message. Le quart inférieur — le zinc, les
+          pompes à bière — passe sous le dégradé, ce qui adoucit la transition
+          et récupère un peu de cette hauteur visuellement.
+
+          La classe `bandeau-comptoir` n'habille rien : elle sert de repère à
+          PhotoCopains.css, qui doit savoir de combien descendre la vignette des
+          copains sur cette page. Voir le commentaire là-bas. */}
+      <Bandeau nom="comptoir-chien" ratio={4 / 3} className="bandeau-comptoir mb-5" />
+
       <h1 className="font-display text-[26px] font-extrabold leading-none mb-1">💬 Le Comptoir</h1>
       <p className="text-xs italic text-slate-500 mb-5">
         Entre nous · {messages.length} message{messages.length > 1 ? 's' : ''}
