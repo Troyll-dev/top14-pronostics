@@ -77,11 +77,29 @@ import Bandeau from '../components/Bandeau';
    dessous, c'est-a-dire pendant le defilement. */
 const OMBRE_COLONNE = '6px 0 8px -6px rgba(0,0,0,.45)';
 
+/* Les quatre teintes, version adoucie.
+ *
+ * Memes teintes qu'avant, un tiers de saturation en moins et un peu plus de
+ * clarte. Sur une case isolee les deux series se valent ; c'est a l'echelle du
+ * tableau que la premiere fatiguait — cinquante-six aplats satures cote a cote,
+ * l'oeil ne sait plus ou se poser.
+ *
+ * Ce qui ne se devine pas : l'adoucissement **augmente** le contraste avec
+ * l'encre sombre, puisqu'il eclaircit les fonds. Mesure sur #0b1020, l'encre
+ * des cellules : or 9,5, bleu 7,9, vert 6,6, rouge 6,6, contre 9,4 / 6,0 / 5,8
+ * / 4,8 auparavant. Les quatre passent le seuil de 4,5, et le rouge — le plus
+ * juste des quatre avant — gagne le plus.
+ *
+ * Ce qu'on perd, en revanche : sur le theme creme, les cases ressortent moins
+ * du fond de la carte (un rapport de 2 a 3 selon la teinte, contre 3 a 5 avec
+ * les couleurs vives). Elles restent parfaitement visibles, mais le tableau y
+ * est plus calme que claquant. C'etait le but.
+ */
 const CELLULE = {
-  3: { background: '#E8AD35', color: '#0b1020', fontWeight: 800 },  // or        score exact
-  2: { background: '#648FE5', color: '#0b1020', fontWeight: 700 },  // bleu      bon vainqueur, ecart proche
-  1: { background: '#38A169', color: '#0b1020', fontWeight: 700 },  // vert      bon vainqueur
-  0: { background: '#D9534F', color: '#0b1020', fontWeight: 600 },  // rouge     rate
+  3: { background: '#DCB261', color: '#0b1020', fontWeight: 800 },  // or        score exact
+  2: { background: '#8BA9DC', color: '#0b1020', fontWeight: 700 },  // bleu      bon vainqueur, ecart proche
+  1: { background: '#6AA585', color: '#0b1020', fontWeight: 700 },  // vert      bon vainqueur
+  0: { background: '#CE8582', color: '#0b1020', fontWeight: 600 },  // rouge     rate
 };
 
 // Pronostic posé, match pas encore joué : neutre et discret, il n'y a rien à
@@ -184,22 +202,25 @@ export default function RoundPredictionsPage() {
   const byUserMatch = {};
   for (const p of predictions) byUserMatch[`${p.user.id}-${p.matchId}`] = p;
 
-  /**
-   * Cette journée porte-t-elle des marques ?
+  /*
+   * Il n'y a plus de place reservee en haut des cellules.
    *
-   * Le bouffon et l'étoile se posent en haut des cellules, et il faut leur
-   * réserver la place — sinon ils mordent sur le score. Mais réserver cette
-   * place dans **toutes** les cellules de toutes les journées coûterait une
-   * vingtaine de pixels par ligne pour rien sur les journées d'avant la mise en
-   * vigueur des multiplicateurs, où il n'y a strictement rien à montrer.
+   * Il y en avait vingt et un pixels des qu'une journee portait une affiche ou
+   * un joker — c'est-a-dire toujours — pour que l'etoile et le bouffon ne
+   * mordent pas sur le score. Sept cases marquees faisaient donc payer le
+   * decalage aux quatre cents autres, et une journee comme la J6 etait d'un
+   * cinquieme plus haute que la J5, qui n'en portait aucune.
    *
-   * La hauteur reste en revanche la même pour toutes les cellules d'une même
-   * journée, y compris celles qui ne portent aucune marque. C'est le point à ne
-   * pas rater : les scores se lisent en colonne, d'un joueur à l'autre, et des
-   * cellules de hauteurs différentes casseraient cet alignement — ce qui est
-   * précisément pour ça que ces marques sont en coin et non à côté du score.
+   * Les marques passent a vingt pixels et se posent dans le coin, debordant
+   * legerement a droite et en haut. Mesure a la largeur reelle d'une colonne —
+   * 4,6 rem, soit une soixantaine de pixels utiles pour un score centre de
+   * trente-huit — il reste de quoi les loger sans toucher aux chiffres.
+   *
+   * La hauteur des cellules redevient donc celle d'une journee sans marque,
+   * pour toutes les journees. C'est exactement ce qu'on voulait : les scores se
+   * lisent en colonne d'un joueur a l'autre, et rien ne doit faire varier cette
+   * hauteur d'une journee a l'autre.
    */
-  const marques = !!afficheMatchId || predictions.some((p) => p.joker);
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-6">
@@ -331,7 +352,7 @@ export default function RoundPredictionsPage() {
                           <td key={m.id} className="px-0.5 py-0.5">
                             <div
                               style={styleCellule(p)}
-                              className={`relative rounded ${marques ? 'pt-[21px] pb-1' : 'py-1'} text-center font-display text-[12px] tabular-nums leading-tight`}
+                              className="relative rounded py-1 text-center font-display text-[12px] tabular-nums leading-tight"
                             >
                               {/* Le joker et l'affiche, en coin de cellule.
 
@@ -361,10 +382,10 @@ export default function RoundPredictionsPage() {
                                   colonne, d'un joueur à l'autre. */}
                               {p?.joker && !estAffiche && (
                                 <span
-                                  className="absolute -top-1 right-0 leading-none drop-shadow-[0_1px_2px_rgba(0,0,0,.45)]"
+                                  className="absolute -top-2 -right-1 leading-none drop-shadow-[0_1px_2px_rgba(0,0,0,.45)]"
                                   title="Joker : points doublés"
                                 >
-                                  <IconeJoker taille={26} />
+                                  <IconeJoker taille={20} />
                                 </span>
                               )}
 
@@ -403,21 +424,38 @@ export default function RoundPredictionsPage() {
                                   compte dans le calcul des points. */}
                               {estAffiche && !p?.joker && (
                                 <span
-                                  className="absolute -top-1 right-0 leading-none drop-shadow-[0_1px_2px_rgba(0,0,0,.45)]"
+                                  className="absolute -top-2 -right-1 leading-none drop-shadow-[0_1px_2px_rgba(0,0,0,.45)]"
                                   title="Affiche de la journée : points triplés"
                                 >
-                                  <IconeAffiche taille={26} />
+                                  <IconeAffiche taille={20} />
                                 </span>
                               )}
 
                               {p ? `${p.homeScorePred}–${p.awayScorePred}` : '—'}
-                              {/* Le gain, sous le pronostic. La couleur disait
-                                  déjà la qualité du pari, mais pas ce qu'il a
-                                  rapporté — et avec les multiplicateurs les
-                                  deux ne coïncident plus : un « bon vainqueur »
-                                  joué en joker rapporte plus qu'un score exact
-                                  ordinaire. */}
-                              {p && p.points !== null && p.points !== undefined && (
+                              {/* Le gain, sous le pronostic — mais seulement
+                                  quand un multiplicateur l'a change.
+
+                                  Il s'affichait partout, et partout sauf sur
+                                  sept cases il repetait ce que la couleur dit
+                                  deja : un fond vert vaut un point, inutile
+                                  d'ecrire « +1 » dessous. C'etait une ligne de
+                                  texte de plus dans chaque cellule, donc de la
+                                  hauteur prise a toutes les lignes du tableau
+                                  pour une information redondante.
+
+                                  Sur une case jouee en joker ou sur l'affiche,
+                                  en revanche, la couleur ne suffit plus : rien
+                                  ne laisse deviner « +6 » sur un fond bleu. Le
+                                  chiffre ne s'affiche donc que la ou il apprend
+                                  quelque chose.
+
+                                  La comparaison se fait sur `basePoints` : s'il
+                                  est absent — pronostics d'avant les
+                                  multiplicateurs — les deux valeurs sont egales
+                                  par construction, et rien ne s'affiche, ce qui
+                                  est correct puisque rien n'etait multiplie. */}
+                              {p && p.points !== null && p.points !== undefined &&
+                                p.points !== (p.basePoints ?? p.points) && (
                                 <div className="text-[9.5px] font-bold opacity-80">
                                   +{p.points}
                                 </div>
