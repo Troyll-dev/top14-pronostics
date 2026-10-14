@@ -63,6 +63,70 @@ import api from '../api/client';
  * joker ×2 — deux accents de la même teinte pour deux choses sans rapport, et on
  * finit par croire qu'elles en ont un.
  */
+/**
+ * Ce que Bob dit quand il vient de remplir.
+ *
+ * Il repondait « 3 pronos remplis · joker pose au hasard », c'est-a-dire un
+ * ticket de caisse. C'etait le seul endroit du bloc ou il n'avait pas de voix —
+ * son avis sur les grilles en a une depuis le debut, lui — et c'etait justement
+ * l'endroit ou il travaille.
+ *
+ * Ce qu'il raconte est vrai, et ca n'a pas toujours ete le cas : on a mesure sa
+ * methode sur les journees jouees avant d'ecrire ces phrases. Il designe bien le
+ * receveur environ trois fois sur quatre, il trouve bien le bon vainqueur dans
+ * sept cas sur dix, et il ne tombe bien quasiment jamais sur le score exact. Un
+ * Bob qui assume ses limites est plus drole qu'un Bob qui compte des cases, et
+ * surtout il ne promet rien qu'il ne tienne — ce qui compte, puisque le joueur
+ * decide ensuite de corriger ou non.
+ *
+ * Huit repliques tirees au sort, dans deux registres : quatre ou il avoue ses
+ * limites, quatre ou il defend ses choix. C'est un choix de personnage et non
+ * une indecision — un poulpe qui s'excuse a chaque fois devient geignard, un
+ * poulpe qui fanfaronne a chaque fois devient insupportable, et les deux humeurs
+ * en alternance font quelqu'un.
+ *
+ * Les fanfaronnes restent vraies, et c'est ce qui les rend defendables : Bob
+ * trouve bien le bon vainqueur aussi souvent que la moyenne des copains, et il a
+ * bien ete recalibre. Un personnage peut se vanter ; il ne doit pas mentir, parce
+ * qu'un joueur qui le prend au mot ne corrigera pas une case qu'il aurait du
+ * corriger.
+ *
+ * Un joueur peut appeler Bob deux journees par saison, et plusieurs fois dans la
+ * meme journee s'il efface : la meme phrase a chaque fois ferait tomber le
+ * personnage en deux clics.
+ *
+ * Elles disent toutes la meme chose sous un angle different : ce qui a ete
+ * ecrit, et que ca se corrige. Une replique qui serait seulement drole, sans
+ * rappeler qu'on peut changer ses scores, ferait perdre a Bob sa raison d'etre.
+ */
+const MOTS = [
+  // Les modestes.
+  (n, joker) =>
+    `${n} case${n > 1 ? 's remplies' : ' remplie'}${joker}. Je mise sur le receveur trois fois sur quatre — il gagne sept fois sur dix cette saison, je ne vais pas faire le malin. Corrige ce qui te déplaît.`,
+  (n, joker) =>
+    `Voilà, ${n} prono${n > 1 ? 's posés' : ' posé'}${joker}. Je ne sais ni qui est blessé ni s’il pleuvra : je lis des moyennes, c’est tout.`,
+  (n, joker) =>
+    `C’est fait, ${n} case${n > 1 ? 's' : ''}${joker}. Je trouve le bon vainqueur deux fois sur trois et jamais le score exact — si tu as une intuition, elle vaut mieux que mon arithmétique.`,
+  (n, joker) =>
+    `${n} prono${n > 1 ? 's' : ''} de poulpe${joker}. Ils comptent comme les tiens et se changent case par case : c’est fait pour.`,
+
+  // Les frimeuses. Elles disent des choses tout aussi vraies, c'est ce qui les
+  // rend defendables : Bob tombe effectivement sur le bon vainqueur aussi
+  // souvent que la moyenne des copains, et il a effectivement ete recalibre.
+  (n, joker) =>
+    `${n} case${n > 1 ? 's' : ''} expédiée${n > 1 ? 's' : ''} en quatre secondes${joker}. Je trouve le bon vainqueur aussi souvent que la moyenne des copains — eux y passent la semaine.`,
+  (n, joker) =>
+    `${n} prono${n > 1 ? 's' : ''}${joker}. Huit tentacules, quatorze chiffres, aucune hésitation. Tu peux corriger, évidemment, mais réfléchis-y à deux fois.`,
+  (n, joker) =>
+    `Grille remplie${joker}. On vient de me recalibrer l’avantage du terrain : je suis meilleur ce soir qu’hier, ce que peu de pronostiqueurs peuvent dire.`,
+  (n, joker) =>
+    `${n} case${n > 1 ? 's' : ''}, et je les assume${joker}. Le receveur gagne sept fois sur dix dans ce championnat — ce n’est pas de la paresse, c’est de la statistique.`,
+];
+
+
+/** Quand il n'y avait rien a remplir. Rare, et il vaut mieux le dire avec le ton. */
+const RIEN_A_REMPLIR = 'Rien à remplir, tout était déjà posé. Tant mieux, j’ai horreur de me répéter.';
+
 const COULEUR = {
   accord: 'text-green-400',
   proche: 'text-slate-400',
@@ -82,6 +146,13 @@ export default function Bob({
   const [envoi, setEnvoi] = useState(false);
   const [erreur, setErreur] = useState(null);
   const [bilan, setBilan] = useState(null);
+  /*
+   * La replique est tiree une fois, au moment ou Bob repond, et rangee dans
+   * l'etat. La tirer a l'affichage la ferait changer a chaque rendu du
+   * composant — a chaque frappe ailleurs sur la page —, et Bob aurait l'air de
+   * se raviser sans arret.
+   */
+  const [mot, setMot] = useState(0);
   const [avis, setAvis] = useState(null);
   const [chargeAvis, setChargeAvis] = useState(false);
   const [confirmeEffacer, setConfirmeEffacer] = useState(false);
@@ -112,6 +183,7 @@ export default function Bob({
     try {
       const { data } = await api.post('/predictions/bob', { round });
       setBilan(data);
+      setMot(Math.floor(Math.random() * MOTS.length));
       setEfface(false);
       setAvis(null); // l'avis d'avant ne vaut plus pour la grille d'après
       setVientDeRemplir(true);
@@ -172,7 +244,9 @@ export default function Bob({
     if (aValider > 0) {
       return `Attention : ${aValider} prono${aValider > 1 ? 's sont saisis' : ' est saisi'} mais pas encore envoyé${aValider > 1 ? 's' : ''}.`;
     }
-    return 'Pas besoin de Bob : tous tes pronos sont posés et validés.';
+    // Il n'a plus rien a remplir, ce qui ne veut pas dire qu'il n'a rien a
+    // faire : c'est le moment ou son avis devient le service utile.
+    return 'Tout est posé et validé. Bob n’a plus qu’à relire — demande-lui ce qu’il en pense.';
   };
 
   const alerte = !trop && aRemplir === 0 && aValider > 0;
@@ -280,12 +354,25 @@ export default function Bob({
             </p>
           )}
 
+          {/* Ce que Bob vient de faire, dit par Bob.
+
+              Le nom du match sur lequel le joker est tombe plutot que « joker
+              pose au hasard » : le joueur doit pouvoir aller le verifier, et un
+              joker qu'on ne sait pas situer est un joker qu'on subit. Si le
+              match n'est pas dans la liste — cas theorique, la liste vient de la
+              meme journee — on retombe sur la formule generale plutot que sur un
+              trou dans la phrase. */}
           {bilan && (
-            <p className="mt-3 pt-3 border-t border-slate-800 text-[12.5px] text-green-400">
+            <p className="mt-3 pt-3 border-t border-slate-800 text-[12.5px] text-green-400 leading-relaxed">
               {bilan.remplis > 0
-                ? `${bilan.remplis} prono${bilan.remplis > 1 ? 's' : ''} rempli${bilan.remplis > 1 ? 's' : ''}`
-                : 'Rien à remplir'}
-              {bilan.jokerMatchId ? ' · joker posé au hasard' : ''}
+                ? MOTS[mot](bilan.remplis, (() => {
+                    if (!bilan.jokerMatchId) return '';
+                    const m = matches.find((x) => x.id === bilan.jokerMatchId);
+                    return m
+                      ? `, joker au hasard sur ${m.homeTeam.shortName}–${m.awayTeam.shortName}`
+                      : ', joker posé au hasard';
+                  })())
+                : RIEN_A_REMPLIR}
             </p>
           )}
 
