@@ -69,7 +69,10 @@ const STADES = [
   { cles: ['la rochelle', 'stade rochelais', 'sr'], stade: 'Marcel-Deflandre', lat: 46.1536, lon: -1.1706 },
   { cles: ['bayonne', 'aviron bayonnais', 'ab'], stade: 'Jean-Dauger', lat: 43.4857, lon: -1.4860 },
   { cles: ['stade francais', 'stade francais paris', 'sfp', 'sf'], stade: 'Jean-Bouin', lat: 48.8427, lon: 2.2529 },
-  { cles: ['castres', 'castres olympique', 'co'], stade: 'Pierre-Antoine', lat: 43.6090, lon: 2.2436 },
+  // « CO » et « CAO » : la base a montre l'un, l'usage dit l'autre. Les deux sont
+  // la, parce qu'un alias de trop ne coute rien et qu'un alias manquant coute
+  // une rencontre sans meteo.
+  { cles: ['castres', 'castres olympique', 'co', 'cao'], stade: 'Pierre-Antoine', lat: 43.6090, lon: 2.2436 },
   { cles: ['montpellier', 'mhr'], stade: 'GGL Stadium', lat: 43.6327, lon: 3.8812 },
   { cles: ['lyon', 'lou', 'lou rugby'], stade: 'Matmut Stadium', lat: 45.7256, lon: 4.8320 },
   { cles: ['racing 92', 'racing', 'r92'], stade: 'Paris La Defense Arena', lat: 48.8955, lon: 2.2290 },
