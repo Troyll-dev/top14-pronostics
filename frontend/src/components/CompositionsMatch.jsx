@@ -75,6 +75,39 @@ import { useState, useRef, useLayoutEffect, useCallback } from 'react';
  * et redonnerait du noir sur fond sombre.
  */
 
+/**
+ * A partir de combien de changements parle-t-on d'une equipe remaniee ?
+ *
+ * Six sur quinze. Un club fait tourner trois a cinq titulaires d'une semaine a
+ * l'autre — blessures, fraicheur, suspension — et personne n'y voit un signal.
+ * Au-dela, c'est une decision : on garde ses cadres pour autre chose.
+ *
+ * Le seuil est un jugement, pas une mesure — contrairement a l'avantage du
+ * terrain, celui-ci n'a pas ete teste contre les resultats. Il est ecrit ici,
+ * en un seul endroit, pour qu'on puisse le corriger le jour ou l'on aura de
+ * quoi le verifier.
+ */
+const REMANIEE = 6;
+
+/** La mention de rotation, en ambre quand l'equipe est franchement remaniee. */
+function Rotation({ info, compact = false }) {
+  if (!info || info.changements === null || info.changements === undefined) return null;
+
+  const fort = info.changements >= REMANIEE;
+  const texte = compact
+    ? `${info.changements} chgt${info.changements > 1 ? 's' : ''}`
+    : `${info.changements} changement${info.changements > 1 ? 's' : ''} depuis la J${info.depuis}`;
+
+  return (
+    <span
+      title={`${info.changements} titulaire${info.changements > 1 ? 's' : ''} sur ${info.sur} n'etaient pas alignes a la J${info.depuis}`}
+      className={fort ? 'text-amber-500' : 'text-slate-600'}
+    >
+      {texte}
+    </span>
+  );
+}
+
 const CAPITAINE = {
   display: 'inline-block',
   background: '#f59e0b',
@@ -150,15 +183,21 @@ function Ligne({ joueur, court }) {
   );
 }
 
-function Camp({ nom, equipe, court, conteneur }) {
+function Camp({ nom, equipe, court, conteneur, rotation }) {
   if (!equipe) return null;
   const titulaires = equipe.titulaires || [];
   const remplacants = equipe.remplacants || [];
 
   return (
     <div ref={conteneur} className="min-w-0">
-      <p className="mb-1 truncate font-display text-[10px] font-bold uppercase tracking-wider text-slate-400">
+      <p className="truncate font-display text-[10px] font-bold uppercase tracking-wider text-slate-400">
         {nom}
+      </p>
+      {/* La rotation sous le nom du club, et pas en tete du bloc : elle parle
+          de cette equipe-la, et la poser entre les deux colonnes obligerait a
+          repeter de qui l'on parle. */}
+      <p className="mb-1 text-[10px]">
+        <Rotation info={rotation} />
       </p>
 
       <ul className="mb-2">
@@ -248,6 +287,12 @@ export default function CompositionsMatch({ match }) {
 
   const le = quand(match.compositionAt);
 
+  const rot = match?.rotation || {};
+  const remanies = [
+    { cle: 'home', nom: match.homeTeam?.shortName || match.homeTeam?.name, info: rot.home },
+    { cle: 'away', nom: match.awayTeam?.shortName || match.awayTeam?.name, info: rot.away },
+  ].filter((x) => x.info && x.info.changements >= REMANIEE);
+
   return (
     <div className="relative z-10 mt-3 pt-3 border-t border-slate-800">
       <button
@@ -259,6 +304,17 @@ export default function CompositionsMatch({ match }) {
         <span className={`text-[9px] text-amber-500 transition-transform ${ouvert ? 'rotate-90' : ''}`}>▶</span>
         Compositions
         {le && <span className="text-slate-600">· annoncées {le}</span>}
+        {/* Le chiffre apparait sur le bouton **replie**, et c'est tout
+            l'interet de la mesure : savoir qu'une equipe est remaniee sans
+            avoir a deplier quarante-six noms. Seuls les cotes franchement
+            remanies s'y affichent — en dessous du seuil, la rotation est
+            ordinaire et n'a rien a dire ici ; elle reste visible une fois le
+            bloc ouvert. */}
+        {remanies.map(({ cle, nom, info }) => (
+          <span key={cle} className="text-amber-500">
+            · {nom} <Rotation info={info} compact />
+          </span>
+        ))}
       </button>
 
       {ouvert && (
@@ -272,12 +328,14 @@ export default function CompositionsMatch({ match }) {
               equipe={c.home}
               court={court.home}
               conteneur={refHome}
+              rotation={rot.home}
             />
             <Camp
               nom={match.awayTeam?.name || 'Extérieur'}
               equipe={c.away}
               court={court.away}
               conteneur={refAway}
+              rotation={rot.away}
             />
           </div>
 

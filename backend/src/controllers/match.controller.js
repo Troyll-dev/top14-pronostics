@@ -2,6 +2,7 @@ const { PrismaClient } = require('@prisma/client');
 const { pointsFor } = require('../services/scoring');
 const { multiplicateur, afficheDeLaJournee, journeeCommencee } = require('../services/rules');
 const { forme, serie } = require('../services/team-stats.service');
+const { rotations } = require('../services/compo-rotation.service');
 
 const prisma = new PrismaClient();
 
@@ -98,6 +99,24 @@ exports.getMatches = async (req, res) => {
       }
     }
 
+    /*
+     * La rotation de chaque club : combien de titulaires ont change depuis sa
+     * derniere composition connue.
+     *
+     * C'est la seule information que les compositions portaient sans qu'on
+     * puisse la lire : il fallait retenir quarante-six noms d'une semaine sur
+     * l'autre. Un club qui change neuf titulaires pour un deplacement annonce
+     * son intention, et le chiffre le dit en trois mots.
+     */
+    let rot = null;
+    if (round) {
+      try {
+        rot = await rotations({ season, round: parseInt(round) });
+      } catch (err) {
+        console.error('[matches] rotations indisponibles :', err.message);
+      }
+    }
+
     const cote = (id) => ({
       ...(f ? { ...(f[id] || {}) } : {}),
       serie: s ? (s[id] || []) : null,
@@ -112,10 +131,16 @@ exports.getMatches = async (req, res) => {
      * a la carte d'aller les chercher a trois endroits differents pour afficher
      * un seul bloc.
      */
-    const avecForme = (m) =>
-      f || s || classement
-        ? { ...m, forme: { home: cote(m.homeTeamId), away: cote(m.awayTeamId) } }
-        : m;
+    const avecForme = (m) => {
+      if (!f && !s && !classement && !rot) return m;
+      return {
+        ...m,
+        forme: { home: cote(m.homeTeamId), away: cote(m.awayTeamId) },
+        // A cote de la composition qu'elle commente, et non dans `forme` : elle
+        // ne parle pas du niveau du club mais de la feuille de match du jour.
+        rotation: rot ? (rot[m.id] || null) : null,
+      };
+    };
 
     // Les compositions ne partent que si l'on a demande une journee.
     //
