@@ -24,15 +24,49 @@
  *
  *   <line-up-pitch home-team="RC Toulon" away-team="RC Vannes">   <- les deux camps
  *     ... player-pitch : le quinze de depart dessine sur le terrain
- *   <div class="line-up__classic-team">                           <- recevant
+ *   <div class="line-up__classic-team">                           <- une equipe
  *     <h3 class="line-up__classic-title">XV de départ</h3>
  *       <a class="player-block player-block--lineup">             x15
  *     <h3 class="line-up__classic-title">Remplaçants</h3>
  *       <a class="player-block player-block--lineup">             x8
- *   <div class="line-up__classic-team">                           <- visiteur
+ *   <div class="line-up__classic-team">                           <- l'autre
  *   <div class="line-up__classic-team line-up__classic-team--officials">
  *
- * Deux details qui decident de l'ecriture de l'analyseur.
+ * ---------------------------------------------------------------------------
+ * L'ATTRIBUT QUI DECIDE DE L'ORDRE — ET QUI A COUTE SIX JOURNEES
+ * ---------------------------------------------------------------------------
+ *
+ * Les deux blocs d'equipe ne se nomment pas. Aucun nom de club, aucun slug,
+ * aucun ecusson : rien que « XV de départ » suivi de quinze joueurs. Leur
+ * appartenance tient donc entierement a leur ordre, et cet ordre **n'est pas
+ * toujours le meme**.
+ *
+ *   <line-up-pitch home-team="LOU Rugby" away-team="Stade Rochelais"
+ *                  visiting-first>              <- le VISITEUR est ecrit en premier
+ *
+ *   <line-up-pitch home-team="Section Paloise" away-team="Castres Olympique">
+ *                                               <- le recevant est en premier
+ *
+ * Cette version lisait toujours le premier bloc comme le recevant. Elle avait
+ * donc raison quand l'attribut est absent, et tort quand il est la — soit une
+ * rencontre sur deux environ, sans regularite visible. Les compositions des six
+ * premieres journees sont en base avec les deux camps intervertis une fois sur
+ * deux, et personne ne s'en est apercu : il aurait fallu reconnaitre quarante-
+ * six joueurs de memoire. C'est un compteur de rotation, ecrit pour tout autre
+ * chose, qui a fini par le reveler en annoncant que tous les clubs changeaient
+ * quinze titulaires chaque semaine.
+ *
+ * Deux lecons dans le code ci-dessous. D'abord on lit l'attribut au lieu de
+ * supposer l'ordre. Ensuite, et surtout, **une feuille dont on ne sait pas lire
+ * l'en-tete n'est plus exploitable** : sans en-tete, on ignore l'ordre, donc on
+ * ignore a qui appartient chaque quinze, et une composition qu'on ne sait pas
+ * attribuer ne vaut rien. Mieux vaut une absence franche qu'une inversion
+ * silencieuse — c'est la difference entre « on ne sait pas » et « on se
+ * trompe », et seule la seconde trompe les joueurs.
+ *
+ * ---------------------------------------------------------------------------
+ *
+ * Deux details qui decident du reste de l'analyseur.
  *
  * Le bloc dessine sur le terrain ne porte que le quinze de depart : il ignore
  * les remplacants, qui sont precisement ceux dont on veut savoir s'ils sont la.
@@ -64,9 +98,29 @@ const RE_JOUEUR = /<a\s+href="[^"]*\/joueur\/(\d+)-[^"]*"\s+class="([^"]*)"/g;
 const RE_NUMERO = /player-block__number"[^>]*>\s*(\d+)\s*</;
 const RE_NOM = /player-block__name"[^>]*>\s*([^<]+?)\s*</;
 const RE_POSTE = /player-block__position"[^>]*>\s*([^<]+?)\s*</;
-const RE_PITCH = /<line-up-pitch\b[\s\S]{0,400}?>/;
+
+/*
+ * La balise d'en-tete, jusqu'a son chevron fermant.
+ *
+ * La borne est passee de 400 a 1200 caracteres. Les trois attributs tiennent
+ * largement dans 400, mais c'est exactement le genre de limite qui laisse
+ * tomber un attribut le jour ou la LNR en ajoute un — et cette balise porte
+ * desormais l'information qui decide de l'attribution des quinze. Une borne
+ * reste necessaire pour ne pas devorer la page entiere si le chevron manque.
+ */
+const RE_PITCH = /<line-up-pitch\b[\s\S]{0,1200}?>/;
 const RE_HOME_ATTR = /home-team="([^"]*)"/;
 const RE_AWAY_ATTR = /away-team="([^"]*)"/;
+
+/**
+ * L'attribut qui inverse l'ordre des deux blocs.
+ *
+ * C'est un attribut booleen : il est present ou il ne l'est pas, sans valeur.
+ * On exige donc une frontiere de mot de chaque cote, pour qu'un futur
+ * `data-visiting-first-something` ne le declenche pas par accident.
+ */
+const RE_VISITEUR_DABORD = /(^|[\s"'])visiting-first([\s=>"'/]|$)/;
+
 const RE_OFFICIEL = /player-block__name"[^>]*>\s*([^<]+?)\s*<[\s\S]{0,400}?player-block__position"[^>]*>\s*([^<]+?)\s*</g;
 
 const ENTITES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: '\'', nbsp: ' ' };
@@ -177,6 +231,8 @@ function arbitre(bloc) {
   return null;
 }
 
+const videEquipe = () => ({ titulaires: [], remplacants: [] });
+
 /**
  * Analyse une page « compositions ».
  *
@@ -184,27 +240,46 @@ function arbitre(bloc) {
  * composition a moins de quinze titulaires n'est pas encore publiee. La
  * distinction compte, parce que les deux cas sont normaux — la page existe des
  * l'annonce du calendrier, et ne se remplit que deux jours avant.
+ *
+ * Trois champs disent a l'appelant ce qu'il peut en faire :
+ *
+ *   ordreConnu   l'en-tete a ete lu, donc on sait a qui appartient chaque
+ *                quinze. A faux, la composition n'est PAS exploitable, meme
+ *                complete — on ne saurait pas de quel cote la ranger.
+ *   complete     les deux quinze sont publies.
+ *   visiteurEnPremier  l'ordre reellement rencontre, garde pour le rapport et
+ *                pour qu'une anomalie future soit lisible sans relire la page.
  */
 function parseCompositions(html) {
   const page = String(html || '');
   const pitch = RE_PITCH.exec(page);
   const entete = pitch ? pitch[0] : '';
+  const ordreConnu = !!pitch;
 
   const tous = blocs(page);
   const equipes = tous.filter((b) => !b.officiels);
   const off = tous.find((b) => b.officiels);
 
-  const home = equipes[0] ? joueursDuBloc(equipes[0].html) : { titulaires: [], remplacants: [] };
-  const away = equipes[1] ? joueursDuBloc(equipes[1].html) : { titulaires: [], remplacants: [] };
+  const premier = equipes[0] ? joueursDuBloc(equipes[0].html) : videEquipe();
+  const second = equipes[1] ? joueursDuBloc(equipes[1].html) : videEquipe();
+
+  // La seule ligne qui compte vraiment dans ce fichier.
+  const visiteurEnPremier = ordreConnu && RE_VISITEUR_DABORD.test(entete);
+  const home = visiteurEnPremier ? second : premier;
+  const away = visiteurEnPremier ? premier : second;
 
   return {
     homeTeam: decode(RE_HOME_ATTR.exec(entete)?.[1] || '') || null,
     awayTeam: decode(RE_AWAY_ATTR.exec(entete)?.[1] || '') || null,
+    ordreConnu,
+    visiteurEnPremier,
     arbitre: arbitre(off?.html),
     home,
     away,
     complete:
-      home.titulaires.length >= MIN_TITULAIRES && away.titulaires.length >= MIN_TITULAIRES,
+      ordreConnu &&
+      home.titulaires.length >= MIN_TITULAIRES &&
+      away.titulaires.length >= MIN_TITULAIRES,
   };
 }
 

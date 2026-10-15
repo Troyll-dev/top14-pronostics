@@ -16,9 +16,37 @@
  *
  * Ce qu'il ne fait pas, volontairement. Il ne devine rien. Une page vide est le
  * cas normal du mardi, pas une panne : elle est comptee « en attente » et rien
- * n'est ecrit. Et il refuse d'ecrire si le camp recevant annonce par la feuille
- * de match n'est pas celui de notre base — auquel cas c'est notre appariement
- * qui est faux, et une composition inversee serait pire que pas de composition.
+ * n'est ecrit.
+ *
+ * ---------------------------------------------------------------------------
+ * LES GARDE-FOUS, ET POURQUOI ILS ONT ETE RESSERRES
+ * ---------------------------------------------------------------------------
+ *
+ * Les six premieres journees ont ete ecrites avec les deux camps intervertis
+ * une fois sur deux. La cause etait dans l'analyseur — la LNR range parfois le
+ * visiteur en premier et le signale par un attribut qui n'etait pas lu, voir
+ * sources/lnr-compositions.js. Mais il faut regarder pourquoi ce service l'a
+ * laissee passer six semaines, parce que c'est la sa part de responsabilite.
+ *
+ * Le controle en place etait :
+ *
+ *     if (lu.homeTeam && ev.home && lu.homeTeam !== ev.home) { refuser }
+ *
+ * Il comparait le nom du recevant annonce par la feuille a celui attendu. Ces
+ * deux noms etaient justes — ils sont lus dans l'en-tete, que le defaut
+ * n'affectait pas. Le controle disait donc « tout va bien » pendant que les
+ * quinze changeaient de cote sous lui : il verifiait l'etiquette, pas le
+ * contenu.
+ *
+ * Et sa premiere condition, `lu.homeTeam &&`, le desarmait entierement des que
+ * ce nom manquait. Un garde-fou qui s'efface quand la donnee se degrade garde
+ * exactement dans les cas ou il ne sert a rien.
+ *
+ * Les trois refus ci-dessous sont donc ecrits dans l'autre sens : on exige une
+ * raison d'ecrire, au lieu de chercher une raison de refuser. Pas d'en-tete
+ * lisible, pas d'ecriture — car sans en-tete on ignore l'ordre des blocs, donc
+ * a qui appartient chaque quinze. Pas de nom de recevant, pas d'ecriture. Un
+ * nom qui ne correspond pas, pas d'ecriture.
  *
  * Cout reseau : une requete par rencontre, sept par journee, quelques fois par
  * jour. On espace d'une demi-seconde par politesse envers un site qu'on lit
@@ -80,11 +108,19 @@ async function journeesProches(fenetre = FENETRE_JOURS) {
   return matchs.map((m) => m.round);
 }
 
-/** Ce qu'on garde en base. Volontairement plat : lu tel quel par le front. */
+/**
+ * Ce qu'on garde en base. Volontairement plat : lu tel quel par le front.
+ *
+ * `ordre` ne sert a rien a l'affichage, et c'est voulu : il dit dans quel sens
+ * la page etait ecrite le jour de la lecture. Une composition en base devient
+ * ainsi verifiable sans retourner sur le site — et le defaut qui a coute six
+ * journees aurait ete visible dans les donnees elles-memes.
+ */
 function aEcrire(lu) {
   return {
     arbitre: lu.arbitre || null,
     url: lu.url || null,
+    ordre: lu.visiteurEnPremier ? 'visiteur-en-premier' : 'recevant-en-premier',
     home: lu.home,
     away: lu.away,
   };
@@ -134,12 +170,21 @@ function changements(avant, apres) {
  * En simulation, rien n'est ecrit et le rapport dit exactement ce qui le
  * serait — y compris les quinze noms, pour qu'on puisse verifier a l'oeil qu'on
  * n'a pas interverti les deux camps.
+ *
+ * `inclureTerminees` n'est jamais vrai en fonctionnement normal : une rencontre
+ * jouee ne change plus de composition, et la relire serait une requete pour
+ * rien. Il existe pour le rattrapage des journees ecrites de travers, qui sont
+ * precisement toutes terminees — voir scripts/compo-rattrapage.js. On le passe
+ * explicitement, a la main, et jamais depuis un cron.
  */
-async function syncCompositions({ dryRun = false, rounds = null, verbose = false } = {}) {
+async function syncCompositions({
+  dryRun = false, rounds = null, verbose = false, inclureTerminees = false,
+} = {}) {
   const cibles = rounds && rounds.length ? rounds : await journeesProches();
   const rapport = {
     ok: true, dryRun, rounds: cibles, sources: {},
-    updated: 0, skipped: 0, enAttente: 0, unmatched: [], changes: [], apercus: [],
+    updated: 0, skipped: 0, enAttente: 0, refusees: 0,
+    unmatched: [], changes: [], apercus: [],
   };
   if (!cibles.length) {
     rapport.reason = 'Aucune rencontre a venir dans la fenetre';
@@ -184,8 +229,9 @@ async function syncCompositions({ dryRun = false, rounds = null, verbose = false
       }
 
       // Une rencontre jouee ne change plus de composition : ce qui est en base
-      // est definitif, et une requete de plus n'apprendrait rien.
-      if (match.status === 'FINISHED') { rapport.skipped++; continue; }
+      // est definitif, et une requete de plus n'apprendrait rien. Sauf quand on
+      // repare ce qui a ete ecrit de travers, d'ou l'echappatoire explicite.
+      if (match.status === 'FINISHED' && !inclureTerminees) { rapport.skipped++; continue; }
 
       let lu;
       try {
@@ -199,16 +245,51 @@ async function syncCompositions({ dryRun = false, rounds = null, verbose = false
         await dors(PAUSE_MS);
       }
 
+      /*
+       * Refus 1 — l'en-tete n'a pas ete lu.
+       *
+       * C'est lui qui porte `visiting-first`, donc l'ordre des deux blocs. Sans
+       * lui, les quinze sont peut-etre complets mais on ignore a qui les
+       * attribuer. Une composition qu'on ne sait pas ranger ne vaut rien, et
+       * c'est exactement l'erreur qu'on repare : mieux vaut un manque visible.
+       */
+      if (!lu.ordreConnu) {
+        rapport.ok = false;
+        rapport.refusees++;
+        rapport.unmatched.push(
+          `J${round} ${ev.home}–${ev.away} : en-tete <line-up-pitch> illisible — ordre des camps inconnu, rien ecrit`
+        );
+        console.error(`[compositions] ${ev.home}–${ev.away} : en-tete illisible`);
+        continue;
+      }
+
       // Le mardi, la feuille existe et n'annonce personne. Ce n'est pas une
       // panne, c'est le calendrier.
       if (!lu.complete) { rapport.enAttente++; continue; }
 
-      // Le garde-fou qui compte. Si la feuille de match annonce un autre
-      // recevant que notre base, c'est notre appariement qui est faux — et une
-      // composition inversee tromperait les joueurs bien plus surement qu'une
-      // absence de composition.
-      if (lu.homeTeam && ev.home && lu.homeTeam !== ev.home) {
+      /*
+       * Refus 2 — la feuille ne nomme pas son recevant.
+       *
+       * L'ancienne version passait outre (`if (lu.homeTeam && ...)`), ce qui
+       * revenait a se fier le plus a la donnee la plus degradee.
+       */
+      if (!lu.homeTeam) {
         rapport.ok = false;
+        rapport.refusees++;
+        rapport.unmatched.push(`J${round} ${ev.home}–${ev.away} : la feuille n'annonce aucun recevant — rien ecrit`);
+        continue;
+      }
+
+      /*
+       * Refus 3 — ce n'est pas la bonne rencontre.
+       *
+       * Si la feuille annonce un autre recevant que celui attendu, c'est notre
+       * appariement qui est faux, et une composition rangee sous le mauvais
+       * club tromperait les joueurs bien plus surement qu'une absence.
+       */
+      if (ev.home && lu.homeTeam !== ev.home) {
+        rapport.ok = false;
+        rapport.refusees++;
         rapport.unmatched.push(
           `J${round} ${ev.home}–${ev.away} : la feuille annonce « ${lu.homeTeam} » comme recevant — rien ecrit`
         );
@@ -223,13 +304,15 @@ async function syncCompositions({ dryRun = false, rounds = null, verbose = false
         `J${round} ${ev.home}–${ev.away} : ` +
           (n === null ? 'composition publiee' : `${n} changement${n > 1 ? 's' : ''}`) +
           ` (${neuf.home.titulaires.length}+${neuf.home.remplacants.length} / ` +
-          `${neuf.away.titulaires.length}+${neuf.away.remplacants.length})`
+          `${neuf.away.titulaires.length}+${neuf.away.remplacants.length})` +
+          (lu.visiteurEnPremier ? ' [visiteur ecrit en premier]' : '')
       );
 
       if (verbose || dryRun) {
         rapport.apercus.push({
           match: `${ev.home} – ${ev.away}`,
           arbitre: neuf.arbitre,
+          ordre: neuf.ordre,
           home: neuf.home.titulaires.map((j) => `${j.numero} ${j.nom}${j.capitaine ? ' (cap.)' : ''}`),
           away: neuf.away.titulaires.map((j) => `${j.numero} ${j.nom}${j.capitaine ? ' (cap.)' : ''}`),
         });
@@ -248,7 +331,8 @@ async function syncCompositions({ dryRun = false, rounds = null, verbose = false
   if (rapport.unmatched.length) console.warn('[compositions] non traites :', rapport.unmatched);
   console.log(
     `[compositions] ${dryRun ? '(simulation) ' : ''}J${cibles.join(', J')} : ` +
-      `${rapport.updated} ecrite(s), ${rapport.skipped} inchangee(s), ${rapport.enAttente} en attente`
+      `${rapport.updated} ecrite(s), ${rapport.skipped} inchangee(s), ` +
+      `${rapport.enAttente} en attente, ${rapport.refusees} refusee(s)`
   );
   return rapport;
 }
