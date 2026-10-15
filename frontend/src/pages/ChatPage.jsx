@@ -566,9 +566,14 @@ export default function ChatPage() {
       </div>
 
       <p className="text-[11px] italic text-slate-600 mt-4">
+        {/* La note de bas de page dit d'abord l'ordre, parce que c'est la seule
+            chose qui surprenne : partout ailleurs, le dernier message est en
+            bas. Le reste — la relecture automatique, la mise en veille, la
+            suppression de ses propres messages — repond aux questions qu'on se
+            pose ensuite. */}
         {prive
-          ? 'Cette conversation n’est lisible que par vous deux — pas même depuis l’administration. Chacun peut retirer ses propres messages.'
-          : 'Le salon se rafraîchit tout seul toutes les six secondes, et se met en veille quand l’onglet est en arrière-plan. Chacun peut retirer ses propres messages.'}
+          ? 'Les messages les plus récents sont en haut. Cette conversation n’est lisible que par vous deux — pas même depuis l’administration — et chacun peut retirer les siens.'
+          : 'Les messages les plus récents sont en haut. Le salon se rafraîchit tout seul toutes les six secondes et se met en veille quand l’onglet est en arrière-plan. Chacun peut retirer ses propres messages.'}
       </p>
     </div>
   );
