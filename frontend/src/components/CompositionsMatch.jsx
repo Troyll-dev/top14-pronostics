@@ -78,16 +78,36 @@ import { useState, useRef, useLayoutEffect, useCallback } from 'react';
 /**
  * A partir de combien de changements parle-t-on d'une equipe remaniee ?
  *
- * Six sur quinze. Un club fait tourner trois a cinq titulaires d'une semaine a
- * l'autre — blessures, fraicheur, suspension — et personne n'y voit un signal.
- * Au-dela, c'est une decision : on garde ses cadres pour autre chose.
+ * Dix sur quinze. Ce seuil etait a six, par jugement : on supposait qu'un club
+ * fait tourner trois a cinq titulaires d'une semaine a l'autre, et qu'au-dela
+ * c'etait une decision.
  *
- * Le seuil est un jugement, pas une mesure — contrairement a l'avantage du
- * terrain, celui-ci n'a pas ete teste contre les resultats. Il est ecrit ici,
- * en un seul endroit, pour qu'on puisse le corriger le jour ou l'on aura de
- * quoi le verifier.
+ * La supposition etait fausse. Mesure sur la J5 vers la J6, une fois les
+ * compositions remises a l'endroit, la rotation des douze clubs observes va de
+ * 4 a 13, pour une moyenne de 7,2 :
+ *
+ *     4  Racing          5  Bordeaux, Toulon, Montpellier
+ *     6  La Rochelle, Bayonne, Vannes
+ *     8  Clermont, Stade Francais
+ *    10  Pau, Perpignan        13  Lyon
+ *
+ * A six, le badge se serait allume sur huit clubs sur douze. Un avertissement
+ * qui concerne les deux tiers de la ligue n'avertit de rien — c'est le defaut
+ * meme des plaquages manques, ecartes du bloc de pronostic pour cette raison.
+ * A dix, il reste trois clubs, ce qui correspond a l'idee qu'on s'en fait :
+ * l'exception, pas l'ordinaire.
+ *
+ * Une mesure, mais une petite : douze observations sur un seul passage de
+ * journee. Elle suffit a montrer que six etait trop bas, pas a fixer dix pour
+ * la saison. Elle ne dit rien non plus de ce qui nous interesse vraiment —
+ * est-ce qu'une equipe remaniee perd davantage que ne le prevoit Bob ? Cela se
+ * testera quand il y aura assez de journees, et c'est ce jour-la que ce seuil
+ * cessera d'etre une opinion.
+ *
+ * En attendant, le chiffre brut reste toujours affiche : la couleur n'est qu'un
+ * coup d'oeil, la mesure est le nombre.
  */
-const REMANIEE = 6;
+const REMANIEE = 10;
 
 /**
  * Le bloc est-il montrable ?
