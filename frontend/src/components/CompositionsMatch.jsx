@@ -92,22 +92,27 @@ const REMANIEE = 6;
 /**
  * Le bloc est-il montrable ?
  *
- * Non, pour l'instant. Les feuilles de match stockees ne sont pas rattachees a
- * la bonne rencontre : le quinze affiche sous un club est celui d'un autre, et
- * la verification sur les six journees connues l'a montre sur presque toutes
- * les affiches. Ce n'est pas un defaut d'affichage, c'est la collecte qu'il faut
- * reprendre.
+ * Oui — de nouveau, et pas par defaut : la donnee a ete verifiee avant qu'on
+ * rallume.
  *
- * En attendant, on n'affiche rien. Une donnee fausse presentee avec assurance
- * est pire qu'une donnee absente : personne ne verifie une liste de quarante-six
- * noms, et quelqu'un finirait par pronostiquer en croyant qu'un club se deplace
- * sans ses internationaux alors qu'il lit la feuille du voisin.
+ * Il a ete eteint une journee. Les quinze affiches sous chaque club etaient
+ * ceux de l'adversaire une fois sur deux : la LNR range parfois le visiteur en
+ * premier sur sa feuille de match et le signale par un attribut `visiting-first`
+ * que notre analyseur ne lisait pas. Six journees sont parties en base de
+ * travers sans que personne le voie — il aurait fallu reconnaitre quarante-six
+ * joueurs de memoire — et c'est le compteur de rotation ci-dessous, ecrit pour
+ * tout autre chose, qui l'a revele en annoncant que tous les clubs changeaient
+ * quinze titulaires chaque semaine.
  *
- * Le code reste entier, y compris le compteur de rotation. Le jour ou la
- * collecte est reparee, cette ligne repasse a `true` et tout revient — c'est
- * d'ailleurs la raison de ne pas l'avoir supprime.
+ * L'attribut est lu, les garde-fous exigent desormais une raison d'ecrire
+ * plutot qu'une raison de refuser, et les journees deja enregistrees ont ete
+ * relues a la source. Voir sources/lnr-compositions.js.
+ *
+ * On garde l'interrupteur. Eteindre un bloc dont la donnee est douteuse doit
+ * rester l'affaire d'une ligne : une donnee fausse presentee avec assurance est
+ * pire qu'une donnee absente.
  */
-const FIABLE = false;
+const FIABLE = true;
 
 /** La mention de rotation, en ambre quand l'equipe est franchement remaniee. */
 function Rotation({ info, compact = false }) {
