@@ -95,11 +95,14 @@ const NATIONS = {
  */
 const STADES = [
   [/stade de france|saint-denis/i, 'FRA'],
+  // La France delocalise regulierement une rencontre du Tournoi — Lille en
+  // 2026. Ces enceintes sont en France : y recevoir, c'est recevoir.
+  [/pierre.?mauroy|velodrome|v[ée]lodrome|allianz riviera|groupama stadium|matmut atlantique/i, 'FRA'],
   [/aviva/i, 'IRE'],
   [/croke park/i, 'IRE'],
   [/murrayfield/i, 'SCO'],
   [/principality|millennium/i, 'WAL'],
-  [/olimpico|flaminio/i, 'ITA'],
+  [/olimpico|flaminio|artemio franchi/i, 'ITA'],
   [/twickenham|allianz stadium/i, 'ENG'],
 ];
 
