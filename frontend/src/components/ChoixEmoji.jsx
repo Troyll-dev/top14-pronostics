@@ -13,8 +13,8 @@ import { useState, useEffect, useRef } from 'react';
  * par chaque joueur, à chaque mise à jour du site, pour un salon où l'on tape
  * surtout un ballon et une chope.
  *
- * Ici, une soixantaine d'emojis choisis à la main, rangés par thème, écrits en
- * clair dans ce fichier. Pas de dépendance, pas de téléchargement, et la liste
+ * Ici, une soixantaine d'emojis choisis à la main, rangés par thème, chacun avec
+ * son nom, écrits en clair dans ce fichier. Pas de dépendance, pas de téléchargement, et la liste
  * se modifie en une ligne le jour où il en manque un.
  *
  * Ce qu'on perd : la recherche, et les trois mille quatre cents autres. Le
@@ -40,28 +40,63 @@ import { useState, useEffect, useRef } from 'react';
  * élément d'interface — il a le droit d'avoir l'accent de son appareil.
  */
 
+/*
+ * Chaque emoji porte son nom, et pas seulement pour faire joli.
+ *
+ * Un emoji dessiné par le système est petit, et plusieurs se ressemblent assez
+ * pour qu'on se trompe : 😅 et 😂, 👍 et 🙌, 🥃 et 🍷. Le nom au survol lève le
+ * doute avant le clic plutôt qu'après l'envoi.
+ *
+ * Il sert aussi aux lecteurs d'écran, pour qui une grille de soixante boutons
+ * sans libellé n'est qu'une suite de « bouton, bouton, bouton ».
+ *
+ * Les noms sont courts et en français courant — « mort de rire » plutôt que
+ * « visage riant aux larmes de joie », qui est le nom officiel et que personne
+ * n'emploie.
+ */
 const FAMILLES = [
   {
     nom: 'Rugby',
-    liste: ['🏉', '🥅', '🏆', '🥇', '🥈', '🥉', '⏱️', '📣', '🎽', '🤕', '🧤', '🩹'],
+    liste: [
+      ['🏉', 'ballon de rugby'], ['🥅', 'en-but'], ['🏆', 'trophée'], ['🥇', 'première place'],
+      ['🥈', 'deuxième place'], ['🥉', 'troisième place'], ['⏱️', 'chrono'], ['📣', 'porte-voix'],
+      ['🎽', 'maillot'], ['🤕', 'blessé'], ['🧤', 'gants'], ['🩹', 'pansement'],
+    ],
   },
   {
     nom: 'Réactions',
-    liste: ['😂', '😅', '😮', '😱', '😭', '🤣', '😏', '😬', '🙄', '🤔', '😤', '🤯'],
+    liste: [
+      ['😂', 'mort de rire'], ['😅', 'rire gêné'], ['😮', 'surpris'], ['😱', 'horrifié'],
+      ['😭', 'en pleurs'], ['🤣', 'plié de rire'], ['😏', 'narquois'], ['😬', 'grimace'],
+      ['🙄', 'yeux au ciel'], ['🤔', 'songeur'], ['😤', 'remonté'], ['🤯', 'ça explose'],
+    ],
   },
   {
     nom: 'Pouces',
-    liste: ['👏', '👍', '👎', '🙌', '💪', '🤝', '🙏', '🫡', '🤞', '✌️', '👀', '🫵'],
+    liste: [
+      ['👏', 'bravo'], ['👍', 'pouce en l’air'], ['👎', 'pouce en bas'], ['🙌', 'hourra'],
+      ['💪', 'costaud'], ['🤝', 'poignée de main'], ['🙏', 'merci'], ['🫡', 'salut militaire'],
+      ['🤞', 'doigts croisés'], ['✌️', 'victoire'], ['👀', 'je regarde'], ['🫵', 'toi'],
+    ],
   },
   {
     nom: 'Comptoir',
-    liste: ['🍺', '🍻', '🥂', '🍷', '🥃', '☕', '🍕', '🧀', '🥖', '🔥', '❄️', '🌧️'],
+    liste: [
+      ['🍺', 'bière'], ['🍻', 'tchin'], ['🥂', 'champagne'], ['🍷', 'vin'],
+      ['🥃', 'whisky'], ['☕', 'café'], ['🍕', 'pizza'], ['🧀', 'fromage'],
+      ['🥖', 'baguette'], ['🔥', 'feu'], ['❄️', 'froid'], ['🌧️', 'pluie'],
+    ],
   },
   {
     nom: 'Verdicts',
-    liste: ['✅', '❌', '⭐', '💯', '🎯', '🤡', '💀', '🧊', '🚀', '🐙', '🐓', '🧨'],
+    liste: [
+      ['✅', 'validé'], ['❌', 'raté'], ['⭐', 'étoile'], ['💯', 'cent pour cent'],
+      ['🎯', 'dans le mille'], ['🤡', 'clown'], ['💀', 'tête de mort'], ['🧊', 'glaçon'],
+      ['🚀', 'fusée'], ['🐙', 'poulpe'], ['🐓', 'coq'], ['🧨', 'pétard'],
+    ],
   },
 ];
+
 
 export default function ChoixEmoji({ onChoix, disabled = false }) {
   const [ouvert, setOuvert] = useState(false);
@@ -115,10 +150,12 @@ export default function ChoixEmoji({ onChoix, disabled = false }) {
                 {f.nom}
               </p>
               <div className="grid grid-cols-6 gap-0.5">
-                {f.liste.map((e) => (
+                {f.liste.map(([e, nom]) => (
                   <button
                     key={e}
                     type="button"
+                    title={nom}
+                    aria-label={nom}
                     onClick={() => { onChoix(e); setOuvert(false); }}
                     className="h-9 text-[19px] leading-none rounded hover:bg-slate-800 transition-colors"
                   >
