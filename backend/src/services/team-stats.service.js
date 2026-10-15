@@ -111,8 +111,8 @@ const val = (m, clef, cote) => {
   return Number.isFinite(v) ? v : null;
 };
 
-/** Un accumulateur vide. Les compteurs restent a zero, les moyennes se calculent apres. */
-function vide() {
+/** Les compteurs nus, sans contexte. */
+function compteurs() {
   return {
     matchs: 0,
     essaisPour: 0, essaisContre: 0,
@@ -122,11 +122,42 @@ function vide() {
   };
 }
 
+/**
+ * Un accumulateur vide : le total de la saison, et les deux contextes.
+ *
+ * ---------------------------------------------------------------------------
+ * POURQUOI SEPARER LE DOMICILE DE L'EXTERIEUR
+ * ---------------------------------------------------------------------------
+ *
+ * Parce qu'on l'a mesure. Sur les journees jouees, le receveur l'emporte dans
+ * 71 % des rencontres, et aucune strategie testee — ni les copains, ni un Elo,
+ * ni le classement — ne fait mieux que de parier le receveur a chaque fois.
+ * L'avantage du terrain vaut une dizaine de points, pas six : c'est ce qui a
+ * fait corriger la constante de Bob.
+ *
+ * Or une moyenne de saison melange les deux contextes. Un club qui marque 28
+ * points de moyenne peut en mettre 35 chez lui et 20 au-dehors ; la moyenne
+ * globale annonce alors un match serre la ou tout dit le contraire. La carte
+ * compare donc ce qui se compare : les chiffres du receveur **a domicile**
+ * face a ceux du visiteur **a l'exterieur**.
+ *
+ * Les totaux toutes rencontres confondues restent, en tete de l'objet et sous
+ * leurs noms d'origine. Bob les lit — c'est sur eux qu'il est calibre — et les
+ * remplacer aurait change son comportement sans que personne ne l'ait demande.
+ */
+function vide() {
+  return {
+    ...compteurs(),
+    domicile: compteurs(),
+    exterieur: compteurs(),
+  };
+}
+
 const moyenne = (total, n) => (n ? Math.round((total / n) * 10) / 10 : null);
 
-/** Ferme un accumulateur : ajoute les moyennes, retire les compteurs de service. */
-function fermer(a) {
-  const { possession, possessionMatchs, ...garde } = a;
+/** Ferme un jeu de compteurs : ajoute les moyennes, retire les compteurs de service. */
+function fermerCompteurs(a) {
+  const { possession, possessionMatchs, domicile, exterieur, ...garde } = a;
   return {
     ...garde,
     essaisPourParMatch: moyenne(a.essaisPour, a.matchs),
@@ -136,6 +167,22 @@ function fermer(a) {
     penalitesParMatch: moyenne(a.penalitesConcedees, a.matchs),
     plaquagesManquesParMatch: moyenne(a.plaquagesManques, a.matchs),
     possessionMoyenne: moyenne(possession, possessionMatchs),
+  };
+}
+
+/**
+ * Ferme un accumulateur complet : le total, puis les deux contextes.
+ *
+ * La forme de sortie est volontairement additive — les champs d'origine n'ont
+ * pas bouge d'un caractere, et `domicile` / `exterieur` s'ajoutent a cote. Tout
+ * ce qui lisait cet objet avant continue de fonctionner sans savoir que les
+ * contextes existent, Bob le premier.
+ */
+function fermer(a) {
+  return {
+    ...fermerCompteurs(a),
+    domicile: fermerCompteurs(a.domicile || compteurs()),
+    exterieur: fermerCompteurs(a.exterieur || compteurs()),
   };
 }
 
@@ -189,22 +236,34 @@ function cumuler(matchs) {
   };
 
   for (const m of matchs) {
-    const dom = pour(m.homeTeamId);
-    const ext = pour(m.awayTeamId);
-    dom.matchs++;
-    ext.matchs++;
+    const domTotal = pour(m.homeTeamId);
+    const extTotal = pour(m.awayTeamId);
+
+    /*
+     * Chaque rencontre est comptee deux fois pour chaque club : une fois dans
+     * son total de saison, une fois dans le contexte ou elle s'est jouee. Les
+     * deux lignes ci-dessous sont tout le mecanisme — le reste de la boucle ne
+     * sait meme pas qu'il y a deux destinations, puisqu'il ecrit dans un objet
+     * qui porte les deux.
+     */
+    const dom = [domTotal, domTotal.domicile];
+    const ext = [extTotal, extTotal.exterieur];
+    const ajoute = (cibles, champ, v) => { for (const c of cibles) c[champ] += v; };
+
+    ajoute(dom, 'matchs', 1);
+    ajoute(ext, 'matchs', 1);
 
     // Les scores viennent de notre base, pas de la page : meme chiffre, source
     // qui fait foi.
     if (Number.isFinite(m.homeScore) && Number.isFinite(m.awayScore)) {
-      dom.pointsPour += m.homeScore;   dom.pointsContre += m.awayScore;
-      ext.pointsPour += m.awayScore;   ext.pointsContre += m.homeScore;
+      ajoute(dom, 'pointsPour', m.homeScore);   ajoute(dom, 'pointsContre', m.awayScore);
+      ajoute(ext, 'pointsPour', m.awayScore);   ajoute(ext, 'pointsContre', m.homeScore);
     }
 
     const eDom = val(m, stats.ESSAIS, 'home');
     const eExt = val(m, stats.ESSAIS, 'away');
-    if (eDom !== null) { dom.essaisPour += eDom; ext.essaisContre += eDom; }
-    if (eExt !== null) { ext.essaisPour += eExt; dom.essaisContre += eExt; }
+    if (eDom !== null) { ajoute(dom, 'essaisPour', eDom); ajoute(ext, 'essaisContre', eDom); }
+    if (eExt !== null) { ajoute(ext, 'essaisPour', eExt); ajoute(dom, 'essaisContre', eExt); }
 
     for (const [clef, champ] of [
       [stats.PENALITES_CONCEDEES, 'penalitesConcedees'],
@@ -212,25 +271,92 @@ function cumuler(matchs) {
     ]) {
       const a = val(m, clef, 'home');
       const b = val(m, clef, 'away');
-      if (a !== null) dom[champ] += a;
-      if (b !== null) ext[champ] += b;
+      if (a !== null) ajoute(dom, champ, a);
+      if (b !== null) ajoute(ext, champ, b);
     }
 
     const c = m.stats?.cartons;
     if (c) {
-      dom.cartons += (c.home?.jaune || 0) + (c.home?.orange || 0) + (c.home?.rouge || 0);
-      ext.cartons += (c.away?.jaune || 0) + (c.away?.orange || 0) + (c.away?.rouge || 0);
+      ajoute(dom, 'cartons', (c.home?.jaune || 0) + (c.home?.orange || 0) + (c.home?.rouge || 0));
+      ajoute(ext, 'cartons', (c.away?.jaune || 0) + (c.away?.orange || 0) + (c.away?.rouge || 0));
     }
 
     const pDom = val(m, stats.POSSESSION, 'home');
     const pExt = val(m, stats.POSSESSION, 'away');
-    if (pDom !== null) { dom.possession += pDom; dom.possessionMatchs++; }
-    if (pExt !== null) { ext.possession += pExt; ext.possessionMatchs++; }
+    if (pDom !== null) { ajoute(dom, 'possession', pDom); ajoute(dom, 'possessionMatchs', 1); }
+    if (pExt !== null) { ajoute(ext, 'possession', pExt); ajoute(ext, 'possessionMatchs', 1); }
   }
 
   const sortie = {};
   for (const [id, a] of par) sortie[id] = fermer(a);
   return sortie;
+}
+
+/**
+ * Les cinq derniers resultats de chaque club.
+ *
+ * ---------------------------------------------------------------------------
+ * POURQUOI ICI, ALORS QUE LE CLASSEMENT LES CALCULE DEJA
+ * ---------------------------------------------------------------------------
+ *
+ * `standings.service.js` produit la meme chose pour la page Championnat, mais
+ * sans borne : il rend la serie d'aujourd'hui. Sur la carte d'une rencontre, la
+ * serie doit s'arreter **avant** la journee affichee — sinon, en rouvrant la
+ * page de la J3 en fevrier, on verrait une forme qui contient le resultat du
+ * match qu'on est en train de regarder, ce qui n'a aucun sens.
+ *
+ * C'est la meme regle d'honnetete que pour les moyennes, et c'est pour ca que
+ * la fonction vit a cote d'elles plutot que d'aller chercher celle du
+ * classement.
+ *
+ * Elle n'exige pas `statsAt` : un resultat existe des que le score est connu,
+ * meme si la feuille de statistiques n'a pas encore ete lue. Une serie ne
+ * depend que du score.
+ *
+ * Rend, par identifiant de club, du plus recent au plus ancien :
+ * `[{ res: 'V' | 'N' | 'D', round, domicile, adversaireId, pour, contre }]`
+ */
+async function serie({ season = SEASON, avantRound = null, combien = 5 } = {}) {
+  const where = {
+    season,
+    status: 'FINISHED',
+    homeScore: { not: null },
+    awayScore: { not: null },
+  };
+  if (Number.isFinite(avantRound)) where.round = { lt: avantRound };
+
+  const matchs = await prisma.match.findMany({
+    where,
+    select: {
+      round: true, kickoff: true,
+      homeTeamId: true, awayTeamId: true, homeScore: true, awayScore: true,
+    },
+    // Du plus recent au plus ancien : la premiere rencontre rencontree pour un
+    // club est donc la derniere qu'il a jouee, et l'on s'arrete a cinq.
+    orderBy: [{ round: 'desc' }, { kickoff: 'desc' }],
+  });
+
+  const par = {};
+  const pousse = (id, ligne) => {
+    if (!par[id]) par[id] = [];
+    if (par[id].length < combien) par[id].push(ligne);
+  };
+
+  for (const m of matchs) {
+    const ecart = m.homeScore - m.awayScore;
+    const res = (pourLui) => (ecart === 0 ? 'N' : (ecart > 0) === pourLui ? 'V' : 'D');
+
+    pousse(m.homeTeamId, {
+      res: res(true), round: m.round, domicile: true,
+      adversaireId: m.awayTeamId, pour: m.homeScore, contre: m.awayScore,
+    });
+    pousse(m.awayTeamId, {
+      res: res(false), round: m.round, domicile: false,
+      adversaireId: m.homeTeamId, pour: m.awayScore, contre: m.homeScore,
+    });
+  }
+
+  return par;
 }
 
 /**
@@ -376,4 +502,7 @@ async function syncStats({ dryRun = false, rounds = null, limite = 20 } = {}) {
   return rapport;
 }
 
-module.exports = { syncStats, forme, cumuler, aLire, aEcrire, fermer, vide, moyenne, recevantConforme };
+module.exports = {
+  syncStats, forme, cumuler, serie, aLire, aEcrire,
+  fermer, fermerCompteurs, compteurs, vide, moyenne, recevantConforme,
+};

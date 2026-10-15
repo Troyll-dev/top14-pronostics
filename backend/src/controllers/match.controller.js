@@ -1,8 +1,7 @@
 const { PrismaClient } = require('@prisma/client');
 const { pointsFor } = require('../services/scoring');
 const { multiplicateur, afficheDeLaJournee, journeeCommencee } = require('../services/rules');
-const { forme } = require('../services/team-stats.service');
-const { debutSemaine, choisirJournee, JOUR_MS } = require('../services/semaine');
+const { forme, serie } = require('../services/team-stats.service');
 
 const prisma = new PrismaClient();
 
@@ -45,6 +44,8 @@ exports.getMatches = async (req, res) => {
     // pas la forme, et une saison entiere multiplierait le travail par vingt-six
     // pour rien.
     let f = null;
+    let s = null;
+    let classement = null;
     if (round) {
       try {
         f = await forme({ season, avantRound: parseInt(round) });
@@ -54,10 +55,67 @@ exports.getMatches = async (req, res) => {
         // blanche.
         console.error('[matches] forme indisponible :', err.message);
       }
+
+      /*
+       * La serie des cinq derniers resultats, bornee comme la forme.
+       *
+       * Elle repond a ce que les moyennes cachent : le niveau sans la
+       * dynamique. Trois defaites de suite ne se voyaient nulle part, alors
+       * que c'est la premiere chose qu'on regarde dans un journal.
+       */
+      try {
+        s = await serie({ season, avantRound: parseInt(round) });
+      } catch (err) {
+        console.error('[matches] serie indisponible :', err.message);
+      }
+
+      /*
+       * Le classement, lu dans l'instantane deja en base.
+       *
+       * On ne le recalcule pas : c'est celui de la page Championnat, releve sur
+       * la source officielle, et deux classements calcules differemment dans la
+       * meme application finiraient par se contredire.
+       *
+       * Sa limite, et elle est assumee : cet instantane est celui d'aujourd'hui,
+       * pas celui d'avant la journee affichee. Sur la journee a venir — le seul
+       * moment ou l'on pose un pronostic — c'est exactement ce qu'il faut. En
+       * rouvrant une journee passee, le rang affiche serait celui de maintenant,
+       * d'ou la regle cote ecran : il ne s'affiche que sur une rencontre qui
+       * n'a pas encore commence.
+       */
+      try {
+        const snap = await prisma.leagueTable.findUnique({ where: { season } });
+        if (snap?.data?.length) {
+          classement = {};
+          for (const ligne of snap.data) {
+            if (ligne.teamId) {
+              classement[ligne.teamId] = { rang: ligne.rank, points: ligne.points };
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[matches] classement indisponible :', err.message);
+      }
     }
 
+    const cote = (id) => ({
+      ...(f ? { ...(f[id] || {}) } : {}),
+      serie: s ? (s[id] || []) : null,
+      classement: classement ? (classement[id] || null) : null,
+    });
+
+    /*
+     * Tout ce qui aide a decider voyage dans `forme`, sous les deux cotes.
+     *
+     * Les series et le classement auraient pu devenir deux champs de plus sur
+     * la rencontre ; les ranger dans l'objet qui porte deja les moyennes evite
+     * a la carte d'aller les chercher a trois endroits differents pour afficher
+     * un seul bloc.
+     */
     const avecForme = (m) =>
-      f ? { ...m, forme: { home: f[m.homeTeamId] || null, away: f[m.awayTeamId] || null } } : m;
+      f || s || classement
+        ? { ...m, forme: { home: cote(m.homeTeamId), away: cote(m.awayTeamId) } }
+        : m;
 
     // Les compositions ne partent que si l'on a demande une journee.
     //
@@ -228,12 +286,6 @@ async function estLAffiche(match) {
  *                le coup d'envoi est passé. C'est ce qu'il faut afficher par défaut
  *                dans les résultats : le samedi soir on veut voir la journée du jour,
  *                pas la précédente.
- * roundSemaine : la journée de la semaine en cours, la semaine commençant le
- *                mercredi à 0 h (heure de Paris). C'est la valeur qu'ouvre la page
- *                « Tous les pronos ». Voir `services/semaine.js` pour le pourquoi :
- *                elle remplace un calcul qui se faisait dans le navigateur, à partir
- *                du jour de la semaine, et qui se trompait d'une soirée sur une
- *                journée jouée intégralement le samedi.
  */
 exports.getNextRound = async (req, res) => {
   try {
@@ -251,24 +303,9 @@ exports.getNextRound = async (req, res) => {
       select: { round: true },
     });
 
-    // Le premier match programmé dans la fenêtre mercredi → mercredi. On lit le
-    // premier et non le dernier : si une journée déborde sur le lundi suivant,
-    // c'est bien elle qu'on veut, pas la moitié de la suivante.
-    const debut = debutSemaine(now);
-    const semaine = await prisma.match.findFirst({
-      where: { kickoff: { gte: debut, lt: new Date(debut.getTime() + 7 * JOUR_MS) } },
-      orderBy: { kickoff: 'asc' },
-      select: { round: true },
-    });
-
     res.json({
       round: next?.round ?? started?.round ?? 1,
       currentRound: started?.round ?? next?.round ?? 1,
-      roundSemaine: choisirJournee({
-        semaine: semaine?.round,
-        derniere: started?.round,
-        prochaine: next?.round,
-      }),
     });
   } catch (err) {
     console.error(err);
