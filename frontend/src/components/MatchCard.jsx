@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import api from '../api/client';
-import { useAuth } from '../contexts/AuthContext';
 import TeamCrest from './TeamCrest';
 import { matchState, STATE, STATE_CHIP } from '../utils/matchState';
 import CompositionsMatch from './CompositionsMatch';
@@ -152,24 +151,6 @@ function PointsBadge({ prediction }) {
   );
 }
 
-function PointsChip({ prediction }) {
-  const total = prediction?.points;
-  if (total === null || total === undefined) return null;
-
-  const b = base(prediction);
-  const cls = {
-    3: 'bg-green-500 text-slate-950',
-    2: 'bg-amber-500/20 text-amber-400',
-    1: 'bg-slate-700/45 text-slate-400',
-    0: 'bg-slate-800/60 text-slate-500',
-  }[b] || 'bg-slate-800/60 text-slate-500';
-
-  return (
-    <span className={`font-display text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${cls}`}>
-      {prediction.joker && <IconeJoker taille={14} className="-ml-0.5 mr-0.5 align-[-3px]" />}+{total}
-    </span>
-  );
-}
 
 /**
  * La météo du coup d'envoi.
@@ -260,7 +241,9 @@ export default function MatchCard({
   match, draft, onDraftChange, onPredictionSaved, now = Date.now(),
   regles = null, onJoker = null, jokerFige = false, jokerErreur = '',
 }) {
-  const { user } = useAuth();
+  // Plus de `useAuth` ici : l'identite du joueur ne servait qu'a reperer sa
+  // propre ligne dans la liste des pronos des autres, partie vers la page
+  // « Resultats ». Une dependance de moins pour la carte.
   const prediction = match.predictions?.[0];
 
   /**
@@ -330,26 +313,6 @@ export default function MatchCard({
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
 
-  const [showOthers, setShowOthers] = useState(false);
-  const [others, setOthers] = useState(null);
-  const [loadingOthers, setLoadingOthers] = useState(false);
-
-  const toggleOthers = async () => {
-    const opening = !showOthers;
-    setShowOthers(opening);
-    if (opening && others === null) {
-      setLoadingOthers(true);
-      try {
-        const res = await api.get(`/predictions/match/${match.id}`);
-        setOthers(res.data);
-      } catch {
-        setOthers([]);
-      } finally {
-        setLoadingOthers(false);
-      }
-    }
-  };
-
   const handleSave = async () => {
     if (!complete) return;
     setSaving(true);
@@ -362,7 +325,6 @@ export default function MatchCard({
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
-      setOthers(null);
       onPredictionSaved?.(match.id, res.data);
     } catch (err) {
       setError(err.response?.data?.error || 'Erreur');
@@ -764,64 +726,27 @@ export default function MatchCard({
           la LNR. Il n'y a donc rien à prévoir pour le mardi ni pour le début de
           saison : la carte reste exactement comme avant.
 
-          Ils sont placés après le pronostic et avant les pronos des autres :
-          ce qui aide à décider vient avant ce qui raconte ce que les autres ont
-          décidé. */}
+          Ils sont placés après le pronostic : ce qui aide à décider vient après
+          l'endroit où l'on décide, et avant rien d'autre — la liste des pronos
+          des autres qui les suivait est partie vers la page « Résultats ». */}
       <FormeClubs match={match} />
       <CompositionsMatch match={match} />
 
-      {/* Pronostics des autres joueurs */}
-      <div className="relative z-10 mt-3 pt-3 border-t border-slate-800">
-        <button
-          onClick={toggleOthers}
-          className="flex items-center gap-2 text-xs text-slate-400 hover:text-amber-400 transition-colors"
-        >
-          <span className={`text-[9px] text-amber-500 transition-transform ${showOthers ? 'rotate-90' : ''}`}>▶</span>
-          Pronos des joueurs
-          {others && <span className="text-slate-600">({others.length})</span>}
-        </button>
+      {/* Les pronostics des autres joueurs ne sont plus ici.
 
-        {showOthers && (
-          <div className="mt-2.5">
-            {loadingOthers ? (
-              <p className="text-xs text-slate-600 animate-pulse">Chargement…</p>
-            ) : !others || others.length === 0 ? (
-              <p className="text-xs text-slate-600">Aucun pronostic pour ce match.</p>
-            ) : (
-              <ul className="flex flex-col gap-0.5">
-                {others.map((p, i) => {
-                  const isMe = p.user.id === user?.id;
-                  return (
-                    <li
-                      key={p.id}
-                      className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-[13px] ${
-                        isMe
-                          ? 'bg-amber-500/10 shadow-[inset_2px_0_0_rgb(var(--a-500))]'
-                          : i % 2 === 0
-                          ? 'bg-amber-500/[.04]'
-                          : ''
-                      }`}
-                    >
-                      <span
-                        className="w-[7px] h-[7px] rounded-full shrink-0"
-                        style={{ backgroundColor: p.user.avatarColor }}
-                      />
-                      <span className={`truncate ${isMe ? 'text-amber-400 font-semibold' : 'text-slate-400'}`}>
-                        {p.user.username}
-                        {isMe && ' (toi)'}
-                      </span>
-                      <span className="ml-auto font-display font-bold text-[13.5px] tabular-nums shrink-0">
-                        {p.homeScorePred} – {p.awayScorePred}
-                      </span>
-                      <PointsChip prediction={p} />
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </div>
-        )}
-      </div>
+          Ils vivaient dans un replie au bas de chaque carte : huit lignes pour
+          un match, chargees a l'ouverture. La page « Resultats » fait la meme
+          chose en mieux — les sept matchs d'un coup, en colonnes, avec les
+          couleurs et les totaux —, et le lien « Tous les pronos » se trouve a
+          cote du titre de cette page-ci. Le chemin existe, il est a deux clics,
+          et les brouillons sont gardes dans le navigateur : on peut aller voir
+          et revenir sans perdre ce qu'on tapait.
+
+          Ce qu'on perd, et c'est assume : la comparaison immediate sur CE
+          match-la pendant qu'on hesite sur un score. A huit joueurs et sept
+          rencontres, ca ne valait pas un bloc dans chaque carte, une requete
+          par ouverture, et un second endroit a tenir a jour — deux affichages
+          de la meme chose finissent toujours par diverger. */}
     </div>
   );
 }
