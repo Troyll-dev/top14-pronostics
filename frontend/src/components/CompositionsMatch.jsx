@@ -89,6 +89,26 @@ import { useState, useRef, useLayoutEffect, useCallback } from 'react';
  */
 const REMANIEE = 6;
 
+/**
+ * Le bloc est-il montrable ?
+ *
+ * Non, pour l'instant. Les feuilles de match stockees ne sont pas rattachees a
+ * la bonne rencontre : le quinze affiche sous un club est celui d'un autre, et
+ * la verification sur les six journees connues l'a montre sur presque toutes
+ * les affiches. Ce n'est pas un defaut d'affichage, c'est la collecte qu'il faut
+ * reprendre.
+ *
+ * En attendant, on n'affiche rien. Une donnee fausse presentee avec assurance
+ * est pire qu'une donnee absente : personne ne verifie une liste de quarante-six
+ * noms, et quelqu'un finirait par pronostiquer en croyant qu'un club se deplace
+ * sans ses internationaux alors qu'il lit la feuille du voisin.
+ *
+ * Le code reste entier, y compris le compteur de rotation. Le jour ou la
+ * collecte est reparee, cette ligne repasse a `true` et tout revient — c'est
+ * d'ailleurs la raison de ne pas l'avoir supprime.
+ */
+const FIABLE = false;
+
 /** La mention de rotation, en ambre quand l'equipe est franchement remaniee. */
 function Rotation({ info, compact = false }) {
   if (!info || info.changements === null || info.changements === undefined) return null;
@@ -276,6 +296,8 @@ export default function CompositionsMatch({ match }) {
     ro.observe(el);
     return () => ro.disconnect();
   }, [ouvert]);
+
+  if (!FIABLE) return null;
 
   const c = match?.composition;
   // Une composition à moins de quinze titulaires de chaque côté n'est pas une
