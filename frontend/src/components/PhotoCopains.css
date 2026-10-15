@@ -156,24 +156,6 @@
   top: calc(100vw / 1.7778 + 34px);
 }
 
-/* Le Comptoir, dont le bandeau n'est pas en 16/9.
-
-   Le 1.7778 ci-dessus etait une constante tant que tous les bandeaux avaient la
-   meme proportion. Depuis que le composant en accepte une par page, cette
-   constante est devenue une hypothese — et sur une page qui ne la verifie pas,
-   la vignette descend de la hauteur d'un 16/9 alors que l'image fait 4/3 —
-   soit, sur une colonne de 640 pixels, 120 pixels trop haut : le polaroid se
-   posait en plein milieu de la photo au lieu d'arriver au niveau du titre.
-
-   La regle est dupliquee plutot que generalisee, faute de pouvoir lire la
-   proportion ici : elle est portee par le bandeau, qui est le voisin du
-   `.photo-copains-ancre` et non son parent — une variable CSS posee dessus
-   descend a ses enfants, pas a cote. Si une troisieme proportion apparait un
-   jour sur une page qui porte la vignette, c'est le moment de deplacer ce
-   calcul dans le composant plutot que d'ajouter un troisieme bloc ici. */
-.photo-copains-ancre:has(~ * > .bandeau-comptoir) .photo-copains {
-  top: calc(100vw / 1.3333 + 34px);
-}
 
 /* Et la place reservee au texte passe du premier element — le bandeau, qui doit
    garder toute sa largeur — au titre qui le suit. */
@@ -187,9 +169,6 @@
 @media (min-width: 640px) {
   .photo-copains-ancre:has(~ * > .bandeau) .photo-copains {
     top: calc(min(100vw - 32px, 672px) / 1.7778 + 36px);
-  }
-  .photo-copains-ancre:has(~ * > .bandeau-comptoir) .photo-copains {
-    top: calc(min(100vw - 32px, 672px) / 1.3333 + 36px);
   }
   .photo-copains-ancre ~ * > .bandeau ~ h1,
   .photo-copains-ancre ~ * > .bandeau ~ h1 + p { padding-right: 150px; }

@@ -327,15 +327,20 @@ export default function ChatPage() {
     <div className="max-w-2xl mx-auto px-4 py-6">
       {/* Le bandeau du Comptoir : la tablée du pub, vue depuis le bar.
 
-          En 4/3, c'est-à-dire la proportion de l'image elle-même, et non une
-          bande découpée dedans. Une bande aurait été plus discrète au-dessus
-          des messages, mais elle coupait des visages : ici tout le monde est
-          entier, et c'est une image qui ne vaut que par ses douze têtes.
+          En 16/9, comme l'accueil, le classement et la page de bienvenue. La
+          version précédente était en 4/3 — la proportion de son image, gardée
+          telle quelle pour ne couper aucun visage —, et elle coûtait les trois
+          quarts de la largeur en hauteur : sur téléphone, il fallait défiler
+          avant d'atteindre quoi que ce soit. Celle-ci est cadrée large dès
+          l'origine, donc la proportion commune suffit et le site retrouve son
+          bandeau unique.
 
-          La classe `bandeau-comptoir` n'habille rien : elle sert de repère à
-          PhotoCopains.css, qui doit savoir de combien descendre la vignette des
-          copains sur cette page. Voir le commentaire là-bas. */}
-      <Bandeau nom="comptoir-chien" ratio={4 / 3} className="bandeau-comptoir mb-5" />
+          Plus de classe `bandeau-comptoir` : elle servait de repère à
+          PhotoCopains.css pour descendre la vignette des copains de la hauteur
+          d'un 4/3. Le bandeau étant redevenu un 16/9 comme les autres, la règle
+          générale s'applique de nouveau, et l'exception disparaît des deux
+          côtés. */}
+      <Bandeau nom="comptoir-pub" className="mb-5" />
 
       <h1 className="font-display text-[26px] font-extrabold leading-none mb-1">
         {prive ? interlocuteur?.username || 'Conversation' : '💬 Le Comptoir'}
