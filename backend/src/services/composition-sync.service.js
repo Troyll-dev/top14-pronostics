@@ -74,6 +74,25 @@ const resolveTeam = (...a) => require('./results-sync.service').resolveTeam(...a
 
 const SEASON = process.env.SPORTSDB_SEASON || '2026-2027';
 
+/**
+ * Le slug d'un club a partir de son nom, par retournement de la table de la
+ * source.
+ *
+ * Pourquoi un slug plutot qu'un nom. Le controle d'appariement comparait les
+ * libelles : « Montpellier HR » dans le calendrier, « Montpellier Hérault
+ * Rugby » sur la feuille de match. Deux ecritures du meme club, et un refus
+ * d'ecrire sur une feuille parfaitement correcte.
+ *
+ * Ajouter une table d'equivalences de noms serait une mauvaise reponse : elle
+ * serait fausse au premier club qui change de denomination, et on en a deja
+ * une. Le slug, lui, est un identifiant — il est dans l'adresse de la feuille
+ * (`11851-montpellier-toulon`), il ne depend d'aucune orthographe, et il se
+ * verifie avant meme de telecharger la page.
+ */
+const SLUG_PAR_NOM = Object.fromEntries(
+  Object.entries(lnr.SLUG_TO_NAME).map(([slug, nom]) => [nom, slug])
+);
+
 // Combien de jours devant on va chercher. Six couvre la journee du week-end qui
 // vient et le debut de la suivante ; au-dela, rien n'est publie.
 const FENETRE_JOURS = Number(process.env.COMPOSITIONS_FENETRE_JOURS || 6);
@@ -184,7 +203,7 @@ async function syncCompositions({
   const rapport = {
     ok: true, dryRun, rounds: cibles, sources: {},
     updated: 0, skipped: 0, enAttente: 0, refusees: 0,
-    unmatched: [], changes: [], apercus: [],
+    unmatched: [], notes: [], changes: [], apercus: [],
   };
   if (!cibles.length) {
     rapport.reason = 'Aucune rencontre a venir dans la fenetre';
@@ -210,6 +229,30 @@ async function syncCompositions({
 
     for (const ev of events) {
       if (!ev.sheetPath) { rapport.skipped++; continue; }
+
+      /*
+       * Refus 0 — l'adresse de la feuille ne nomme pas les deux clubs attendus.
+       *
+       * Le controle le plus sur, et le moins cher : il se fait sur une chaine
+       * de caracteres, avant toute requete reseau. Si l'adresse associee a
+       * Perpignan–Vannes parle de Bordeaux, l'appariement est faux et aucune
+       * lecture ne pourra le rattraper.
+       *
+       * On ne refuse que si les deux slugs sont connus : un club absent de la
+       * table serait deja signale ailleurs, et ce controle ne doit pas devenir
+       * un second endroit ou la maintenir.
+       */
+      const slugH = SLUG_PAR_NOM[ev.home];
+      const slugA = SLUG_PAR_NOM[ev.away];
+      if (slugH && slugA && !(ev.sheetPath.includes(slugH) && ev.sheetPath.includes(slugA))) {
+        rapport.ok = false;
+        rapport.refusees++;
+        rapport.unmatched.push(
+          `J${round} ${ev.home}–${ev.away} : la feuille « ${ev.sheetPath.split('/').pop()} » ` +
+          `ne nomme pas ces deux clubs — rien ecrit`
+        );
+        continue;
+      }
 
       let match = await prisma.match.findFirst({ where: { externalId: ev.externalId } });
       if (!match) {
@@ -281,19 +324,24 @@ async function syncCompositions({
       }
 
       /*
-       * Refus 3 — ce n'est pas la bonne rencontre.
+       * Le nom du recevant : une note, plus un refus.
        *
-       * Si la feuille annonce un autre recevant que celui attendu, c'est notre
-       * appariement qui est faux, et une composition rangee sous le mauvais
-       * club tromperait les joueurs bien plus surement qu'une absence.
+       * Ce controle refusait d'ecrire quand le nom annonce par la feuille
+       * differait de celui attendu. Il a bloque une feuille parfaitement
+       * correcte, la LNR ecrivant « Montpellier Hérault Rugby » sur la feuille
+       * et « Montpellier HR » au calendrier.
+       *
+       * Un libelle est editorial : il s'ecrit en long ici, en court la, et
+       * change le jour d'un changement de denomination. L'appariement est donc
+       * verifie plus haut, sur les slugs, qui sont des identifiants. Ce qui
+       * reste ici est une note au rapport : une divergence de nom n'empeche
+       * rien, mais elle merite d'etre vue — c'est souvent le premier signe
+       * qu'une table de correspondance a vieilli.
        */
       if (ev.home && lu.homeTeam !== ev.home) {
-        rapport.ok = false;
-        rapport.refusees++;
-        rapport.unmatched.push(
-          `J${round} ${ev.home}–${ev.away} : la feuille annonce « ${lu.homeTeam} » comme recevant — rien ecrit`
+        rapport.notes.push(
+          `J${round} ${ev.home}–${ev.away} : la feuille ecrit « ${lu.homeTeam} » la ou nous ecrivons « ${ev.home} »`
         );
-        continue;
       }
 
       const neuf = aEcrire(lu);
@@ -329,6 +377,7 @@ async function syncCompositions({
   }
 
   if (rapport.unmatched.length) console.warn('[compositions] non traites :', rapport.unmatched);
+  if (rapport.notes.length) console.warn('[compositions] a noter :', rapport.notes);
   console.log(
     `[compositions] ${dryRun ? '(simulation) ' : ''}J${cibles.join(', J')} : ` +
       `${rapport.updated} ecrite(s), ${rapport.skipped} inchangee(s), ` +

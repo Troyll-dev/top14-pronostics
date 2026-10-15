@@ -95,6 +95,13 @@ const ROUNDS = args.filter((a) => /^\d+$/.test(a)).map(Number);
     for (const u of r.unmatched) console.log(`    ${u}`);
   }
 
+  // Les divergences de libelle n'empechent rien, mais elles se regardent : une
+  // table de correspondance qui vieillit commence toujours par la.
+  if (r.notes && r.notes.length) {
+    console.log('\n  a noter :');
+    for (const n of r.notes) console.log(`    ${n}`);
+  }
+
   /*
    * L'ordre rencontre, journee par journee.
    *
