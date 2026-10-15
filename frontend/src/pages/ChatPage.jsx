@@ -5,6 +5,7 @@ import api from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
 import Avatar from '../components/Avatar';
 import Bandeau from '../components/Bandeau';
+import ChoixEmoji from '../components/ChoixEmoji';
 
 const POLL_MS = 6000;
 const MAX_LENGTH = 1000;
@@ -98,6 +99,7 @@ export default function ChatPage() {
   const [error, setError] = useState('');
 
   const scrollerRef = useRef(null);
+  const saisieRef = useRef(null);
   // On ne recolle en bas que si l'on y etait deja : sinon relire un vieux
   // message serait impossible, la liste sauterait a chaque interrogation.
   const stick = useRef(true);
@@ -270,6 +272,34 @@ export default function ChatPage() {
       setMessages(before);
       setError('Suppression impossible');
     }
+  };
+
+  /**
+   * Poser un emoji là où est le curseur.
+   *
+   * Et pas en bout de texte : on ajoute souvent un emoji au milieu d'une phrase
+   * qu'on vient de relire, et un panneau qui recolle tout à la fin oblige à
+   * retaper. La position est relue sur le champ lui-même — React ne la connaît
+   * pas, elle appartient au navigateur.
+   *
+   * Le curseur est ensuite reposé juste après l'emoji, et le champ reprend la
+   * main : sans ça, la frappe suivante repartirait du début du texte, ce qui
+   * est le genre de détail qu'on ne remarque qu'en l'ayant vécu.
+   */
+  const poserEmoji = (emoji) => {
+    const champ = saisieRef.current;
+    const debut = champ?.selectionStart ?? draft.length;
+    const fin = champ?.selectionEnd ?? draft.length;
+
+    const texte = (draft.slice(0, debut) + emoji + draft.slice(fin)).slice(0, MAX_LENGTH);
+    setDraft(texte);
+
+    requestAnimationFrame(() => {
+      if (!champ) return;
+      champ.focus();
+      const ou = Math.min(debut + emoji.length, texte.length);
+      champ.setSelectionRange(ou, ou);
+    });
   };
 
   const onKeyDown = (e) => {
@@ -461,6 +491,7 @@ export default function ChatPage() {
                 clavier ne s'ouvre et ou ce zoom n'existe pas — on revient a
                 13,5 pixels, qui est la taille des bulles de la conversation. */}
             <textarea
+              ref={saisieRef}
               value={draft}
               onChange={(e) => setDraft(e.target.value.slice(0, MAX_LENGTH))}
               onKeyDown={onKeyDown}
@@ -474,6 +505,8 @@ export default function ChatPage() {
                          text-[16px] sm:text-[13.5px] text-white placeholder:text-slate-600
                          focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/25 transition-colors"
             />
+            <ChoixEmoji onChoix={poserEmoji} disabled={sending} />
+
             <button
               onClick={send}
               disabled={sending || !draft.trim()}
