@@ -4,7 +4,6 @@ import { useAuth } from '../contexts/AuthContext';
 import api from '../api/client';
 import Avatar from './Avatar';
 
-const SEEN_KEY = 't14-chat-vu';
 const UNREAD_MS = 20000;
 
 /**
@@ -99,27 +98,23 @@ export default function Navbar() {
   };
 
   /**
-   * Messages non lus depuis la derniere visite du salon.
+   * Les messages non lus, tous fils confondus.
    *
-   * Le repere est garde dans le navigateur ; a la premiere ouverture on le
-   * pose a maintenant, pour ne pas accueillir un nouvel arrivant avec une
-   * pastille a trois chiffres.
+   * Le compte vient du serveur, qui garde la date de derniere lecture de chaque
+   * joueur pour chaque fil — le Comptoir et chaque conversation privee. Il
+   * vivait avant dans le navigateur, et ca se voyait : on lisait sur son
+   * telephone, le PC gardait sa pastille. Avec un seul salon c'etait
+   * supportable ; avec huit fils, ce serait huit pastilles fausses.
+   *
+   * Ce qui disparait au passage : le repere pose a « maintenant » a la premiere
+   * ouverture, qui evitait d'accueillir un nouvel arrivant avec une pastille a
+   * trois chiffres. Le serveur n'en a pas besoin — sans ligne de lecture, il
+   * compte les messages recus, et un nouveau n'en a aucun.
    */
   const refreshUnread = useCallback(async () => {
     if (!user) return;
-    let since;
     try {
-      since = localStorage.getItem(SEEN_KEY);
-      if (!since) {
-        since = new Date().toISOString();
-        localStorage.setItem(SEEN_KEY, since);
-      }
-    } catch {
-      since = new Date().toISOString();
-    }
-
-    try {
-      const res = await api.get(`/messages/unread?since=${encodeURIComponent(since)}`);
+      const res = await api.get('/messages/unread');
       setUnread(res.data.count || 0);
     } catch {
       /* salon indisponible : la barre reste utilisable, sans pastille */
@@ -131,13 +126,22 @@ export default function Navbar() {
     refreshUnread();
     const id = setInterval(() => { if (!document.hidden) refreshUnread(); }, UNREAD_MS);
 
-    const onRead = () => setUnread(0);
+    /*
+     * L'evenement ne dit plus « tout est lu » mais « quelque chose a change,
+     * recompte ». C'est la nuance qu'imposent les fils : ouvrir une
+     * conversation n'efface pas la pastille s'il reste du nouveau ailleurs, et
+     * mettre zero ici afficherait un total faux jusqu'au tour suivant.
+     */
+    const onRead = () => refreshUnread();
     window.addEventListener('t14-chat-lu', onRead);
 
     return () => { clearInterval(id); window.removeEventListener('t14-chat-lu', onRead); };
   }, [user, refreshUnread]);
 
-  useEffect(() => { if (pathname === '/chat') setUnread(0); }, [pathname]);
+  // Entrer dans le salon ne vide plus la pastille : on n'y lit qu'un fil a la
+  // fois, et c'est la page qui annonce chaque lecture. On recompte simplement
+  // en arrivant, pour ne pas attendre le prochain tour.
+  useEffect(() => { if (pathname === '/chat') refreshUnread(); }, [pathname, refreshUnread]);
 
   /**
    * L'ordre des onglets.

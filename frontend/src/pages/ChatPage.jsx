@@ -6,20 +6,50 @@ import { useAuth } from '../contexts/AuthContext';
 import Avatar from '../components/Avatar';
 import Bandeau from '../components/Bandeau';
 
-const SEEN_KEY = 't14-chat-vu';
 const POLL_MS = 6000;
 const MAX_LENGTH = 1000;
+
+/** Le Comptoir porte le numéro de fil 0 : ce n'est l'identifiant de personne. */
+const COMPTOIR = 0;
 
 // Deux messages du meme auteur a moins de cinq minutes d'intervalle sont
 // regroupes : on n'affiche le pseudo et la pastille qu'une fois.
 const GROUP_MS = 5 * 60 * 1000;
 
-export function markChatSeen(at) {
-  try {
-    localStorage.setItem(SEEN_KEY, new Date(at).toISOString());
-  } catch {
-    /* stockage indisponible : la pastille restera, sans consequence */
-  }
+/**
+ * Le Comptoir, et les conversations privées.
+ *
+ * ---------------------------------------------------------------------------
+ * UNE SEULE PAGE POUR DEUX USAGES
+ * ---------------------------------------------------------------------------
+ *
+ * La page ne montre qu'un fil à la fois, et une rangée en tête permet d'en
+ * changer : le Comptoir d'abord, puis un rang par copain. Tout le reste — les
+ * bulles, le regroupement par auteur, les séparateurs de jour, la saisie, le
+ * recollage en bas — sert les deux formes sans être écrit deux fois.
+ *
+ * C'est la contrepartie du choix fait côté serveur : un message privé est un
+ * message ordinaire avec un destinataire. Si l'écran avait eu deux pages, il
+ * aurait fallu dupliquer tout ce qui précède, et ces deux copies auraient
+ * divergé au premier correctif — exactement comme les quatre bandeaux avant
+ * qu'ils ne deviennent un composant.
+ *
+ * ---------------------------------------------------------------------------
+ * LA LECTURE EST EN BASE, PLUS DANS LE NAVIGATEUR
+ * ---------------------------------------------------------------------------
+ *
+ * La date de dernière lecture vivait dans `localStorage`. On lisait sur son
+ * téléphone, le PC gardait sa pastille — supportable avec un seul salon,
+ * intenable avec huit fils. Elle est désormais enregistrée par le serveur,
+ * fil par fil, et l'écran l'annonce en deux occasions : à l'ouverture d'un fil,
+ * et quand un message y arrive pendant qu'on le regarde.
+ *
+ * L'évènement `t14-chat-lu` reste, mais il ne dit plus « tout est lu » : il dit
+ * « quelque chose a changé, recompte ». C'est la barre de navigation qui
+ * recompte, parce qu'elle seule sait ce qu'elle affiche — lire un fil ne vide
+ * pas la pastille s'il en reste un autre non lu.
+ */
+export function signalerLecture() {
   window.dispatchEvent(new CustomEvent('t14-chat-lu'));
 }
 
@@ -35,17 +65,31 @@ function daySeparator(date) {
  * L'interrogation du serveur rend un nouveau tableau toutes les six secondes,
  * meme quand personne n'a rien dit. Pour React, un nouveau tableau est un
  * changement : tout effet qui depend de `messages` repart donc six fois par
- * minute, qu'il y ait du nouveau ou non. Cette empreinte — le nombre de
- * messages et l'identifiant du dernier — ne change, elle, que lorsqu'il s'est
- * reellement passe quelque chose.
+ * minute, qu'il y ait du nouveau ou non. Cette empreinte — le fil regarde, le
+ * nombre de messages et l'identifiant du dernier — ne change, elle, que
+ * lorsqu'il s'est reellement passe quelque chose.
  */
-function empreinte(messages) {
-  if (!messages.length) return 'vide';
-  return `${messages.length}:${messages[messages.length - 1].id}`;
+function empreinte(fil, messages) {
+  if (!messages.length) return `${fil}:vide`;
+  return `${fil}:${messages.length}:${messages[messages.length - 1].id}`;
+}
+
+/** La pastille des non-lus d'un fil. */
+function Pastille({ n }) {
+  if (!n) return null;
+  return (
+    <span className="min-w-[17px] h-[17px] px-1 rounded-full bg-red-500 text-white
+                     font-display text-[10px] font-bold leading-[17px] text-center tabular-nums">
+      {n > 99 ? '99' : n}
+    </span>
+  );
 }
 
 export default function ChatPage() {
   const { user } = useAuth();
+
+  const [fil, setFil] = useState(COMPTOIR);
+  const [fils, setFils] = useState(null);
 
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -70,24 +114,50 @@ export default function ChatPage() {
     stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
   };
 
-  const fetchMessages = useCallback(async () => {
+  const chargerFils = useCallback(async () => {
     try {
-      const res = await api.get('/messages?limit=100');
+      const res = await api.get('/messages/fils');
+      setFils(res.data);
+    } catch {
+      /* liste indisponible : on reste sur le fil ouvert, sans rangee */
+    }
+  }, []);
+
+  const fetchMessages = useCallback(async (quelFil) => {
+    try {
+      const res = await api.get(
+        quelFil === COMPTOIR ? '/messages?limit=100' : `/messages?avec=${quelFil}&limit=100`
+      );
       setMessages(res.data);
     } catch (err) {
       console.error(err);
     }
   }, []);
 
+  /**
+   * L'interrogation régulière.
+   *
+   * Les messages du fil ouvert toutes les six secondes, la liste des fils une
+   * fois sur deux : elle coûte une requête par copain côté serveur, et son seul
+   * rôle est de faire apparaître une pastille — douze secondes de retard sur
+   * une conversation qu'on ne regarde pas ne gênent personne.
+   *
+   * Rien ne part quand l'onglet est en arrière-plan, et tout repart au retour —
+   * le même réglage que partout ailleurs dans l'application.
+   */
   useEffect(() => {
     let alive = true;
+    let tour = 0;
 
     const tick = async () => {
       if (document.hidden) return;
-      await fetchMessages();
+      await fetchMessages(fil);
+      if (tour % 2 === 0) await chargerFils();
+      tour++;
       if (alive) setLoading(false);
     };
 
+    setLoading(true);
     tick();
     const id = setInterval(tick, POLL_MS);
     const onVisible = () => { if (!document.hidden) tick(); };
@@ -98,52 +168,73 @@ export default function ChatPage() {
       clearInterval(id);
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [fetchMessages]);
+  }, [fil, fetchMessages, chargerFils]);
 
-  // Tant que la page est ouverte, tout ce qui arrive est considere comme lu.
-  // Garde sur l'empreinte : sans elle, on reecrivait le repere et on diffusait
-  // l'evenement « salon lu » toutes les six secondes sans raison.
+  /**
+   * « J'ai lu ce fil. »
+   *
+   * Déclenché à l'ouverture et à chaque arrivée réelle de message. La garde sur
+   * l'empreinte est ce qui évite d'écrire en base toutes les six secondes sans
+   * raison — c'est le même piège que pour le défilement, et il coûtait ici une
+   * requête d'écriture plutôt qu'un sursaut d'affichage.
+   */
   useEffect(() => {
-    if (!messages.length) return;
-    const e = empreinte(messages);
+    const e = empreinte(fil, messages);
     if (e === vuLecture.current) return;
     vuLecture.current = e;
-    markChatSeen(messages[messages.length - 1].createdAt);
-  }, [messages]);
+
+    api.post('/messages/lu', { fil })
+      .then(() => {
+        signalerLecture();
+        // La rangée doit perdre sa pastille tout de suite : attendre le
+        // prochain tour donnerait l'impression que le clic n'a rien fait.
+        setFils((f) => {
+          if (!f) return f;
+          if (fil === COMPTOIR) {
+            return { ...f, comptoir: { ...f.comptoir, nonLus: 0 }, total: f.total - f.comptoir.nonLus };
+          }
+          const avant = f.prives.find((p) => p.fil === fil)?.nonLus || 0;
+          return {
+            ...f,
+            prives: f.prives.map((p) => (p.fil === fil ? { ...p, nonLus: 0 } : p)),
+            total: f.total - avant,
+          };
+        });
+      })
+      .catch(() => { /* sans consequence : la pastille se corrigera au prochain tour */ });
+  }, [fil, messages]);
 
   /**
    * Recoller en bas de la conversation.
    *
-   * Ce que faisait cet effet avant, et pourquoi il fallait le changer :
+   * `scrollTop` sur le cadre lui-même, et surtout pas `scrollIntoView` : ce
+   * dernier remonte toute la chaîne des parents défilables jusqu'à la fenêtre.
+   * Sur téléphone, clavier ouvert, la page bougeait sous le doigt et la zone de
+   * saisie sortait de l'écran — on tapait un message et il disparaissait.
    *
-   * **`scrollIntoView` ne defile pas que le cadre de la conversation.** Il
-   * remonte toute la chaine des parents defilables jusqu'a la page elle-meme,
-   * et deplace donc aussi la fenetre. Sur telephone, clavier ouvert, la page
-   * bougeait sous le doigt et la zone de saisie sortait de l'ecran : on tapait
-   * un message et il disparaissait. C'est le meme piege que sur le selecteur de
-   * journee du championnat, ou un `scrollIntoView` innocent faisait ouvrir la
-   * page au milieu du tableau. Donner l'ordre au cadre lui-meme, par
-   * `scrollTop`, ne peut toucher que lui.
-   *
-   * **Il repartait toutes les six secondes.** L'interrogation rend un nouveau
-   * tableau meme quand rien n'a change, et l'effet ne regardait que l'identite
-   * de ce tableau. Le defilement forcé revenait donc six fois par minute, y
-   * compris pendant qu'on ecrivait. L'empreinte supprime ce declenchement a
-   * vide : on ne recolle en bas que lorsqu'un message est reellement arrive.
-   *
-   * Le repere invisible en fin de liste n'a plus lieu d'etre : on vise
-   * directement le bas du cadre.
+   * L'empreinte évite le second défaut de la version d'origine : l'effet
+   * repartait six fois par minute, y compris pendant qu'on écrivait, parce que
+   * l'interrogation rend un nouveau tableau même quand rien n'a changé.
    */
   useEffect(() => {
     const el = scrollerRef.current;
     if (!el || !messages.length) return;
 
-    const e = empreinte(messages);
+    const e = empreinte(fil, messages);
     if (e === vuDefilement.current) return;
     vuDefilement.current = e;
 
     if (stick.current) el.scrollTop = el.scrollHeight;
-  }, [messages]);
+  }, [fil, messages]);
+
+  const ouvrir = (nouveau) => {
+    if (nouveau === fil) return;
+    setMessages([]);
+    setDraft('');
+    setError('');
+    stick.current = true;
+    setFil(nouveau);
+  };
 
   const send = async () => {
     const body = draft.trim();
@@ -152,12 +243,16 @@ export default function ChatPage() {
     setSending(true);
     setError('');
     try {
-      const res = await api.post('/messages', { body });
+      const res = await api.post('/messages', {
+        body,
+        ...(fil === COMPTOIR ? {} : { destinataireId: fil }),
+      });
       setDraft('');
       stick.current = true;
       // On insere tout de suite plutot que d'attendre la prochaine
       // interrogation : l'envoi doit paraitre instantane.
       setMessages((prev) => (prev.some((m) => m.id === res.data.id) ? prev : [...prev, res.data]));
+      chargerFils();
     } catch (err) {
       setError(err.response?.data?.error || 'Envoi impossible');
     } finally {
@@ -170,6 +265,7 @@ export default function ChatPage() {
     setMessages((prev) => prev.filter((m) => m.id !== id));
     try {
       await api.delete(`/messages/${id}`);
+      chargerFils();
     } catch {
       setMessages(before);
       setError('Suppression impossible');
@@ -184,6 +280,8 @@ export default function ChatPage() {
   };
 
   const left = MAX_LENGTH - draft.length;
+  const interlocuteur = fils?.prives?.find((p) => p.fil === fil) || null;
+  const prive = fil !== COMPTOIR;
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6">
@@ -192,24 +290,66 @@ export default function ChatPage() {
           En 4/3, c'est-à-dire la proportion de l'image elle-même, et non une
           bande découpée dedans. Une bande aurait été plus discrète au-dessus
           des messages, mais elle coupait des visages : ici tout le monde est
-          entier, du type au maillot vert jusqu'aux deux filles de droite, et
-          c'est une image qui ne vaut que par ses douze têtes.
-
-          Ce que ça coûte, et c'est assumé : sur un téléphone le bandeau fait
-          les trois quarts de la largeur en hauteur, donc il faut faire défiler
-          pour atteindre le premier message. Le quart inférieur — le zinc, les
-          pompes à bière — passe sous le dégradé, ce qui adoucit la transition
-          et récupère un peu de cette hauteur visuellement.
+          entier, et c'est une image qui ne vaut que par ses douze têtes.
 
           La classe `bandeau-comptoir` n'habille rien : elle sert de repère à
           PhotoCopains.css, qui doit savoir de combien descendre la vignette des
           copains sur cette page. Voir le commentaire là-bas. */}
       <Bandeau nom="comptoir-chien" ratio={4 / 3} className="bandeau-comptoir mb-5" />
 
-      <h1 className="font-display text-[26px] font-extrabold leading-none mb-1">💬 Le Comptoir</h1>
-      <p className="text-xs italic text-slate-500 mb-5">
-        Entre nous · {messages.length} message{messages.length > 1 ? 's' : ''}
+      <h1 className="font-display text-[26px] font-extrabold leading-none mb-1">
+        {prive ? interlocuteur?.username || 'Conversation' : '💬 Le Comptoir'}
+      </h1>
+      <p className="text-xs italic text-slate-500 mb-4">
+        {prive
+          ? 'Entre vous deux · personne d’autre ne lit cette conversation'
+          : `Entre nous · ${messages.length} message${messages.length > 1 ? 's' : ''}`}
       </p>
+
+      {/* La rangée des fils.
+
+          Elle défile horizontalement sur téléphone plutôt que de se replier sur
+          plusieurs lignes : huit rangs empilés pousseraient la conversation
+          sous la ligne de flottaison, alors que c'est elle qu'on vient lire. Le
+          Comptoir reste en tête, toujours à la même place.
+
+          Le rang porte la pastille du joueur et son nombre de non-lus. Un
+          joueur en pause reste dans la liste, en grisé : il peut revenir, et sa
+          conversation ne disparaît pas avec son activité. */}
+      {fils && (
+        <div className="flex gap-1.5 overflow-x-auto pb-2 mb-3 -mx-1 px-1">
+          <button
+            onClick={() => ouvrir(COMPTOIR)}
+            className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[12.5px] font-display font-semibold transition-colors ${
+              fil === COMPTOIR
+                ? 'chip-accent border-transparent'
+                : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-amber-500 hover:text-white'
+            }`}
+          >
+            Le Comptoir
+            <Pastille n={fils.comptoir.nonLus} />
+          </button>
+
+          {fils.prives.map((p) => (
+            <button
+              key={p.fil}
+              onClick={() => ouvrir(p.fil)}
+              title={p.enPause ? `${p.username} est en pause` : `Écrire à ${p.username}`}
+              className={`shrink-0 flex items-center gap-1.5 pl-1.5 pr-3 py-1 rounded-full border text-[12.5px] font-display font-semibold transition-colors ${
+                fil === p.fil
+                  ? 'chip-accent border-transparent'
+                  : `bg-slate-900 border-slate-800 hover:border-amber-500 hover:text-white ${
+                      p.enPause ? 'text-slate-600' : 'text-slate-400'
+                    }`
+              }`}
+            >
+              <Avatar user={p} size={22} />
+              {p.username}
+              <Pastille n={p.nonLus} />
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="card p-0 overflow-hidden">
         <div
@@ -221,8 +361,14 @@ export default function ChatPage() {
             <p className="text-center py-12 text-slate-500 animate-pulse">Chargement…</p>
           ) : messages.length === 0 ? (
             <div className="text-center py-12">
-              <p className="text-slate-500">Personne n’a encore rien dit.</p>
-              <p className="text-slate-600 text-sm mt-1">À toi d’ouvrir le bal 🏉</p>
+              <p className="text-slate-500">
+                {prive
+                  ? `Rien d’échangé avec ${interlocuteur?.username || 'ce joueur'}.`
+                  : 'Personne n’a encore rien dit.'}
+              </p>
+              <p className="text-slate-600 text-sm mt-1">
+                {prive ? 'Écris-lui le premier.' : 'À toi d’ouvrir le bal 🏉'}
+              </p>
             </div>
           ) : (
             messages.map((m, i) => {
@@ -309,23 +455,21 @@ export default function ChatPage() {
                 zoome la page pour le rendre lisible. A 13,5 pixels, ecrire un
                 message agrandissait donc tout le site — et comme l'application
                 installee n'a ni barre d'adresse ni geste pour revenir en
-                arriere, le zoom restait : la barre du haut depassait a gauche,
-                celle du bas se trouvait rognee, et il fallait faire glisser la
-                page de cote pour retrouver ses reperes.
-
-                La preuve etait dans « Mes pronos » : les cases de score y sont
-                a 16 pixels pile, et cette page ne zoome jamais.
+                arriere, le zoom restait.
 
                 Au-dela de `sm` — donc sur tablette et ordinateur, ou aucun
                 clavier ne s'ouvre et ou ce zoom n'existe pas — on revient a
-                13,5 pixels, qui est la taille des bulles de la conversation :
-                la zone de saisie doit ressembler a ce qu'elle produit. */}
+                13,5 pixels, qui est la taille des bulles de la conversation. */}
             <textarea
               value={draft}
               onChange={(e) => setDraft(e.target.value.slice(0, MAX_LENGTH))}
               onKeyDown={onKeyDown}
               rows={1}
-              placeholder="Ton message… (Entrée pour envoyer)"
+              placeholder={
+                prive
+                  ? `Ton message à ${interlocuteur?.username || ''}… (Entrée pour envoyer)`
+                  : 'Ton message… (Entrée pour envoyer)'
+              }
               className="flex-1 resize-none bg-slate-950 border-[1.5px] border-slate-800 rounded-md px-3 py-2
                          text-[16px] sm:text-[13.5px] text-white placeholder:text-slate-600
                          focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/25 transition-colors"
@@ -349,8 +493,9 @@ export default function ChatPage() {
       </div>
 
       <p className="text-[11px] italic text-slate-600 mt-4">
-        Le salon se rafraîchit tout seul toutes les six secondes, et se met en veille quand
-        l’onglet est en arrière-plan. Chacun peut retirer ses propres messages.
+        {prive
+          ? 'Cette conversation n’est lisible que par vous deux — pas même depuis l’administration. Chacun peut retirer ses propres messages.'
+          : 'Le salon se rafraîchit tout seul toutes les six secondes, et se met en veille quand l’onglet est en arrière-plan. Chacun peut retirer ses propres messages.'}
       </p>
     </div>
   );
