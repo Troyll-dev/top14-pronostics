@@ -113,7 +113,7 @@ export default function ChatPage() {
   const onScroll = () => {
     const el = scrollerRef.current;
     if (!el) return;
-    stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    stick.current = el.scrollTop < 80;
   };
 
   const chargerFils = useCallback(async () => {
@@ -207,15 +207,14 @@ export default function ChatPage() {
   }, [fil, messages]);
 
   /**
-   * Recoller en bas de la conversation.
+   * Recoller en haut de la conversation.
    *
    * `scrollTop` sur le cadre lui-même, et surtout pas `scrollIntoView` : ce
-   * dernier remonte toute la chaîne des parents défilables jusqu'à la fenêtre.
-   * Sur téléphone, clavier ouvert, la page bougeait sous le doigt et la zone de
-   * saisie sortait de l'écran — on tapait un message et il disparaissait.
+   * dernier remonte toute la chaîne des parents défilables jusqu'à la fenêtre,
+   * et déplacerait donc la page entière.
    *
-   * L'empreinte évite le second défaut de la version d'origine : l'effet
-   * repartait six fois par minute, y compris pendant qu'on écrivait, parce que
+   * L'empreinte évite le défaut de la version d'origine : l'effet repartait six
+   * fois par minute, y compris pendant qu'on écrivait, parce que
    * l'interrogation rend un nouveau tableau même quand rien n'a changé.
    */
   useEffect(() => {
@@ -226,7 +225,7 @@ export default function ChatPage() {
     if (e === vuDefilement.current) return;
     vuDefilement.current = e;
 
-    if (stick.current) el.scrollTop = el.scrollHeight;
+    if (stick.current) el.scrollTop = 0;
   }, [fil, messages]);
 
   const ouvrir = (nouveau) => {
@@ -310,6 +309,17 @@ export default function ChatPage() {
   };
 
   const left = MAX_LENGTH - draft.length;
+
+  /*
+   * Du plus recent au plus ancien.
+   *
+   * Le serveur rend les messages dans l'ordre chronologique — c'est l'ordre
+   * naturel d'une conversation, et celui que toute autre vue attendrait. C'est
+   * donc ici, et seulement ici, qu'on le retourne : la copie evite de modifier
+   * le tableau rendu par l'interrogation, que deux autres effets relisent.
+   */
+  const liste = [...messages].reverse();
+
   const interlocuteur = fils?.prives?.find((p) => p.fil === fil) || null;
   const prive = fil !== COMPTOIR;
 
@@ -382,6 +392,67 @@ export default function ChatPage() {
       )}
 
       <div className="card p-0 overflow-hidden">
+        {/* La saisie, en tete de la carte.
+
+            Elle etait en bas, comme dans toute messagerie. Deux raisons de
+            l'avoir remontee, et elles tiennent a cette page-ci plutot qu'a une
+            mode : le bandeau occupe les trois quarts de la largeur en hauteur,
+            donc sur telephone on defile deja pour atteindre la conversation —
+            autant tomber directement sur ce qui permet d'ecrire. Et le clavier
+            du telephone ne peut plus pousser la zone de saisie hors de l'ecran,
+            puisqu'elle n'est plus au bord inferieur.
+
+            Ce qu'on accepte en echange : une conversation qui se lit a
+            l'envers, les reponses au-dessus de ce a quoi elles repondent. Sur
+            un salon ou l'on vient voir ce qui est nouveau, c'est l'arbitrage
+            des forums, et il se tient. */}
+        <div className="border-b border-slate-800 p-3">
+          <div className="flex items-end gap-2">
+            {/* Seize pixels sur telephone, et ce n'est pas un choix esthetique.
+
+                iOS applique une regle sans exception : quand le curseur entre
+                dans un champ dont le texte fait moins de 16 pixels, Safari
+                zoome la page pour le rendre lisible. A 13,5 pixels, ecrire un
+                message agrandissait donc tout le site — et comme l'application
+                installee n'a ni barre d'adresse ni geste pour revenir en
+                arriere, le zoom restait.
+
+                Au-dela de `sm` — donc sur tablette et ordinateur, ou aucun
+                clavier ne s'ouvre et ou ce zoom n'existe pas — on revient a
+                13,5 pixels, qui est la taille des bulles de la conversation. */}
+            <textarea
+              ref={saisieRef}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value.slice(0, MAX_LENGTH))}
+              onKeyDown={onKeyDown}
+              rows={1}
+              placeholder={
+                prive
+                  ? `Ton message à ${interlocuteur?.username || ''}… (Entrée pour envoyer)`
+                  : 'Ton message… (Entrée pour envoyer)'
+              }
+              className="flex-1 resize-none bg-slate-950 border-[1.5px] border-slate-800 rounded-md px-3 py-2
+                         text-[16px] sm:text-[13.5px] text-white placeholder:text-slate-600
+                         focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/25 transition-colors"
+            />
+            <ChoixEmoji onChoix={poserEmoji} disabled={sending} />
+
+            <button
+              onClick={send}
+              disabled={sending || !draft.trim()}
+              className="btn-primary text-[13px] py-2 shrink-0"
+            >
+              {sending ? '…' : 'Envoyer'}
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between gap-3 mt-1.5 text-[11px]">
+            <span className="text-red-400">{error}</span>
+            <span className={left < 100 ? 'text-amber-500' : 'text-slate-600'}>
+              {left < 100 ? `${left} caractères restants` : 'Maj + Entrée pour aller à la ligne'}
+            </span>
+          </div>
+        </div>
         <div
           ref={scrollerRef}
           onScroll={onScroll}
@@ -401,15 +472,32 @@ export default function ChatPage() {
               </p>
             </div>
           ) : (
-            messages.map((m, i) => {
-              const prev = messages[i - 1];
+            liste.map((m, i) => {
+              /*
+               * Les voisins changent de sens en meme temps que la liste.
+               *
+               * `avant` est le message situe juste au-dessus a l'ecran, donc le
+               * PLUS RECENT des deux — l'inverse de ce que le nom suggererait
+               * dans une liste chronologique, d'ou ce commentaire.
+               *
+               * Le separateur de jour s'affiche au-dessus du premier message
+               * d'une journee rencontre en descendant : « Aujourd'hui » tout en
+               * haut, puis « Hier » quand on franchit la limite en remontant le
+               * temps.
+               *
+               * L'en-tete — pseudo et heure — se pose sur le message le plus
+               * recent d'un groupe, c'est-a-dire celui du haut. C'est la
+               * transposition fidele de la regle d'origine, qui la posait sur le
+               * premier message du groupe tel qu'il apparaissait.
+               */
+              const avant = liste[i - 1];
               const date = new Date(m.createdAt);
-              const newDay = !prev || !isSameDay(date, new Date(prev.createdAt));
+              const newDay = !avant || !isSameDay(date, new Date(avant.createdAt));
               const grouped =
                 !newDay &&
-                prev &&
-                prev.user.id === m.user.id &&
-                date - new Date(prev.createdAt) < GROUP_MS;
+                avant &&
+                avant.user.id === m.user.id &&
+                new Date(avant.createdAt) - date < GROUP_MS;
 
               const isMe = m.user.id === user?.id;
 
@@ -475,54 +563,6 @@ export default function ChatPage() {
           )}
         </div>
 
-        {/* Saisie */}
-        <div className="border-t border-slate-800 p-3">
-          <div className="flex items-end gap-2">
-            {/* Seize pixels sur telephone, et ce n'est pas un choix esthetique.
-
-                iOS applique une regle sans exception : quand le curseur entre
-                dans un champ dont le texte fait moins de 16 pixels, Safari
-                zoome la page pour le rendre lisible. A 13,5 pixels, ecrire un
-                message agrandissait donc tout le site — et comme l'application
-                installee n'a ni barre d'adresse ni geste pour revenir en
-                arriere, le zoom restait.
-
-                Au-dela de `sm` — donc sur tablette et ordinateur, ou aucun
-                clavier ne s'ouvre et ou ce zoom n'existe pas — on revient a
-                13,5 pixels, qui est la taille des bulles de la conversation. */}
-            <textarea
-              ref={saisieRef}
-              value={draft}
-              onChange={(e) => setDraft(e.target.value.slice(0, MAX_LENGTH))}
-              onKeyDown={onKeyDown}
-              rows={1}
-              placeholder={
-                prive
-                  ? `Ton message à ${interlocuteur?.username || ''}… (Entrée pour envoyer)`
-                  : 'Ton message… (Entrée pour envoyer)'
-              }
-              className="flex-1 resize-none bg-slate-950 border-[1.5px] border-slate-800 rounded-md px-3 py-2
-                         text-[16px] sm:text-[13.5px] text-white placeholder:text-slate-600
-                         focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/25 transition-colors"
-            />
-            <ChoixEmoji onChoix={poserEmoji} disabled={sending} />
-
-            <button
-              onClick={send}
-              disabled={sending || !draft.trim()}
-              className="btn-primary text-[13px] py-2 shrink-0"
-            >
-              {sending ? '…' : 'Envoyer'}
-            </button>
-          </div>
-
-          <div className="flex items-center justify-between gap-3 mt-1.5 text-[11px]">
-            <span className="text-red-400">{error}</span>
-            <span className={left < 100 ? 'text-amber-500' : 'text-slate-600'}>
-              {left < 100 ? `${left} caractères restants` : 'Maj + Entrée pour aller à la ligne'}
-            </span>
-          </div>
-        </div>
       </div>
 
       <p className="text-[11px] italic text-slate-600 mt-4">

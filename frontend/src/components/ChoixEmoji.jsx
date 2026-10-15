@@ -137,11 +137,15 @@ export default function ChoixEmoji({ onChoix, disabled = false }) {
       </button>
 
       {ouvert && (
-        /* Au-dessus du bouton et aligné à droite : sous lui, le panneau
-           tomberait derrière le clavier du téléphone, qui occupe la moitié
-           basse de l'écran dès que la zone de saisie a le curseur. */
+        /* Sous le bouton et aligné à droite.
+
+           Il s'ouvrait au-dessus, du temps où la saisie était en bas de la
+           carte : il fallait fuir le clavier du téléphone. La saisie est passée
+           en tête, et la contrainte s'est inversée — vers le haut, le panneau
+           sortirait de l'écran ; vers le bas, il recouvre quelques messages le
+           temps qu'on choisisse, ce qui ne coûte rien. */
         <div
-          className="absolute bottom-full right-0 mb-2 z-30 w-[268px] max-h-[260px] overflow-y-auto
+          className="absolute top-full right-0 mt-2 z-30 w-[268px] max-h-[260px] overflow-y-auto
                      rounded-lg border border-slate-800 bg-slate-900 p-2 shadow-[0_12px_30px_-12px_rgba(0,0,0,.65)]"
         >
           {FAMILLES.map((f) => (
