@@ -72,7 +72,14 @@ model User {
   bot          Boolean       @default(false)
 
   predictions  Prediction[]
-  messages     Message[]
+  /// Les messages ecrits et les messages recus.
+  ///
+  /// Deux relations vers la meme table, donc deux noms : Prisma ne sait plus
+  /// deviner laquelle est laquelle des qu'il y en a plus d'une. Les noms sont
+  /// internes au schema et ne changent rien en base.
+  messages     Message[] @relation("Ecrits")
+  recus        Message[] @relation("Recus")
+  lectures     Lecture[]
   avatar       UserAvatar?
   authTokens   AuthToken[]
   reminders    Reminder[]
@@ -183,13 +190,56 @@ model Prediction {
 /// Les messages disparaissent avec le compte de leur auteur, comme ses pronostics.
 model Message {
   id        Int      @id @default(autoincrement())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation("Ecrits", fields: [userId], references: [id], onDelete: Cascade)
   userId    Int
+
+  /// A qui ce message est-il adresse ?
+  ///
+  /// Vide, c'est le Comptoir : tout le monde le lit, et c'est le seul cas qui
+  /// existait jusqu'ici — les messages deja en base restent donc exactement ce
+  /// qu'ils etaient, sans migration de donnees.
+  ///
+  /// Rempli, c'est un message prive. Le fil entre deux joueurs est l'ensemble
+  /// des messages ou l'un est l'auteur et l'autre le destinataire, dans les
+  /// deux sens. Pas de table de conversations ni de participants : a huit
+  /// joueurs, ce serait de la plomberie pour un probleme qu'on n'a pas, et une
+  /// table de plus a tenir a jour est une occasion de plus de se tromper.
+  ///
+  /// Les messages prives ne sont lisibles que par leurs deux interlocuteurs.
+  /// L'administration ne les voit pas — sa moderation ne porte que sur le
+  /// Comptoir —, et ce n'est pas un oubli : un salon public se modere, une
+  /// conversation entre deux personnes ne se lit pas.
+  destinataire   User?  @relation("Recus", fields: [destinataireId], references: [id], onDelete: Cascade)
+  destinataireId Int?
+
   body      String   @db.VarChar(1000)
   createdAt DateTime @default(now())
 
   @@index([createdAt])
+  @@index([destinataireId, userId])
   @@map("messages")
+}
+
+/// Ou en est chacun dans sa lecture, fil par fil.
+///
+/// La date de derniere lecture vivait dans le navigateur, et ca se voyait : on
+/// lisait sur son telephone, le PC continuait d'afficher la pastille. C'etait
+/// supportable avec un seul salon ; avec huit fils, ce serait huit pastilles
+/// fausses.
+///
+/// `fil` vaut 0 pour le Comptoir, et l'identifiant de l'autre joueur pour un fil
+/// prive. Un entier plutot qu'une seconde cle etrangere : le Comptoir n'est pas
+/// un utilisateur, et lui inventer une ligne dans `users` pour que la contrainte
+/// tombe juste serait payer cher une elegance de schema.
+model Lecture {
+  id     Int      @id @default(autoincrement())
+  user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId Int
+  fil    Int                      // 0 = le Comptoir, sinon l'autre joueur
+  luAt   DateTime @default(now())
+
+  @@unique([userId, fil])
+  @@map("lectures")
 }
 
 /// Jetons a usage unique envoyes par e-mail : reinitialisation de mot de passe,
