@@ -475,6 +475,22 @@ export default function MatchCard({
     : !complete ? 'Saisis les deux scores pour pouvoir y poser ton joker.'
     : null;
 
+  /**
+   * Le score manque : la seule raison de refus qui change **pendant la frappe**.
+   *
+   * Elle avait sa propre ligne sous le joker, comme les autres. Mais elle est
+   * la seule à apparaître et disparaître au fil des chiffres : on tape le
+   * premier score, la ligne est là ; on tape le second, elle s'en va, et la
+   * carte raccourcit sous le pouce au moment précis où l'on vise une case.
+   *
+   * Elle se dit donc dans la rangée elle-même, à la place de « points ×2 » et
+   * dans la même longueur — trois mots, pour ne jamais passer à la ligne sur un
+   * téléphone. La hauteur de la carte ne dépend plus de ce qu'on est en train
+   * de taper. Les autres refus — match commencé, joker figé — gardent leur
+   * ligne : ils ne changent pas pendant qu'on saisit.
+   */
+  const scoreManquant = !jokerFige && !locked && !complete;
+
   // La rangée reste affichée sur un match commencé qui porte le joker : sinon
   // le groupe n'aurait plus aucun bouton coché et l'on ne saurait plus où il
   // est.
@@ -720,7 +736,15 @@ export default function MatchCard({
 
       {/* Saisie */}
       {!locked && (
-        <div className="relative z-10 mt-3.5 pt-3 border-t border-slate-800 flex items-center gap-3 flex-wrap">
+        /* Hauteur minimale réservée : celle du bouton.
+
+           Cette rangée change de contenu au fil de la frappe — la pastille
+           « Enregistré » et sa phrase, puis le bouton « Enregistrer la
+           modification » dès qu'on touche un chiffre. Les deux n'ont pas la
+           même hauteur, et la carte bougeait d'une quinzaine de pixels à la
+           première frappe. On réserve la plus grande des deux : 12 pixels de
+           marge, 36 de bouton, 1 de trait. */
+        <div className="relative z-10 mt-3.5 pt-3 min-h-[49px] border-t border-slate-800 flex items-center gap-3 flex-wrap">
           {/* Le bouton ne s'affiche que s'il a quelque chose a faire.
 
               Il portait « Modifier » en grise tant que rien n'avait change.
@@ -845,7 +869,9 @@ export default function MatchCard({
                     <IconeJoker taille={16} /> Joker ×2
                   </span>
                 ) : (
-                  <span className="text-slate-500 font-normal">· points ×2</span>
+                  <span className="text-slate-500 font-normal whitespace-nowrap">
+                    {scoreManquant ? '· score d\'abord' : '· points ×2'}
+                  </span>
                 )}
               </span>
             </label>
@@ -863,7 +889,7 @@ export default function MatchCard({
             {jokerEnCours && <span className="text-[11.5px] text-slate-500">…</span>}
           </div>
 
-          {jokerBloque && (
+          {jokerBloque && !scoreManquant && (
             <p className="text-[11.5px] text-slate-500 mt-1.5">{jokerBloque}</p>
           )}
           {jokerErreur && (

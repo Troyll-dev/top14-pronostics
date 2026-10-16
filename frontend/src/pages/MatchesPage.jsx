@@ -489,32 +489,57 @@ export default function MatchesPage() {
         />
       )}
 
-      {/* Tout valider — place AVANT la liste, et c'est tout l'objet du
-          changement. En dessous des sept matchs, il fallait faire defiler
-          toute la page pour le decouvrir : autant dire que personne ne le
-          voyait, et qu'on pouvait quitter la page en croyant avoir joue. */}
-      {!loading && (toSave.length > 0 || bulkResult) && (
-        <div className="card mb-5 border-l-4 border-l-amber-500">
-          {toSave.length > 0 ? (
-            <div className="flex items-center justify-between gap-4 flex-wrap">
-              <div>
-                <p className="font-display font-bold text-[15px]">
-                  {toSave.length} prono{toSave.length > 1 ? 's' : ''} en attente
-                </p>
-                <p className="text-[12px] text-slate-500 mt-0.5">
-                  Saisis mais pas encore envoyés. Ils sont conservés dans ce navigateur.
-                </p>
-              </div>
-              <button onClick={saveAll} disabled={bulkSaving} className="btn-primary text-[13.5px] shrink-0">
-                {bulkSaving ? 'Envoi…' : 'Tout valider'}
-              </button>
-            </div>
-          ) : (
-            <p className="font-display font-bold text-[15px] text-green-400">
-              ✅ Tous tes pronos sont enregistrés
-            </p>
-          )}
+      {/* Tout valider — placé AVANT la liste, et c'est tout l'objet du
+          changement. En dessous des sept matchs, il fallait faire défiler
+          toute la page pour le découvrir : autant dire que personne ne le
+          voyait, et qu'on pouvait quitter la page en croyant avoir joué.
 
+          Le bloc est désormais **toujours là** tant qu'il reste une rencontre
+          ouverte, et il garde la même hauteur qu'il ait quelque chose à envoyer
+          ou non.
+
+          Il apparaissait auparavant au moment précis où l'on complétait un
+          score — le second chiffre tapé faisait naître « 1 prono en attente »
+          au-dessus de la liste, et toutes les cartes descendaient d'une
+          centaine de pixels sous le pouce. Les ordinateurs et Android
+          compensent ce genre de saut ; l'iPhone ne le fait pas, et c'est
+          précisément sur un iPhone qu'on saisit ses pronos.
+
+          Les deux états ont donc la même charpente : un titre, une phrase, le
+          bouton. Le bouton est inactif quand il n'y a rien à envoyer, ce qui se
+          comprend d'un regard. La phrase a deux lignes réservées sur téléphone,
+          parce que la plus longue des deux s'y replie ; sur un écran large les
+          deux tiennent sur une ligne et la réserve est levée.
+
+          Le liseré passe de l'ambre au vert : c'est la seule chose qui change
+          vraiment de l'un à l'autre, et elle ne coûte aucun pixel. */}
+      {!loading && matches.some(isOpen) && (
+        <div className={`card mb-5 border-l-4 ${toSave.length > 0 ? 'border-l-amber-500' : 'border-l-green-500/70'}`}>
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className={`font-display font-bold text-[15px] ${toSave.length > 0 ? '' : 'text-green-400'}`}>
+                {toSave.length > 0
+                  ? `${toSave.length} prono${toSave.length > 1 ? 's' : ''} en attente`
+                  : '✅ Rien en attente'}
+              </p>
+              <p className="text-[12px] leading-[1.5] min-h-[3em] sm:min-h-0 text-slate-500 mt-0.5">
+                {toSave.length > 0
+                  ? 'Saisis mais pas encore envoyés. Ils sont conservés dans ce navigateur.'
+                  : 'Tout ce que tu as saisi est enregistré. Un score modifié s\'affichera ici.'}
+              </p>
+            </div>
+            <button
+              onClick={saveAll}
+              disabled={bulkSaving || toSave.length === 0}
+              className="btn-primary text-[13.5px] shrink-0"
+            >
+              {bulkSaving ? 'Envoi…' : 'Tout valider'}
+            </button>
+          </div>
+
+          {/* Le compte rendu d'un envoi groupé, lui, change la hauteur — mais il
+              n'apparaît qu'après un clic sur ce bouton, c'est-à-dire quand on a
+              les yeux ici et pas sur une case de score plus bas. */}
           {bulkResult && (
             <div className="mt-3 pt-3 border-t border-slate-800 text-[12.5px]">
               {bulkResult.ok > 0 && (
