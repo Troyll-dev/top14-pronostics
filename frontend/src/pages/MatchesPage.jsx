@@ -124,13 +124,32 @@ export default function MatchesPage() {
     }
   }, [drafts]);
 
-  const fetchMatches = useCallback(() => {
+  /**
+   * Relire les matchs — bruyamment ou en silence.
+   *
+   * Au chargement de la page et au changement de journée, on affiche
+   * « Chargement des matchs… » : il n'y a encore rien à montrer.
+   *
+   * Après un geste sur une carte — poser le joker, laisser Bob remplir — on
+   * relit **en silence**, sans passer par cet état. C'était la cause du retour
+   * en haut de page : `loading` à vrai démontait les sept cartes le temps de la
+   * requête, la page se réduisait à une ligne, et le navigateur ramenait la vue
+   * tout en haut. On se retrouvait au-dessus du bandeau après avoir coché un
+   * joker sur le cinquième match.
+   *
+   * La validation d'un pronostic, elle, évitait déjà le piège en ne relisant
+   * rien du tout (voir handleSaved). Le joker et Bob, qui ont besoin de relire
+   * pour connaître l'état réel côté serveur, le font maintenant sans toucher à
+   * ce qui est affiché : les cartes restent en place et se mettent à jour sous
+   * le pouce.
+   */
+  const fetchMatches = useCallback(({ silencieux = false } = {}) => {
     if (!currentRound) return;
-    setLoading(true);
+    if (!silencieux) setLoading(true);
     api.get(`/matches?round=${currentRound}`)
       .then((res) => setMatches(res.data))
       .catch(console.error)
-      .finally(() => setLoading(false));
+      .finally(() => { if (!silencieux) setLoading(false); });
   }, [currentRound]);
 
   const fetchRegles = useCallback(() => {
@@ -165,7 +184,7 @@ export default function MatchesPage() {
     setJokerErreur(null);
     try {
       await api.post('/predictions/joker', { matchId: cible });
-      fetchMatches();
+      fetchMatches({ silencieux: true });
       fetchRegles();
     } catch (err) {
       setJokerErreur({
@@ -244,6 +263,56 @@ export default function MatchesPage() {
     const p = m.predictions?.[0];
     return !p || p.homeScorePred !== d.home || p.awayScorePred !== d.away;
   });
+
+  /**
+   * Après « Valider » sur une carte, descendre jusqu'au prochain match à faire.
+   *
+   * « Prochain match à faire », et non « carte suivante » : si les deux
+   * rencontres d'après sont déjà pronostiquées, s'arrêter dessus obligerait à
+   * faire défiler de toute façon. On cherche donc, **plus bas** dans la page,
+   * la première rencontre encore ouverte qui n'a pas de pronostic ou dont le
+   * score saisi n'est pas enregistré. On ne remonte jamais : un match laissé
+   * de côté plus haut est un choix, et revenir dessus sans qu'on l'ait demandé
+   * serait déroutant.
+   *
+   * S'il n'y en a plus, on ne bouge pas : la journée est faite, et la carte
+   * qu'on vient de valider affiche « ✅ Enregistré » — c'est la bonne chose à
+   * avoir sous les yeux.
+   *
+   * Un temps d'arrêt de six dixièmes de seconde avant de partir, pour qu'on
+   * voie la confirmation sur la carte qu'on quitte. Sans lui, la page part
+   * avant qu'on sache si l'envoi a réussi.
+   *
+   * Le défilement est doux, sauf si le système demande de réduire les
+   * animations : on saute alors directement, comme le reste de l'appareil.
+   */
+  const allerAuSuivant = useCallback((matchId) => {
+    const i = matches.findIndex((m) => m.id === matchId);
+    if (i < 0) return;
+
+    const resteAFaire = (m) => {
+      if (matchState(m, Date.now()) !== 'avenir') return false;
+      const p = m.predictions?.[0];
+      if (!p) return true;
+      const d = drafts[m.id];
+      if (!d || d.home === '' || d.home === undefined || d.away === '' || d.away === undefined) return false;
+      return p.homeScorePred !== d.home || p.awayScorePred !== d.away;
+    };
+
+    const suivant = matches.slice(i + 1).find(resteAFaire);
+    if (!suivant) return;
+
+    let doux = true;
+    try {
+      doux = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    } catch { /* navigateur ancien : on garde le défilement doux */ }
+
+    setTimeout(() => {
+      document
+        .getElementById(`match-${suivant.id}`)
+        ?.scrollIntoView({ behavior: doux ? 'smooth' : 'auto', block: 'start' });
+    }, 600);
+  }, [matches, drafts]);
 
   const saveAll = async () => {
     setBulkSaving(true);
@@ -416,7 +485,7 @@ export default function MatchesPage() {
           matches={matches}
           aRemplir={pending.length}
           aValider={toSave.length}
-          onFait={() => { fetchMatches(); fetchRegles(); }}
+          onFait={() => { fetchMatches({ silencieux: true }); fetchRegles(); }}
         />
       )}
 
@@ -484,6 +553,7 @@ export default function MatchesPage() {
               now={now}
               onDraftChange={setDraft}
               onPredictionSaved={handleSaved}
+              onSuivant={allerAuSuivant}
               regles={regles}
               onJoker={choisirJoker}
               jokerFige={jokerFige}

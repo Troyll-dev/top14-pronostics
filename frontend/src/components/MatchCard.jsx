@@ -308,6 +308,7 @@ const ENCADRE_ATTENTE = 'bg-slate-800/40 text-slate-600 border-slate-800';
 export default function MatchCard({
   match, draft, onDraftChange, onPredictionSaved, now = Date.now(),
   regles = null, onJoker = null, jokerFige = false, jokerErreur = '',
+  onSuivant = null,
 }) {
   // Plus de `useAuth` ici : l'identite du joueur ne servait qu'a reperer sa
   // propre ligne dans la liste des pronos des autres, partie vers la page
@@ -391,6 +392,11 @@ export default function MatchCard({
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
       onPredictionSaved?.(match.id, res.data);
+      // Puis la page fait défiler jusqu'au prochain match à pronostiquer.
+      // Seulement ici, après un clic sur « Valider » : ni « Tout valider » ni
+      // la pose du joker n'appellent cette fonction, et c'est voulu — dans ces
+      // deux cas on n'est pas en train d'avancer d'une carte à la suivante.
+      onSuivant?.(match.id);
     } catch (err) {
       setError(err.response?.data?.error || 'Erreur');
     } finally {
@@ -510,7 +516,10 @@ export default function MatchCard({
   const caseAway = caseScore('away');
 
   return (
-    <div className={`card stitched ${bordure}`}>
+    // `id` pour que la page puisse faire défiler jusqu'à cette carte ;
+    // `scroll-mt-24` pour qu'elle s'arrête sous la barre de navigation, qui
+    // reste fixée en haut et la masquerait sinon.
+    <div id={`match-${match.id}`} className={`card stitched scroll-mt-24 ${bordure}`}>
       {/* LES PASTILLES, EN TÊTE DE CARTE — QUAND IL Y EN A.
 
           Ce qui qualifie la rencontre tout entière : l'affiche de la journée,
@@ -880,10 +889,10 @@ export default function MatchCard({
           rendraient la page illisible pour la seule personne qui veut vérifier
           si le buteur est titulaire.
 
-          Les deux blocs sont désormais repliés par défaut sur téléphone — voir
-          FormeClubs. Déplié, « Avant de pronostiquer » fait à lui seul plus
-          d'un demi-écran, et on ne voyait jamais deux rencontres à la fois.
-          Sur ordinateur, où la place ne manque pas, il reste ouvert.
+          « Avant de pronostiquer » est ouvert par défaut, y compris sur
+          téléphone : on l'a replié une version, puis rouvert — ces chiffres
+          servent au moment d'écrire un score, et les déplier sept fois par
+          journée coûtait plus que le défilement économisé.
 
           Les deux blocs disparaissent complètement quand il n'y a rien à
           montrer — aucune journée jouée, ou composition pas encore publiée par
