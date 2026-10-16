@@ -185,6 +185,7 @@ function infoMeteo(match, state) {
     return {
       texte: 'météo bientôt',
       notable: false,
+      attente: true,
       title: 'Aucune prévision fiable au-delà de dix jours : elle apparaîtra en approchant.',
     };
   }
@@ -241,6 +242,63 @@ function chaine(brut) {
   const choisie = parts.reduce((a, b) => (b.length > a.length ? b : a));
   return choisie.replace(/\s*\+/g, '+');
 }
+
+/**
+ * Le stade de chaque club, quand la rencontre n'en annonce pas.
+ *
+ * La source renseigne `venue` pour certaines rencontres seulement : Castres–
+ * Stade Français n'en a pas, par exemple. La carte affichait jusqu'ici la ville
+ * à la place, sous le nom du club recevant — ce qui masquait le trou, puisque
+ * « Castres » ressemble à une réponse. En remontant le stade sur sa propre
+ * ligne, le trou est devenu visible, et il fallait le combler plutôt que
+ * d'afficher une ligne à moitié vide.
+ *
+ * Quatorze lignes, rangées par le nom du club tel qu'il existe en base — les
+ * mêmes noms que la table de correspondance de la source LNR. Le `venue` de la
+ * rencontre garde la priorité : il couvre les délocalisations, qu'aucune table
+ * ne peut prévoir. Celle-ci ne sert que de repli, et un club absent ne fait
+ * rien échouer : la ligne se contente alors de la météo.
+ *
+ * À reprendre à chaque montée ou descente, et quand un sponsor rebaptise une
+ * enceinte. C'est la seule donnée de ce fichier qui vieillit toute seule.
+ */
+const STADE_PAR_CLUB = {
+  'Stade Toulousain': 'Stade Ernest-Wallon',
+  'Castres Olympique': 'Stade Pierre-Fabre',
+  'Stade Français Paris': 'Stade Jean-Bouin',
+  'Union Bordeaux-Bègles': 'Stade Chaban-Delmas',
+  'Stade Rochelais': 'Stade Marcel-Deflandre',
+  'LOU Rugby': 'Matmut Stadium de Gerland',
+  'RC Toulon': 'Stade Mayol',
+  'Racing 92': 'Paris La Défense Arena',
+  'ASM Clermont': 'Stade Marcel-Michelin',
+  'Section Paloise': 'Stade du Hameau',
+  'Aviron Bayonnais': 'Stade Jean-Dauger',
+  'Montpellier HR': 'GGL Stadium',
+  'USA Perpignan': 'Stade Aimé-Giral',
+  'RC Vannes': 'Stade de la Rabine',
+};
+
+const nomStade = (match) =>
+  match.venue || STADE_PAR_CLUB[match.homeTeam?.name] || null;
+
+/**
+ * L'encadré du diffuseur et de la météo.
+ *
+ * Ils étaient encadrés, ils le restent. Une première version les avait passés
+ * en texte simple pour gagner de la hauteur ; c'était se tromper de cause. Ce
+ * qui coûtait de la hauteur, c'était qu'ils s'empilent au-dessus du match, pas
+ * qu'ils aient un cadre. Une fois l'affiche en tête de carte, le cadre ne coûte
+ * plus rien — et il rend un vrai service : c'est lui qui permet à la météo de
+ * passer en ambre quand il pleut ou qu'il vente, ce qu'une couleur de texte
+ * seule ne fait pas assez voir.
+ */
+const ENCADRE =
+  'font-display text-[9.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 ' +
+  'rounded border whitespace-nowrap';
+const ENCADRE_NEUTRE = 'bg-slate-700/40 text-slate-400 border-slate-700';
+const ENCADRE_ALERTE = 'bg-amber-500/15 text-amber-500 border-amber-500/40';
+const ENCADRE_ATTENTE = 'bg-slate-800/40 text-slate-600 border-slate-800';
 
 /**
  * Les scores saisis ne vivent plus dans cette carte mais dans MatchesPage,
@@ -453,6 +511,54 @@ export default function MatchCard({
 
   return (
     <div className={`card stitched ${bordure}`}>
+      {/* LES PASTILLES, EN TÊTE DE CARTE — QUAND IL Y EN A.
+
+          Ce qui qualifie la rencontre tout entière : l'affiche de la journée,
+          multipliée par trois pour tout le monde ; le joker, sur un match où
+          sa rangée n'est plus affichée ; et l'état du match une fois le coup
+          d'envoi passé — « en cours », « terminé ».
+
+          Au-dessus du match et non à côté de la date : ces pastilles disent
+          dans quel régime se joue la rencontre, ce qui se lit avant les noms
+          des équipes, pas après l'heure. Elles étaient sur la ligne de date,
+          où elles décentraient le texte et paraissaient accrochées au hasard.
+
+          La rangée n'existe que si elle a quelque chose à montrer. Sur une
+          rencontre ordinaire à venir — cinq ou six des sept de la journée —
+          il n'y en a pas, et le match reste la première chose de la carte.
+          C'est ce qui rend ce placement acceptable : il ne coûte une ligne
+          qu'aux cartes qui ont une raison de se distinguer.
+
+          Centrées, sur l'axe du score, comme tout ce qui entoure l'affiche. */}
+      {(estAffiche || (estJoker && !montreJoker) || state !== 'avenir') && (
+        <div className="relative z-10 mb-3 flex flex-wrap items-center justify-center gap-1.5">
+          {estAffiche && (
+            <span
+              title="Match de la semaine : tous les points de cette rencontre sont multipliés par 3"
+              style={PASTILLE.affiche}
+              className="inline-flex items-center gap-1"
+            >
+              <IconeAffiche taille={18} /> Affiche ×3
+            </span>
+          )}
+          {estJoker && !montreJoker && (
+            <span
+              title="Ton joker était posé ici : tes points sur cette rencontre sont doublés"
+              style={PASTILLE.joker}
+              className="inline-flex items-center gap-1"
+            >
+              <IconeJoker taille={18} /> Joker ×2
+            </span>
+          )}
+          {state !== 'avenir' && (
+            <span className={`font-display text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded whitespace-nowrap flex items-center gap-1.5 ${STATE_CHIP[state]}`}>
+              {state === 'encours' && <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />}
+              {STATE[state].label}
+            </span>
+          )}
+        </div>
+      )}
+
       {/* L'AFFICHE, EN TÊTE DE CARTE.
 
           Elle était en troisième position, sous l'en-tête. Sur un ordinateur
@@ -531,138 +637,58 @@ export default function MatchCard({
 
       {/* LE CONTEXTE, SUR DEUX LIGNES CENTRÉES SOUS L'AFFICHE.
 
-          Elles étaient quatre encadrés — date, diffuseur, météo, et le stade
-          coincé sous le nom du club — chacun avec son fond, sa bordure et ses
-          marges. Sur un téléphone ça faisait trois rangées, pour une
-          information qu'on lit en diagonale.
-
-          Deux lignes de texte simple, et un partage qui tient à ce qu'on
-          cherche. La première dit **quand** on regarde : la date, l'heure, la
-          chaîne. La seconde dit **où et par quel temps** : le stade et la
-          météo, qui ne se lisent pas au même moment — on consulte l'heure en
-          arrivant, le vent au moment d'écrire un score.
+          La première dit **quand** on regarde : la date et l'heure, puis la
+          chaîne dans son encadré. La seconde dit **où et par quel temps** : le
+          stade, puis la météo dans le sien. Ce ne sont pas des informations
+          qu'on lit au même moment — l'heure en arrivant sur la page, le vent au
+          moment d'écrire un score.
 
           Centrées, parce que l'affiche au-dessus est symétrique de part et
           d'autre du score : alignées à gauche, elles tiraient l'œil hors de
-          l'axe que la rencontre vient d'installer. On centre le **groupe** —
-          texte et pastille d'état ensemble — et non le texte seul : sinon, sur
-          un match en cours ou terminé, la date se centrerait dans l'espace
-          laissé par la pastille, donc légèrement à gauche du score.
+          l'axe que la rencontre vient d'installer.
 
-          Elles ne sont **pas tronquées**, et c'est un choix qui a changé en
-          cours de route. Une première version coupait la ligne par des points
-          de suspension pour qu'elle ne passe jamais à la ligne : c'était
-          protéger le match d'un contexte trop long. Mais l'affiche est
-          désormais en tête de carte, et rien de ce qui la suit ne peut plus la
-          repousser. La troncature cachait donc de l'information sans plus rien
-          protéger — afficher « Stade Ernest-Wa… » revient à ne pas l'afficher.
-
-          Quand une ligne est trop longue, elle se replie **entre les morceaux**
-          et jamais à l'intérieur d'un morceau : chacun — la date, la chaîne, le
-          stade, la météo — porte `whitespace-nowrap`, et seuls les séparateurs
-          « · » offrent un point de coupure. On ne lira jamais « 17 °C » sur
-          deux lignes, ni « Canal+ » d'un côté et « Live » de l'autre.
+          **Pas de troncature.** Une version intermédiaire coupait ces lignes
+          par des points de suspension pour qu'elles ne passent jamais à la
+          ligne. C'était protéger le match d'un contexte trop long — mais le
+          match est désormais en tête de carte, rien ne peut plus le repousser,
+          et la troncature ne faisait plus que cacher de l'information. Quand
+          une ligne est trop longue, elle se replie **entre** les morceaux,
+          jamais à l'intérieur : chacun porte `whitespace-nowrap`.
 
           Le diffuseur et la météo ne s'affichent qu'avant le coup d'envoi.
           Après, savoir sur quelle chaîne le match passait et qu'il bruinait
           n'apprend plus rien : le score est là. Le stade, lui, reste : il dit
           où la rencontre s'est jouée, ce qui ne périme pas. */}
       <div className="relative z-10 mt-2.5 flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
-        <span className="text-center text-[11.5px] text-slate-500">
-          <span className="italic whitespace-nowrap first-letter:uppercase inline-block">{dateStr}</span>
-          {match.broadcaster && state === 'avenir' && (
-            <>
-              {' · '}
-              <span title={`Diffusion : ${match.broadcaster}`} className="whitespace-nowrap">
-                📺 {chaine(match.broadcaster)}
-              </span>
-            </>
-          )}
+        <span className="italic whitespace-nowrap inline-block first-letter:uppercase text-[11.5px] text-slate-500">
+          {dateStr}
         </span>
-
-        {/* À droite, ce qui concerne le pronostic.
-
-            La pastille « Joker ×2 » ne s'affiche ici que lorsque la rangée du
-            joker, plus bas, n'est pas visible — c'est-à-dire sur une rencontre
-            terminée, où il faut bien se rappeler où le joker était posé.
-
-            Elle a fait un aller-retour, et la raison mérite d'être écrite. Tant
-            que la rangée du bas disait « points ×2 » en texte gris, cette
-            pastille était la seule marque violette de la carte : c'est elle
-            qu'on repérait en faisant défiler, et la garder avait un sens. Depuis
-            que la rangée porte elle-même la pastille, les deux rectangles
-            violets se retrouvaient identiques à trois centimètres l'un de
-            l'autre. Ce n'est plus une marque et un contrôle : c'est deux fois
-            la même marque, et celle du bas a l'avantage d'être à côté du
-            bouton qui la commande.
-
-            L'affiche garde la sienne pour la même raison, avec une différence :
-            elle n'a aucun contrôle ailleurs, puisqu'elle ne se choisit pas.
-
-            Fonds pleins et non teintés : un aplat violet ou ambre avec du texte
-            blanc ou noir se lit sur les deux thèmes. La version précédente
-            posait du violet clair sur un voile transparent — correct sur fond
-            nuit, illisible sur le fond crème.
-
-            Les deux pastilles portent leur dessin plutôt qu'un emoji, et le
-            même dans toute l'application : le bouffon pour le joker, le
-            calendrier étoilé pour l'affiche. Un emoji est dessiné par le
-            système, donc différent sur chaque appareil — pour un symbole qui
-            porte une règle du jeu, c'est une mauvaise propriété. */}
-        <span className="shrink-0 flex items-center gap-1.5">
-          {estAffiche && (
-            <span
-              title="Match de la semaine : tous les points de cette rencontre sont multipliés par 3"
-              style={PASTILLE.affiche}
-              className="inline-flex items-center gap-1"
-            >
-              <IconeAffiche taille={18} /> Affiche ×3
-            </span>
-          )}
-          {estJoker && !montreJoker && (
-            <span
-              title="Ton joker est posé ici : tes points sur cette rencontre sont doublés"
-              style={PASTILLE.joker}
-              className="inline-flex items-center gap-1"
-            >
-              <IconeJoker taille={18} /> Joker ×2
-            </span>
-          )}
-
-          {/* L'état du pronostic n'est plus ici.
-
-              « Enregistré » en haut de carte répondait à une question qu'on ne
-              se pose pas en lisant une date et une chaîne de télévision. Il est
-              descendu dans la rangée de saisie, contre le bouton : l'état d'une
-              action se lit à côté de l'action, et il y remplace la ligne qui ne
-              servait qu'à écrire « change un score pour le modifier ».
-
-              Ce qui reste ici concerne la rencontre et non le pari : « en
-              cours », « terminé ». Ceux-là ont leur place en tête de carte,
-              puisqu'ils disent dans quel monde on se trouve. */}
-          {state !== 'avenir' && (
-            <span className={`font-display text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded whitespace-nowrap flex items-center gap-1.5 ${STATE_CHIP[state]}`}>
-              {state === 'encours' && <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />}
-              {STATE[state].label}
-            </span>
-          )}
-        </span>
+        {match.broadcaster && state === 'avenir' && (
+          <span title={`Diffusion : ${match.broadcaster}`} className={`${ENCADRE} ${ENCADRE_NEUTRE}`}>
+            📺 {chaine(match.broadcaster)}
+          </span>
+        )}
       </div>
 
       {/* Deuxième ligne : où, et par quel temps.
 
-          Elle disparaît entièrement quand elle n'a rien à dire — une rencontre
-          sans stade renseigné et déjà jouée, par exemple. Une ligne vide
-          coûterait sa hauteur pour rien, et ce sont précisément ces hauteurs-là
-          qu'on est en train de récupérer. */}
-      {(match.venue || meteo) && (
-        <div className="relative z-10 mt-0.5 text-center text-[11.5px] text-slate-500">
-          {match.venue && <span className="italic whitespace-nowrap">{match.venue}</span>}
-          {match.venue && meteo && ' · '}
+          La météo passe en ambre au-delà de vingt-cinq kilomètres-heure de vent
+          ou d'un millimètre de pluie : c'est là qu'un match de rugby change de
+          nature — les buteurs manquent, le jeu au pied devient un pari, les
+          scores baissent. Le reste est une information de confort.
+
+          La ligne disparaît entièrement si elle n'a rien à dire. */}
+      {(nomStade(match) || meteo) && (
+        <div className="relative z-10 mt-1.5 flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
+          {nomStade(match) && (
+            <span className="italic whitespace-nowrap text-[11.5px] text-slate-500">{nomStade(match)}</span>
+          )}
           {meteo && (
             <span
               title={meteo.title}
-              className={`whitespace-nowrap ${meteo.notable ? 'text-amber-500 font-semibold' : ''}`}
+              className={`${ENCADRE} ${
+                meteo.attente ? ENCADRE_ATTENTE : meteo.notable ? ENCADRE_ALERTE : ENCADRE_NEUTRE
+              }`}
             >
               {meteo.texte}
             </span>
@@ -796,18 +822,22 @@ export default function MatchCard({
                   pas ce nombre. */}
               <span className={`inline-flex items-center gap-2 ${estJoker ? 'font-semibold' : 'text-slate-400'}`}>
                 <IconeJoker taille={26} /> Mon joker ici
-                {/* La pastille plutôt que « · points ×2 ».
+                {/* La pastille quand le joker est posé, le texte sinon.
 
-                    Le texte gris disait la règle en passant, du bout des
-                    lèvres, dans la même nuance que le reste de la carte. Or
-                    c'est la seule chose que ce contrôle fait : doubler les
-                    points. La pastille le dit avec le même dessin et la même
-                    couleur que la marque en tête de carte, si bien que l'on
-                    voit du premier coup que cocher cette case produit ce
-                    rectangle-là. Le contrôle et son résultat se ressemblent. */}
-                <span style={PASTILLE.joker} className="inline-flex items-center gap-1">
-                  <IconeJoker taille={16} /> Joker ×2
-                </span>
+                    Le rectangle violet est une **marque** : il dit « c'est
+                    ici ». L'afficher sur les sept cartes, cochées ou non,
+                    revenait à marquer partout, donc nulle part — et l'on ne
+                    distinguait plus d'un coup d'œil la carte qui porte le
+                    joker. Il n'apparaît donc que sur celle-là ; les autres
+                    gardent la règle écrite en gris, qui dit ce que ferait le
+                    bouton sans prétendre qu'il est enclenché. */}
+                {estJoker ? (
+                  <span style={PASTILLE.joker} className="inline-flex items-center gap-1">
+                    <IconeJoker taille={16} /> Joker ×2
+                  </span>
+                ) : (
+                  <span className="text-slate-500 font-normal">· points ×2</span>
+                )}
               </span>
             </label>
 
