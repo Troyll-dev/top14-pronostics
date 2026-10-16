@@ -264,56 +264,6 @@ export default function MatchesPage() {
     return !p || p.homeScorePred !== d.home || p.awayScorePred !== d.away;
   });
 
-  /**
-   * Après « Valider » sur une carte, descendre jusqu'au prochain match à faire.
-   *
-   * « Prochain match à faire », et non « carte suivante » : si les deux
-   * rencontres d'après sont déjà pronostiquées, s'arrêter dessus obligerait à
-   * faire défiler de toute façon. On cherche donc, **plus bas** dans la page,
-   * la première rencontre encore ouverte qui n'a pas de pronostic ou dont le
-   * score saisi n'est pas enregistré. On ne remonte jamais : un match laissé
-   * de côté plus haut est un choix, et revenir dessus sans qu'on l'ait demandé
-   * serait déroutant.
-   *
-   * S'il n'y en a plus, on ne bouge pas : la journée est faite, et la carte
-   * qu'on vient de valider affiche « ✅ Enregistré » — c'est la bonne chose à
-   * avoir sous les yeux.
-   *
-   * Un temps d'arrêt de six dixièmes de seconde avant de partir, pour qu'on
-   * voie la confirmation sur la carte qu'on quitte. Sans lui, la page part
-   * avant qu'on sache si l'envoi a réussi.
-   *
-   * Le défilement est doux, sauf si le système demande de réduire les
-   * animations : on saute alors directement, comme le reste de l'appareil.
-   */
-  const allerAuSuivant = useCallback((matchId) => {
-    const i = matches.findIndex((m) => m.id === matchId);
-    if (i < 0) return;
-
-    const resteAFaire = (m) => {
-      if (matchState(m, Date.now()) !== 'avenir') return false;
-      const p = m.predictions?.[0];
-      if (!p) return true;
-      const d = drafts[m.id];
-      if (!d || d.home === '' || d.home === undefined || d.away === '' || d.away === undefined) return false;
-      return p.homeScorePred !== d.home || p.awayScorePred !== d.away;
-    };
-
-    const suivant = matches.slice(i + 1).find(resteAFaire);
-    if (!suivant) return;
-
-    let doux = true;
-    try {
-      doux = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    } catch { /* navigateur ancien : on garde le défilement doux */ }
-
-    setTimeout(() => {
-      document
-        .getElementById(`match-${suivant.id}`)
-        ?.scrollIntoView({ behavior: doux ? 'smooth' : 'auto', block: 'start' });
-    }, 600);
-  }, [matches, drafts]);
-
   const saveAll = async () => {
     setBulkSaving(true);
     setBulkResult(null);
@@ -578,7 +528,6 @@ export default function MatchesPage() {
               now={now}
               onDraftChange={setDraft}
               onPredictionSaved={handleSaved}
-              onSuivant={allerAuSuivant}
               regles={regles}
               onJoker={choisirJoker}
               jokerFige={jokerFige}

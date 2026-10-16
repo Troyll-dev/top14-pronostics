@@ -308,7 +308,6 @@ const ENCADRE_ATTENTE = 'bg-slate-800/40 text-slate-600 border-slate-800';
 export default function MatchCard({
   match, draft, onDraftChange, onPredictionSaved, now = Date.now(),
   regles = null, onJoker = null, jokerFige = false, jokerErreur = '',
-  onSuivant = null,
 }) {
   // Plus de `useAuth` ici : l'identite du joueur ne servait qu'a reperer sa
   // propre ligne dans la liste des pronos des autres, partie vers la page
@@ -392,11 +391,10 @@ export default function MatchCard({
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
       onPredictionSaved?.(match.id, res.data);
-      // Puis la page fait défiler jusqu'au prochain match à pronostiquer.
-      // Seulement ici, après un clic sur « Valider » : ni « Tout valider » ni
-      // la pose du joker n'appellent cette fonction, et c'est voulu — dans ces
-      // deux cas on n'est pas en train d'avancer d'une carte à la suivante.
-      onSuivant?.(match.id);
+      // La page ne fait plus défiler jusqu'au match suivant après une
+      // validation. Ça a été essayé et retiré : on reste sur la carte qu'on
+      // vient de valider, avec son « ✅ Enregistré » sous les yeux, et c'est le
+      // joueur qui décide où il va ensuite.
     } catch (err) {
       setError(err.response?.data?.error || 'Erreur');
     } finally {
@@ -532,10 +530,7 @@ export default function MatchCard({
   const caseAway = caseScore('away');
 
   return (
-    // `id` pour que la page puisse faire défiler jusqu'à cette carte ;
-    // `scroll-mt-24` pour qu'elle s'arrête sous la barre de navigation, qui
-    // reste fixée en haut et la masquerait sinon.
-    <div id={`match-${match.id}`} className={`card stitched scroll-mt-24 ${bordure}`}>
+    <div className={`card stitched ${bordure}`}>
       {/* LES PASTILLES, EN TÊTE DE CARTE — QUAND IL Y EN A.
 
           Ce qui qualifie la rencontre tout entière : l'affiche de la journée,
