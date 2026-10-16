@@ -3,6 +3,7 @@ const {
   stats, classerAvecPauses, retenuDepuis, DEPUIS, DEPUIS_TOUS, DEPARTAGES,
 } = require('../services/ranking');
 const series = require('../services/series.service');
+const { TOP14, lire } = require('../services/competitions');
 
 const prisma = new PrismaClient();
 
@@ -44,7 +45,16 @@ exports.getLeaderboard = async (req, res) => {
         // donc l'etat ici plutot que de filtrer dans la requete : il faut
         // pouvoir l'afficher grise, ce qu'une absence ne permettrait pas.
         enPause: true,
+        // Les pronostics du championnat seulement.
+        //
+        // Ce classement prenait tous les pronostics d'un joueur, quels qu'ils
+        // soient — ce qui revenait au même tant qu'il n'existait qu'une
+        // compétition. Avec le Tournoi, un score exact sur France–Galles se
+        // serait ajouté au total du Top 14, et le classement du championnat
+        // aurait bougé un samedi de février sans qu'un match de Top 14 soit
+        // joué. Le Tournoi aura son propre classement.
         predictions: {
+          where: { match: { competition: TOP14 } },
           select: {
             points: true, basePoints: true, joker: true,
             homeScorePred: true, awayScorePred: true,
@@ -148,10 +158,12 @@ exports.getLeaderboard = async (req, res) => {
  */
 exports.getRoundLeaderboard = async (req, res) => {
   const { round } = req.params;
+  // Une journée se désigne par sa compétition et son numéro.
+  const competition = lire(req.query.competition);
 
   try {
     const predictions = await prisma.prediction.findMany({
-      where: { match: { round: parseInt(round), status: 'FINISHED' } },
+      where: { match: { competition, round: parseInt(round), status: 'FINISHED' } },
       include: {
         user: {
           select: {

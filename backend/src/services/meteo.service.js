@@ -1,6 +1,7 @@
 const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
+const { TOP14 } = require('./competitions');
 
 /**
  * La meteo des rencontres a venir.
@@ -221,8 +222,13 @@ async function syncMeteo() {
   const maintenant = new Date();
   const limite = new Date(maintenant.getTime() + HORIZON_JOURS * 86400000);
 
+  // Le Top 14 seulement, pour l'instant : la table des stades ne connaît que
+  // les quatorze clubs, et une rencontre du Tournoi produirait une erreur par
+  // passage — l'Aviva Stadium n'y est pas. On l'ouvrira au Tournoi en ajoutant
+  // ses six enceintes, pas en tolérant des erreurs.
   const matchs = await prisma.match.findMany({
     where: {
+      competition: TOP14,
       status: { in: ['SCHEDULED', 'LIVE'] },
       kickoff: { gte: maintenant, lte: limite },
     },

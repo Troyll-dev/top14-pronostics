@@ -3,14 +3,20 @@ const { pointsFor } = require('../services/scoring');
 const { multiplicateur, afficheDeLaJournee, journeeCommencee } = require('../services/rules');
 const { forme, serie } = require('../services/team-stats.service');
 const { rotations } = require('../services/compo-rotation.service');
+const competitions = require('../services/competitions');
 
 const prisma = new PrismaClient();
 
-// GET /api/matches?round=1&season=2026-2027
+// GET /api/matches?round=1&season=2026-2027&competition=TOP14
+//
+// `competition` vaut le Top 14 par défaut : tous les appels existants du site
+// continuent d'obtenir exactement la même réponse. Le Tournoi devra la demander
+// explicitement.
 exports.getMatches = async (req, res) => {
   const { round, season = '2026-2027' } = req.query;
+  const competition = competitions.lire(req.query.competition);
   try {
-    const where = { season };
+    const where = { season, competition };
     if (round) where.round = parseInt(round);
 
     const matches = await prisma.match.findMany({
@@ -177,9 +183,14 @@ exports.getMatches = async (req, res) => {
  */
 exports.getRounds = async (req, res) => {
   try {
+    // Les journées d'une seule compétition : sans ce filtre, les cinq journées
+    // du Tournoi se fondraient dans les vingt-six du championnat.
+    const competition = competitions.lire(req.query.competition);
     const rounds = await prisma.match.groupBy({
       by: ['round'],
-      where: req.query.jouees === '1' ? { status: 'FINISHED' } : undefined,
+      where: req.query.jouees === '1'
+        ? { competition, status: 'FINISHED' }
+        : { competition },
       orderBy: { round: 'asc' },
     });
     res.json(rounds.map((r) => r.round));
@@ -316,14 +327,20 @@ exports.getNextRound = async (req, res) => {
   try {
     const now = new Date();
 
+    // Le filtre le plus important de tout le passage au Tournoi. Sans lui, le
+    // vendredi 5 février, le prochain coup d'envoi serait Irlande–Angleterre :
+    // la journée renvoyée serait sa « J1 », et la page Mes pronos du Top 14
+    // basculerait sur la première journée du championnat.
+    const competition = competitions.lire(req.query.competition);
+
     const next = await prisma.match.findFirst({
-      where: { kickoff: { gt: now }, status: 'SCHEDULED' },
+      where: { competition, kickoff: { gt: now }, status: 'SCHEDULED' },
       orderBy: { kickoff: 'asc' },
       select: { round: true },
     });
 
     const started = await prisma.match.findFirst({
-      where: { kickoff: { lte: now } },
+      where: { competition, kickoff: { lte: now } },
       orderBy: { kickoff: 'desc' },
       select: { round: true },
     });

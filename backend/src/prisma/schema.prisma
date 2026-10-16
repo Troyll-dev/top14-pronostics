@@ -124,6 +124,21 @@ model Match {
   externalId   String?       @unique   // ID depuis l'API externe
   round        Int                     // Journée (1-26)
   season       String        @default("2026-2027")
+
+  /// La compétition : « TOP14 » ou « SIX_NATIONS ».
+  ///
+  /// Une chaîne et non un enum Prisma, pour que l'ajout d'une compétition — la
+  /// Coupe du monde un jour — ne demande pas de modifier un type en base. Les
+  /// valeurs possibles vivent dans `services/competitions.js`, qu'on importe au
+  /// lieu d'écrire la chaîne à la main.
+  ///
+  /// « TOP14 » par défaut : les rencontres déjà en base sont du championnat, et
+  /// la colonne les classe ainsi sans qu'on ait à les toucher.
+  ///
+  /// Les numéros de journée se recoupent — le Tournoi a ses J1 à J5 comme le
+  /// championnat — d'où l'index sur les trois colonnes à la fois : c'est le
+  /// triplet qui désigne une journée, plus le seul numéro.
+  competition  String        @default("TOP14")
   homeTeam     Team          @relation("HomeTeam", fields: [homeTeamId], references: [id])
   homeTeamId   Int
   awayTeam     Team          @relation("AwayTeam", fields: [awayTeamId], references: [id])
@@ -158,6 +173,7 @@ model Match {
   predictions  Prediction[]
   updatedAt    DateTime      @updatedAt
 
+  @@index([competition, season, round])
   @@map("matches")
 }
 

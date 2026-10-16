@@ -20,6 +20,7 @@ const { PrismaClient } = require('@prisma/client');
 const mailer = require('./mailer.service');
 const desinscription = require('./desinscription.service');
 const annonce = require('./annonce.service');
+const { TOP14 } = require('./competitions');
 
 const prisma = new PrismaClient();
 
@@ -38,8 +39,12 @@ const dateFr = new Intl.DateTimeFormat('fr-FR', {
  */
 async function prochaineJournee(now = new Date()) {
   const limite = new Date(now.getTime() + FENETRE_JOURS * 24 * 3600 * 1000);
+  // Le Top 14 seulement. Ce rappel parle de « la journée 7 », et la table des
+  // rappels envoyés ne connaît que le numéro : un rappel pour la J1 du Tournoi
+  // aurait empêché celui de la J1 du championnat, et inversement. Le Tournoi
+  // aura le sien, avec son propre `kind`.
   const matchs = await prisma.match.findMany({
-    where: { status: 'SCHEDULED', kickoff: { gt: now, lt: limite } },
+    where: { competition: TOP14, status: 'SCHEDULED', kickoff: { gt: now, lt: limite } },
     include: { homeTeam: true, awayTeam: true },
     orderBy: [{ round: 'asc' }, { kickoff: 'asc' }],
   });

@@ -7,6 +7,7 @@ const { debutSemaine, choisirJournee } = require('../services/semaine');
 const prisma = new PrismaClient();
 
 const SEASON = process.env.SPORTSDB_SEASON || '2026-2027';
+const competitions = require('../services/competitions');
 
 /**
  * Le plus haut score qu'on accepte.
@@ -574,9 +575,12 @@ exports.getMyPredictions = async (req, res) => {
   const { round } = req.query;
 
   try {
-    const where = { userId };
+    // Une journée se désigne par sa compétition et son numéro : la J1 du
+    // Tournoi et la J1 du championnat n'ont rien en commun.
+    const competition = competitions.lire(req.query.competition);
+    const where = { userId, match: { competition } };
     if (round) {
-      where.match = { round: parseInt(round) };
+      where.match.round = parseInt(round);
     }
 
     const predictions = await prisma.prediction.findMany({
@@ -596,10 +600,13 @@ exports.getMyPredictions = async (req, res) => {
 // Les pronostics sont visibles en permanence par tous les joueurs.
 exports.getRoundPredictions = async (req, res) => {
   const { round } = req.params;
+  // La page Résultats : sans la compétition, le tableau de la J1 du Top 14
+  // aurait reçu en colonnes les trois matchs de la J1 du Tournoi.
+  const competition = competitions.lire(req.query.competition);
 
   try {
     const predictions = await prisma.prediction.findMany({
-      where: { match: { round: parseInt(round) } },
+      where: { match: { competition, round: parseInt(round) } },
       include: {
         user: { select: { id: true, username: true, avatarColor: true } },
         match: { include: { homeTeam: true, awayTeam: true } },
