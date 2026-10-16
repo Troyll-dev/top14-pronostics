@@ -1,8 +1,8 @@
 /**
  * Le bandeau d'une page.
  *
- * Six pages en portent un — Bienvenue, Accueil, Classement, Mes pronos,
- * Championnat, Résultats — et il n'y en a qu'une implémentation. C'est l'objet de ce fichier : la première
+ * Sept pages en portent un — Bienvenue, Accueil, Classement, Mes pronos,
+ * Championnat, Résultats, Comptoir — et il n'y en a qu'une implémentation. C'est l'objet de ce fichier : la première
  * version vivait dans WelcomePage, et les autres pages l'auraient recopiée.
  * Quatre copies d'un même réglage, ce sont quatre occasions pour l'une d'elles
  * de dériver sans qu'on s'en aperçoive — un arrondi ici, un dégradé là.
@@ -57,6 +57,32 @@
  * `alt=""` et `aria-hidden` : ce sont des illustrations, elles ne portent
  * aucune information. Les décrire à un lecteur d'écran lui ferait perdre du
  * temps avant d'arriver au contenu.
+ *
+ * ---------------------------------------------------------------------------
+ * COLLÉ SOUS LA BARRE SUR TÉLÉPHONE, DÉTACHÉ SUR ÉCRAN LARGE
+ * ---------------------------------------------------------------------------
+ *
+ * Sur téléphone, le bandeau touche les deux bords de l'écran : il se présente
+ * comme une bande pleine largeur. Mais toutes les pages s'ouvrent sur une marge
+ * haute de vingt-quatre pixels (`py-6`), qui le présentait en même temps comme
+ * une carte posée sur le fond — une bande crème entre le liseré orange de la
+ * barre et le haut de l'image, qui lui donnait l'air de flotter.
+ *
+ * `-mt-6` annule cette marge, et le bandeau vient se coller sous la barre : la
+ * page s'ouvre sur trois bandes qui s'enchaînent, le vert, le liseré, l'image.
+ *
+ * Sur écran large (`sm:` et au-delà), il ne touche plus les bords, il a des
+ * coins arrondis : c'est réellement une carte, et une carte posée contre une
+ * barre n'a pas de sens. `sm:mt-0` lui rend donc sa marge. La règle suit la
+ * nature de l'objet — bande d'un bord à l'autre, ou carte au milieu du fond —
+ * et pas une préférence de page.
+ *
+ * La correction a d'abord été faite sur « Mes pronos » seule, en retirant la
+ * marge haute de la page. Elle est ici désormais, pour les sept pages d'un
+ * coup, et suppose une convention que toutes respectent : **le bandeau est le
+ * premier élément d'une colonne en `py-6`**. Une page qui en dérogerait le
+ * verrait remonter de vingt-quatre pixels — c'est ce qu'il faut regarder en
+ * premier si un bandeau mord un jour sur la barre.
  */
 /**
  * ---------------------------------------------------------------------------
@@ -92,7 +118,7 @@ export default function Bandeau({
   return (
     <div
       aria-hidden="true"
-      className={`bandeau -mx-4 sm:mx-0 sm:rounded-xl overflow-hidden ${className}`}
+      className={`bandeau -mx-4 -mt-6 sm:mx-0 sm:mt-0 sm:rounded-xl overflow-hidden ${className}`}
       style={{
         WebkitMaskImage: 'linear-gradient(#000 74%, transparent 100%)',
         maskImage: 'linear-gradient(#000 74%, transparent 100%)',

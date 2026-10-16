@@ -26,8 +26,17 @@ export default function WelcomePage() {
       </header>
 
       <main className="max-w-3xl mx-auto px-4">
-        {/* Accroche */}
-        <section className="text-center pt-4 pb-12 relative">
+        {/* Accroche
+
+            `pt-6` sur téléphone et non plus `pt-4`. Le bandeau annule désormais
+            lui-même une marge haute de vingt-quatre pixels pour venir se coller
+            sous la barre — c'est la convention de toutes les pages, qui
+            s'ouvrent en `py-6`. Celle-ci s'ouvrait en `pt-4` : sans cet
+            ajustement, le bandeau serait remonté de huit pixels sous la barre.
+
+            Sur écran large le bandeau redevient une carte aux coins arrondis et
+            ne s'annule plus rien ; la page y garde donc sa marge d'origine. */}
+        <section className="text-center pt-6 sm:pt-4 pb-12 relative">
           {/* L'emoji ballon de 64 pixels a disparu d'ici : il tenait lieu
               d'identite faute de mieux, et une photo du pub dit la meme chose
               en mieux. Il reste dans la barre du haut, ou il sert de marque. */}
