@@ -268,13 +268,15 @@ const STADE_PAR_CLUB = {
   'Stade Français Paris': 'Stade Jean-Bouin',
   'Union Bordeaux-Bègles': 'Stade Chaban-Delmas',
   'Stade Rochelais': 'Stade Marcel-Deflandre',
+  // Contrat de nom prolongé au moins jusqu'en 2031 (annonce de décembre 2025).
   'LOU Rugby': 'Matmut Stadium de Gerland',
   'RC Toulon': 'Stade Mayol',
   'Racing 92': 'Paris La Défense Arena',
   'ASM Clermont': 'Stade Marcel-Michelin',
   'Section Paloise': 'Stade du Hameau',
   'Aviron Bayonnais': 'Stade Jean-Dauger',
-  'Montpellier HR': 'GGL Stadium',
+  // Septeo Stadium depuis septembre 2025 (ex-GGL Stadium, ex-Altrad Stadium).
+  'Montpellier HR': 'Septeo Stadium',
   'USA Perpignan': 'Stade Aimé-Giral',
   'RC Vannes': 'Stade de la Rabine',
 };
