@@ -131,8 +131,41 @@ function Serie({ liste = [], aGauche = false }) {
   );
 }
 
+/**
+ * Ouvert sur ordinateur, replié sur téléphone.
+ *
+ * Le bloc était ouvert partout, et c'est le bon réglage là où la place ne
+ * manque pas : les chiffres sont sous les yeux pendant qu'on saisit un score,
+ * ce qui est exactement leur raison d'être.
+ *
+ * Sur un téléphone, le calcul s'inverse. Déplié, ce bloc fait à lui seul plus
+ * d'un demi-écran ; avec le reste de la carte, une seule rencontre dépasse la
+ * hauteur de l'appareil et l'on ne voit jamais deux matchs à la fois. Or la
+ * plupart des visites consistent à saisir sept scores qu'on a déjà en tête —
+ * on consulte les moyennes une fois, le samedi matin, pas à chaque passage.
+ *
+ * Le seuil est 640 pixels, celui de `sm:` dans la configuration Tailwind du
+ * projet : un seul endroit décide de ce qu'est « un petit écran », et ce bloc
+ * suit la même frontière que les tailles d'écussons et de cases de score.
+ *
+ * La mesure est faite une seule fois, à la construction. Un téléphone qu'on
+ * tourne ne rouvre donc pas les sept blocs d'un coup sous les doigts — et
+ * surtout, un bloc que l'on vient d'ouvrir à la main ne se referait pas tout
+ * seul, ce qui serait le plus agaçant des deux.
+ *
+ * `matchMedia` n'existe pas partout : en son absence on ouvre, c'est-à-dire
+ * qu'on garde le comportement d'avant.
+ */
+function ouvertParDefaut() {
+  try {
+    return window.matchMedia('(min-width: 640px)').matches;
+  } catch {
+    return true;
+  }
+}
+
 export default function FormeClubs({ match }) {
-  const [ouvert, setOuvert] = useState(true);
+  const [ouvert, setOuvert] = useState(ouvertParDefaut);
   const [saison, setSaison] = useState(false);
 
   const h = match?.forme?.home;

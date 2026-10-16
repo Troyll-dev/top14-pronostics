@@ -273,8 +273,24 @@ export default function MatchesPage() {
     setBulkResult({ ok, failed });
   };
 
+  /*
+   * Plus de marge au-dessus du bandeau — `pb-6` au lieu de `py-6`.
+   *
+   * Il y avait une bande de fond crème entre le liseré orange de la barre de
+   * navigation et le haut de l'image. L'image touche déjà les deux bords
+   * latéraux : elle se présente donc comme un bandeau pleine largeur, mais sa
+   * marge haute la présentait en même temps comme une carte posée sur le fond.
+   * Elle ne peut pas être les deux, et c'est cet entre-deux qui lui donnait
+   * l'air de flotter.
+   *
+   * Collée, la page s'ouvre sur trois bandes qui s'enchaînent : le vert de la
+   * barre, le liseré, l'image. La respiration arrive juste après, sous le
+   * titre, là où elle sert à quelque chose.
+   *
+   * La marge basse reste : c'est la seule qui séparait du contenu.
+   */
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6">
+    <div className="max-w-2xl mx-auto px-4 pb-6">
       {/* Le bandeau de la page.
 
           Quatrième page à en porter un, et la première à ne pas être en 16/9.
