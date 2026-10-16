@@ -332,7 +332,24 @@ export default function CompositionsMatch({ match }) {
     c && (c.home?.titulaires?.length || 0) >= 15 && (c.away?.titulaires?.length || 0) >= 15;
   if (!prete) return null;
 
-  const le = quand(match.compositionAt);
+  /**
+   * « Relevées », et seulement avant le coup d'envoi.
+   *
+   * La carte disait « annoncées vendredi à 18 h 17 ». Or `compositionAt` n'est
+   * pas l'heure à laquelle la LNR a publié la feuille — elle ne la donne nulle
+   * part — mais celle à laquelle notre collecte l'a lue, ou a vu qu'elle avait
+   * changé. Quatre passages par jour : la feuille parue à 16 h apparaissait
+   * « annoncée à 18 h 17 », ce qui attribuait à la ligue un horaire qui était
+   * le nôtre. « Relevées » dit ce que la date mesure vraiment.
+   *
+   * Elle sert avant le match : savoir que le quinze a été relu ce matin, et
+   * non jeudi, dit s'il peut encore bouger. Après le coup d'envoi elle n'apprend
+   * plus rien — et pour les journées reprises d'un bloc par le script de
+   * rattrapage, elle porterait la date du rattrapage, qui n'a aucun rapport
+   * avec le match. Elle disparaît donc.
+   */
+  const aVenir = match?.kickoff ? new Date(match.kickoff) > new Date() : false;
+  const le = aVenir ? quand(match.compositionAt) : null;
 
   const rot = match?.rotation || {};
   const remanies = [
@@ -350,7 +367,7 @@ export default function CompositionsMatch({ match }) {
       >
         <span className={`text-[9px] text-amber-500 transition-transform ${ouvert ? 'rotate-90' : ''}`}>▶</span>
         Compositions
-        {le && <span className="text-slate-600">· annoncées {le}</span>}
+        {le && <span className="text-slate-600">· relevées {le}</span>}
         {/* Le chiffre apparait sur le bouton **replie**, et c'est tout
             l'interet de la mesure : savoir qu'une equipe est remaniee sans
             avoir a deplier quarante-six noms. Seuls les cotes franchement
