@@ -1,7 +1,7 @@
 import { useCompetition, TOP14, SIX_NATIONS, LIBELLES } from '../contexts/CompetitionContext';
 
 /**
- * « Top 14 | XV de France », en tête de Mes pronos, Résultats et Classement.
+ * « Top 14 | Six Nations », en tête de Mes pronos, Résultats et Classement.
  *
  * Deux boutons collés plutôt qu'un menu : il n'y a que deux choix, et les voir
  * tous les deux dit d'un coup qu'un second jeu existe. Le style reprend les

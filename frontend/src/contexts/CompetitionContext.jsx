@@ -6,7 +6,7 @@ import { useAuth } from './AuthContext';
  *
  * Elle est partagée par les trois pages qui en dépendent — Mes pronos,
  * Résultats, Classement — pour qu'on n'ait pas à la rechoisir à chaque page :
- * qui passe sur « XV de France » pour poser ses pronos veut voir les résultats
+ * qui passe sur « Six Nations » pour poser ses pronos veut voir les résultats
  * du Tournoi en cliquant sur « Résultats », pas ceux de la J14.
  *
  * Elle est retenue dans le navigateur, comme les brouillons. Si le stockage est
@@ -21,7 +21,7 @@ export const LIBELLES = {
   [TOP14]: { court: 'Top 14', saison: 'Saison 2026-2027', nom: 'Championnat de France' },
   // « Édition 2027 » et non « Tournoi 2027 » : le sous-titre se lit
   // « saison · nom », et le mot Tournoi y figurait deux fois.
-  [SIX_NATIONS]: { court: 'XV de France', saison: 'Édition 2027', nom: 'Tournoi des Six Nations' },
+  [SIX_NATIONS]: { court: 'Six Nations', saison: 'Édition 2027', nom: 'Tournoi des Six Nations' },
 };
 
 /**

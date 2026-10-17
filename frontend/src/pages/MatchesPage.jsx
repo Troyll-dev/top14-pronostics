@@ -448,7 +448,7 @@ export default function MatchesPage() {
           de fond sur l'un des bords. */}
       <Bandeau nom="mes-pronos-pub" ratio={8 / 3} className="mb-5" />
 
-      {/* Top 14 ou XV de France. Il ne rend rien tant que le Tournoi n'est
+      {/* Top 14 ou Six Nations. Il ne rend rien tant que le Tournoi n'est
           pas ouvert à tous : la page reste alors celle d'avant. */}
       <SelecteurCompetition className="mb-4" />
 

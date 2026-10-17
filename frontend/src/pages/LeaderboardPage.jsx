@@ -213,7 +213,7 @@ export default function LeaderboardPage() {
    * Le classement du Tournoi n'existe pas encore : il arrive à l'étape
    * suivante, avec ses propres totaux — tout le monde y part de zéro le 5
    * février. D'ici là, la page le dit plutôt que de montrer le classement du
-   * championnat sous l'onglet « XV de France », ce qui ferait croire que les
+   * championnat sous l'onglet « Six Nations », ce qui ferait croire que les
    * deux se cumulent.
    *
    * Placé après tous les `useState` et `useEffect` : React exige qu'ils soient
