@@ -31,6 +31,13 @@
  * cinquième passe ouvre la page du tableau elle-même, pour 2026 (terminé) et
  * 2027 (pas commencé), et relève aussi les adresses d'API qu'elle contient.
  *
+ * Cinquième passe : la page du tableau est vide elle aussi — le navigateur
+ * le charge depuis une API qui n'apparaît pas dans la page. En revanche, les
+ * buteurs sont bien écrits dans la page « report » (`scoreType`, `scoreTimes`,
+ * quatorze fois). Avec les essais de chaque match, le classement se recalcule
+ * entièrement selon le règlement du Tournoi. Cette sixième passe montre
+ * comment les buteurs sont rangés, et vérifie qu'ils redonnent le score.
+ *
  * Elle n'écrit rien.
  *
  *   node scripts/six-nations-sonde-classement.js
@@ -60,24 +67,33 @@ function extrait(texte, re, largeur = 300) {
 }
 
 (async () => {
-  for (const saison of ['202600', '202700']) {
-    const p = await lire(`/en/m6n/fixtures/${saison}/table`);
-    console.log(`\n=== ${p.url} · statut ${p.statut} · ${p.taille} octets`);
-    if (p.statut !== 200) continue;
+  const p = await lire(`/en/m6n/fixtures/${SAISON}/france-v-england-14032026-2110/report`);
+  console.log(`\n=== ${p.url} · statut ${p.statut} · ${p.taille} octets`);
+  if (p.statut !== 200) process.exit(0);
 
-    // Les champs du tableau, et combien de fois ils apparaissent : six fois
-    // chacun si les six lignes sont dans la page.
-    const champs = ['triesFor', 'triesAgainst', 'bonusPoint', 'bonusPoints', 'pointsFor', 'played', 'position', 'points'];
-    console.log('  comptes :', champs.map((c) => `${c}×${(p.t.match(new RegExp(`"${c}":`, 'g')) || []).length}`).join('  '));
+  // Le premier buteur, avec ce qui le précède : on y verra à quel camp il
+  // appartient et comment la liste est rangée.
+  const re = /"scoreType":/g;
+  const positions = [];
+  let m;
+  while ((m = re.exec(p.t))) positions.push(m.index);
+  console.log(`  ${positions.length} « scoreType »`);
+  if (positions[0] !== undefined) {
+    console.log(`\n  --- avant et après le premier :\n  ${p.t.slice(Math.max(0, positions[0] - 900), positions[0] + 500)}`);
+  }
+  if (positions.length > 1) {
+    const last = positions[positions.length - 1];
+    console.log(`\n  --- autour du dernier :\n  ${p.t.slice(Math.max(0, last - 300), last + 400)}`);
+  }
 
-    // Une ligne : le premier « triesFor » suivi d'un nombre, avec son contexte.
-    const re = /"triesFor":\s*"?\d/;
-    const x = extrait(p.t, re, 700);
-    console.log(x ? `  --- une ligne du tableau :\n  ${x}` : '  aucun « triesFor » numérique dans la page');
-
-    // Les adresses d'API, s'il y en a : le tableau peut venir de là.
-    const api = [...new Set([...p.t.matchAll(/https?:\/\/[a-z0-9.-]*(?:api|stats|feed|data)[a-z0-9.-]*\/[^"'\s<>]{0,120}/gi)].map((m) => m[0]))];
-    console.log(`  adresses d'API : ${api.length ? '\n    ' + api.slice(0, 15).join('\n    ') : 'aucune'}`);
+  // Chaque entrée en une ligne : type et minutes.
+  console.log('\n  --- toutes les entrées :');
+  for (const pos of positions) {
+    const bout = p.t.slice(Math.max(0, pos - 160), pos + 200);
+    const nom = /"playerName":"([^"]*)"/.exec(bout)?.[1] || /"(?:lastName|name)":"([^"]*)"/.exec(bout)?.[1] || '?';
+    const type = /"scoreType":"([^"]*)"/.exec(bout)?.[1] || '?';
+    const fois = /"scoreTimes":\[([^\]]*)\]/.exec(bout)?.[1] || '?';
+    console.log(`    ${type.padEnd(12)} ${nom.padEnd(28)} ${fois}`);
   }
   process.exit(0);
 })().catch((e) => {
