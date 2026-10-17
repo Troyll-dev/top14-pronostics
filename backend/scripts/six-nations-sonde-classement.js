@@ -38,6 +38,12 @@
  * entièrement selon le règlement du Tournoi. Cette sixième passe montre
  * comment les buteurs sont rangés, et vérifie qu'ils redonnent le score.
  *
+ * Sixième passe : les buteurs se lisent, mais sur France–Irlande 2026 ils
+ * ne redonnent pas le score (34 au lieu de 36 : il manque une transformation,
+ * ou un essai de pénalité mal reconnu). Cette septième passe affiche, pour ce
+ * match, la liste brute des buteurs et la chronologie (`timeline`), qui porte
+ * le score après chaque action — de quoi voir ce qui manque.
+ *
  * Elle n'écrit rien.
  *
  *   node scripts/six-nations-sonde-classement.js
@@ -45,6 +51,18 @@
 
 const axios = require('axios');
 const { lisible, BASE } = require('../src/services/sources/six-nations');
+
+function objetA(texte, debut) {
+  let prof = 0, chaine = false;
+  for (let i = debut; i < texte.length; i++) {
+    const c = texte[i];
+    if (chaine) { if (c === '"') chaine = false; continue; }
+    if (c === '"') chaine = true;
+    else if (c === '{') prof++;
+    else if (c === '}') { prof--; if (prof === 0) { try { return JSON.parse(texte.slice(debut, i + 1)); } catch (e) { return { erreur: e.message, brut: texte.slice(debut, Math.min(i + 1, debut + 400)) }; } } }
+  }
+  return null;
+}
 
 const SAISON = '202600';
 const ENTETES = { 'User-Agent': 'top14-pronostics/1.0 (usage prive)', 'Accept-Language': 'en;q=0.9' };
@@ -67,34 +85,33 @@ function extrait(texte, re, largeur = 300) {
 }
 
 (async () => {
-  const p = await lire(`/en/m6n/fixtures/${SAISON}/france-v-england-14032026-2110/report`);
+  const p = await lire(`/en/m6n/fixtures/${SAISON}/france-v-ireland-05022026-2110/report`);
   console.log(`\n=== ${p.url} · statut ${p.statut} · ${p.taille} octets`);
-  if (p.statut !== 200) process.exit(0);
-
-  // Le premier buteur, avec ce qui le précède : on y verra à quel camp il
-  // appartient et comment la liste est rangée.
-  const re = /"scoreType":/g;
-  const positions = [];
-  let m;
-  while ((m = re.exec(p.t))) positions.push(m.index);
-  console.log(`  ${positions.length} « scoreType »`);
-  if (positions[0] !== undefined) {
-    console.log(`\n  --- avant et après le premier :\n  ${p.t.slice(Math.max(0, positions[0] - 900), positions[0] + 500)}`);
+  const re = /"componentProps":\{"(?:home|away)":\{"score":/g;
+  let m, n = 0;
+  while ((m = re.exec(p.t))) {
+    n++;
+    const obj = objetA(p.t, p.t.indexOf('{', m.index + 17));
+    if (!obj || obj.erreur) { console.log(`  bloc ${n} illisible :`, obj && obj.erreur, obj && obj.brut); continue; }
+    for (const cote of ['home', 'away']) {
+      const c = obj[cote];
+      if (!c) continue;
+      console.log(`\n  bloc ${n} · ${cote} · score ${c.score} (mi-temps ${c.scoreHt})`);
+      for (const b of c.scorers || []) {
+        console.log(`    ${String(b.scoreType).padEnd(14)} id ${String(b.playerId).padEnd(7)} ${String(b.playerName || '—').padEnd(26)} ${(b.scoreTimes || []).map((t) => t.gameMinutes).join(', ')}`);
+      }
+      if (Array.isArray(c.timeline)) {
+        console.log(`  chronologie (${c.timeline.length}) :`);
+        for (const e of c.timeline) console.log(`    ${String(e.gameMinutes).padEnd(6)} ${String(e.eventType).padEnd(16)} ${e.homeScore}-${e.awayScore}  ${e.playerName || ''}`);
+      }
+    }
+    if (Array.isArray(obj.timeline)) {
+      console.log(`\n  chronologie commune (${obj.timeline.length}) :`);
+      for (const e of obj.timeline) console.log(`    ${String(e.gameMinutes).padEnd(6)} ${String(e.eventType).padEnd(16)} ${e.homeScore}-${e.awayScore}  ${e.playerName || ''}`);
+    }
+    console.log('\n  clés du bloc :', Object.keys(obj).join(', '), '| home :', Object.keys(obj.home || {}).join(', '));
   }
-  if (positions.length > 1) {
-    const last = positions[positions.length - 1];
-    console.log(`\n  --- autour du dernier :\n  ${p.t.slice(Math.max(0, last - 300), last + 400)}`);
-  }
-
-  // Chaque entrée en une ligne : type et minutes.
-  console.log('\n  --- toutes les entrées :');
-  for (const pos of positions) {
-    const bout = p.t.slice(Math.max(0, pos - 160), pos + 200);
-    const nom = /"playerName":"([^"]*)"/.exec(bout)?.[1] || /"(?:lastName|name)":"([^"]*)"/.exec(bout)?.[1] || '?';
-    const type = /"scoreType":"([^"]*)"/.exec(bout)?.[1] || '?';
-    const fois = /"scoreTimes":\[([^\]]*)\]/.exec(bout)?.[1] || '?';
-    console.log(`    ${type.padEnd(12)} ${nom.padEnd(28)} ${fois}`);
-  }
+  console.log(`\n  ${n} bloc(s) trouvé(s)`);
   process.exit(0);
 })().catch((e) => {
   console.error('Échec :', e.message);
