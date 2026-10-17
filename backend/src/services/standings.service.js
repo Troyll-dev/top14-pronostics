@@ -2,6 +2,8 @@ const lnr = require('./sources/lnr');
 const classement = require('./sources/lnr-classement');
 const { PrismaClient } = require('@prisma/client');
 
+const competitions = require('./competitions');
+
 const prisma = new PrismaClient();
 
 const SEASON = process.env.SPORTSDB_SEASON || '2026-2027';
@@ -48,9 +50,9 @@ function weatherFor(results) {
 }
 
 /** Cinq derniers resultats de chaque equipe, d'apres nos matchs termines. */
-async function computeForm() {
+async function computeForm({ season = SEASON } = {}) {
   const matches = await prisma.match.findMany({
-    where: { status: 'FINISHED', season: SEASON },
+    where: { status: 'FINISHED', season },
     orderBy: { kickoff: 'desc' },
     select: {
       homeTeamId: true, awayTeamId: true,
@@ -235,9 +237,9 @@ async function syncStandings({ dryRun = false } = {}) {
  * contenu et non de dates : elle ne peut pas etre trompee par l'ordre des
  * evenements.
  */
-async function fraicheur(snap) {
+async function fraicheur(snap, season = SEASON) {
   const termines = await prisma.match.count({
-    where: { season: SEASON, status: 'FINISHED' },
+    where: { season, status: 'FINISHED' },
   });
 
   const lignes = snap?.data || [];
@@ -267,22 +269,34 @@ async function etatFraicheur() {
   return fraicheur(snap);
 }
 
-async function getStandings() {
-  const snap = await prisma.leagueTable.findUnique({ where: { season: SEASON } });
-  const form = await computeForm();
+/**
+ * Le classement d'une compétition, tel que la page Championnat l'affiche.
+ *
+ * Même réponse pour les deux : le tableau du Top 14 vient de la LNR, celui du
+ * Tournoi est recalculé à partir des feuilles de match (voir
+ * `six-nations-classement.service.js`), mais tous deux sont rangés dans
+ * `league_table` sous leur saison, avec les mêmes champs. La forme se calcule
+ * de la même façon, sur nos propres résultats de la saison demandée.
+ */
+async function getStandings({ competition } = {}) {
+  const c = competitions.lire(competition);
+  const season = competitions.saison(c);
+  const snap = await prisma.leagueTable.findUnique({ where: { season } });
+  const form = await computeForm({ season });
 
   const table = (snap?.data || []).map((row) => ({
     ...row,
     form: form[row.teamId] || null,
   }));
 
-  const etat = await fraicheur(snap);
+  const etat = await fraicheur(snap, season);
 
   return {
     table,
     fetchedAt: snap?.fetchedAt || null,
     source: snap?.source || null,
-    season: SEASON,
+    season,
+    competition: c,
     fraicheur: etat,
   };
 }

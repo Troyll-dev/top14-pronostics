@@ -36,6 +36,7 @@ const ECRIRE = process.argv.includes('--ecrire');
   bloc('affiches de journée (×3) à marquer', r.affiches || []);
   bloc('REFUS', r.refuses);
   console.log(`\n  inchangées : ${r.inchanges}`);
+  if (r.classement) console.log(`  classement : ${r.classement}`);
 
   if (!ECRIRE) {
     console.log(`

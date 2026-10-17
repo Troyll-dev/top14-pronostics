@@ -65,6 +65,7 @@ const prisma = new PrismaClient();
  * à `undefined` — sans erreur, et sans que les points soient jamais attribués.
  */
 const calculatePoints = (...a) => require('../controllers/match.controller').calculatePoints(...a);
+const { majClassement } = require('./six-nations-classement.service');
 
 /** L'édition en cours : le Tournoi qui se joue au printemps qui vient. */
 const ANNEE = Number(process.env.SIX_NATIONS_ANNEE || 2027);
@@ -190,7 +191,7 @@ async function syncSixNations({ annee = ANNEE, dryRun = false } = {}) {
   const rapport = {
     ok: true, dryRun, annee,
     nations: [], renommees: [], crees: [], modifies: [], scores: [], refuses: [], inchanges: 0,
-    affiches: [],
+    affiches: [], classement: null,
   };
 
   const lu = await source.fetchSeason(annee);
@@ -292,6 +293,34 @@ async function syncSixNations({ annee = ANNEE, dryRun = false } = {}) {
   for (const round of journees) {
     const ligne = await marquerAffiche(annee, round, { dryRun });
     if (ligne) rapport.affiches.push(ligne);
+  }
+
+  /*
+   * Le classement, recalculé quand il le faut : à la première passe (il
+   * n'existe pas encore), après un nouveau score, ou tant qu'il compte moins
+   * de rencontres que la base n'en connaît de terminées — ce qui arrive quand
+   * une feuille de match n'était pas encore complète au passage précédent.
+   *
+   * Un échec ici n'arrête pas la passe : les horaires et les scores sont déjà
+   * écrits, et ils comptent davantage. Il est dit dans le rapport, et la page
+   * Championnat signale le retard.
+   */
+  if (!dryRun) {
+    try {
+      const snap = await prisma.leagueTable.findUnique({ where: { season: String(annee) } });
+      const comptees = Math.round((snap?.data || []).reduce((t, r) => t + (r.played || 0), 0) / 2);
+      const termines = await prisma.match.count({
+        where: { competition: SIX_NATIONS, season: String(annee), status: 'FINISHED' },
+      });
+      if (!snap || rapport.scores.length || comptees < termines) {
+        const c = await majClassement({ annee, lu });
+        rapport.classement = `recalculé sur ${c.matchs} rencontre(s)`;
+      }
+    } catch (err) {
+      rapport.ok = false;
+      rapport.classement = `ÉCHEC — ${err.message}`;
+      console.error('[tournoi] classement :', err.message);
+    }
   }
 
   console.log(

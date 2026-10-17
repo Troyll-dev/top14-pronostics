@@ -4,8 +4,9 @@ import { useAuth } from './AuthContext';
 /**
  * La compétition affichée : le championnat ou le Tournoi.
  *
- * Elle est partagée par les trois pages qui en dépendent — Mes pronos,
- * Résultats, Classement — pour qu'on n'ait pas à la rechoisir à chaque page :
+ * Elle est partagée par les cinq pages qui en dépendent — Accueil,
+ * Championnat, Mes pronos, Résultats, Classement — pour qu'on n'ait pas à la
+ * rechoisir à chaque page :
  * qui passe sur « Six Nations » pour poser ses pronos veut voir les résultats
  * du Tournoi en cliquant sur « Résultats », pas ceux de la J14.
  *

@@ -280,6 +280,7 @@ async function fetchSeason(annee, { minMatchs = 15 } = {}) {
   });
 
   const { matchs, anomalies } = parseSeason(String(res.data), { annee });
+  const rapports = liensRapports(String(res.data), saison);
 
   if (matchs.length < minMatchs) {
     throw new Error(
@@ -288,9 +289,150 @@ async function fetchSeason(annee, { minMatchs = 15 } = {}) {
     );
   }
 
-  return { matchs: matchs.map((x) => ({ ...x, url })), anomalies, url };
+  return {
+    matchs: matchs.map((x) => ({ ...x, url, rapport: rapports[`${x.home}-${x.away}`] || null })),
+    anomalies,
+    url,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// LES PAGES « REPORT » : LES ESSAIS DE CHAQUE MATCH
+// ---------------------------------------------------------------------------
+//
+// Le classement du Tournoi compte des bonus, et le bonus offensif dépend du
+// nombre d'essais — que la carte d'une rencontre ne donne pas. Le site publie
+// bien un classement, mais il le charge dans le navigateur depuis une API que
+// la page ne montre pas : rien à lire côté serveur.
+//
+// Chaque match joué a en revanche sa page « report », rendue par le serveur,
+// avec la liste des points marqués de chaque camp : essais, transformations,
+// pénalités, drops, minute par minute. C'est là qu'on lit les essais.
+
+/** Les noms anglais des adresses du site, vers les codes de ses cartes. */
+const PAR_NOM_ANGLAIS = {
+  france: 'FRA', england: 'ENG', ireland: 'IRE', scotland: 'SCO', wales: 'WAL', italy: 'ITA',
+};
+
+/**
+ * Les adresses des pages « report » d'une édition, rangées par affiche.
+ *
+ * La page des matchs renvoie vers chaque rencontre par une adresse lisible :
+ * `/en/m6n/fixtures/202600/france-v-england-14032026-2110`. Le nom qui précède
+ * « -v- » est celui qui reçoit — c'est l'ordre de la carte, et le stade le
+ * vérifie déjà. On rend `{ 'FRA-ENG': '/en/m6n/fixtures/202600/…/report' }`.
+ */
+function liensRapports(html, saison) {
+  const clair = lisible(html);
+  const re = new RegExp(`/en/m6n/fixtures/${saison}/([a-z]+)-v-([a-z]+)-(\\d{8})-(\\d{4})`, 'g');
+  const sortie = {};
+  let m;
+  while ((m = re.exec(clair))) {
+    const dom = PAR_NOM_ANGLAIS[m[1]];
+    const ext = PAR_NOM_ANGLAIS[m[2]];
+    if (!dom || !ext) continue;
+    sortie[`${dom}-${ext}`] = `/en/m6n/fixtures/${saison}/${m[1]}-v-${m[2]}-${m[3]}-${m[4]}/report`;
+  }
+  return sortie;
+}
+
+/**
+ * L'objet JSON qui commence à `debut` (une accolade ouvrante), lu en comptant
+ * les accolades hors des chaînes. Rend `null` si l'objet est mal formé.
+ */
+function objetA(texte, debut) {
+  let prof = 0;
+  let chaine = false;
+  for (let i = debut; i < texte.length; i++) {
+    const c = texte[i];
+    if (chaine) {
+      if (c === '"') chaine = false;
+      continue;
+    }
+    if (c === '"') chaine = true;
+    else if (c === '{') prof++;
+    else if (c === '}') {
+      prof--;
+      if (prof === 0) {
+        try { return JSON.parse(texte.slice(debut, i + 1)); } catch { return null; }
+      }
+    }
+  }
+  return null;
+}
+
+/** Ce qu'un camp a marqué, compté sur sa liste de buteurs. */
+function compter(camp) {
+  const c = { score: camp.score, essais: 0, essaisPenalite: 0, transformations: 0, penalites: 0, drops: 0 };
+  for (const b of camp.scorers || []) {
+    const n = Array.isArray(b.scoreTimes) && b.scoreTimes.length ? b.scoreTimes.length : 1;
+    const type = String(b.scoreType || '');
+    if (/^try$/i.test(type)) {
+      c.essais += n;
+      // Un essai sans joueur est un essai de pénalité : il vaut sept points
+      // d'un coup, sans transformation à tenter.
+      if (!b.playerId) c.essaisPenalite += n;
+    } else if (/conversion/i.test(type)) c.transformations += n;
+    else if (/penalty/i.test(type)) c.penalites += n;
+    else if (/drop/i.test(type)) c.drops += n;
+  }
+  return c;
+}
+
+/**
+ * Les points marqués redonnent-ils le score ?
+ *
+ * C'est le garde-fou de cette lecture, et il est arithmétique : cinq points
+ * l'essai, deux la transformation, trois la pénalité ou le drop. Un essai de
+ * pénalité vaut sept ; selon la façon dont le site le range, il peut compter
+ * pour un essai seul ou pour un essai et sa transformation — on accepte les
+ * deux lectures, et aucune autre. Une liste de buteurs incomplète ne passe pas.
+ */
+function concorde(c) {
+  const base = 5 * c.essais + 2 * c.transformations + 3 * (c.penalites + c.drops);
+  return c.score === base || c.score === base + 2 * c.essaisPenalite;
+}
+
+/**
+ * Analyse une page « report ». Rend `{ home, away }`, chacun avec son score et
+ * son décompte, ou lève une erreur qui dit ce qui ne va pas.
+ */
+function parseRapport(html) {
+  const clair = lisible(html);
+  const re = /"componentProps":\{"(?:home|away)":\{"score":/g;
+  let m;
+  while ((m = re.exec(clair))) {
+    const debut = clair.indexOf('{', m.index + '"componentProps":'.length);
+    const obj = objetA(clair, debut);
+    if (!obj?.home?.scorers || !obj?.away?.scorers) continue;
+    const home = compter(obj.home);
+    const away = compter(obj.away);
+    for (const [cote, c] of [['domicile', home], ['extérieur', away]]) {
+      if (!concorde(c)) {
+        throw new Error(
+          `buteurs incomplets côté ${cote} : ${c.essais} E, ${c.transformations} T, ` +
+          `${c.penalites} P, ${c.drops} D ne font pas ${c.score}`
+        );
+      }
+    }
+    return { home, away };
+  }
+  throw new Error('aucune liste de buteurs dans la page');
+}
+
+async function fetchRapport(chemin) {
+  const res = await axios.get(BASE + chemin, {
+    timeout: TIMEOUT,
+    headers: {
+      'User-Agent': 'top14-pronostics/1.0 (usage prive)',
+      'Accept-Language': 'en;q=0.9',
+    },
+    maxContentLength: 30 * 1024 * 1024,
+  });
+  return parseRapport(String(res.data));
 }
 
 module.exports = {
   fetchSeason, parseSeason, lisible, nationDuStade, NATIONS, STADES, BASE,
+  liensRapports, parseRapport, fetchRapport, compter, concorde,
 };

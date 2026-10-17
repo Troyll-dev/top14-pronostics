@@ -3,7 +3,7 @@ const {
   stats, classerAvecPauses, retenuDepuis, DEPUIS, DEPUIS_TOUS, DEPARTAGES,
 } = require('../services/ranking');
 const series = require('../services/series.service');
-const { TOP14, lire } = require('../services/competitions');
+const { TOP14, lire, saison } = require('../services/competitions');
 
 const prisma = new PrismaClient();
 
@@ -17,8 +17,21 @@ const prisma = new PrismaClient();
  * personne ne saurait expliquer.
  */
 exports.getLeaderboard = async (req, res) => {
+  /*
+   * Deux classements, un par compétition, chacun avec ses pronostics.
+   *
+   * Les seuils sont ceux du championnat — la J3 pour le général, la J5 pour
+   * « tout le monde inscrit » — parce qu'ils réparent l'histoire de sa saison :
+   * un seul joueur au début, les autres arrivés ensuite. Le Tournoi n'a pas
+   * cette histoire. Tout le monde y part de zéro le même jour : il compte dès
+   * sa J1, et le second onglet n'a pas de sens.
+   */
+  const competition = lire(req.query.competition);
+  const tournoi = competition !== TOP14;
   const demande = parseInt(req.query.depuis, 10);
-  const seuil = Number.isInteger(demande) && demande >= 1 && demande <= 26 ? demande : DEPUIS;
+  const seuil = tournoi
+    ? 1
+    : Number.isInteger(demande) && demande >= 1 && demande <= 26 ? demande : DEPUIS;
   const retenu = retenuDepuis(seuil);
 
   try {
@@ -54,7 +67,7 @@ exports.getLeaderboard = async (req, res) => {
         // aurait bougé un samedi de février sans qu'un match de Top 14 soit
         // joué. Le Tournoi aura son propre classement.
         predictions: {
-          where: { match: { competition: TOP14 } },
+          where: { match: { competition } },
           select: {
             points: true, basePoints: true, joker: true,
             homeScorePred: true, awayScorePred: true,
@@ -122,7 +135,9 @@ exports.getLeaderboard = async (req, res) => {
      * se contredire, comme l'ont fait le site et le bilan sur le departage.
      */
     const classe = classerAvecPauses(leaderboard);
-    const parSerie = await series.pourTous();
+    // Les séries de journées gagnées se comptent dans la compétition affichée :
+    // gagner la J14 du Top 14 ne prolonge pas une série du Tournoi.
+    const parSerie = await series.pourTous({ season: saison(competition) });
 
     const enrichi = classe.map((l) => {
       const avecSerie = { ...l, serie: parSerie.get(l.id) || null };
@@ -140,7 +155,8 @@ exports.getLeaderboard = async (req, res) => {
       depuis: seuil,
       // La journee ou tout le monde etait la, pour que l'ecran sache proposer
       // le second onglet sans avoir a la connaitre de son cote.
-      depuisTous: DEPUIS_TOUS,
+      depuisTous: tournoi ? null : DEPUIS_TOUS,
+      competition,
       departages: DEPARTAGES,
     });
   } catch (err) {

@@ -5,7 +5,7 @@ import Avatar from '../components/Avatar';
 import SelecteurJournee from '../components/SelecteurJournee';
 import Bandeau from '../components/Bandeau';
 import SelecteurCompetition from '../components/SelecteurCompetition';
-import { useCompetition, SIX_NATIONS, LIBELLES } from '../contexts/CompetitionContext';
+import { useCompetition, LIBELLES } from '../contexts/CompetitionContext';
 
 function MedalIcon({ rank }) {
   // Pas de rang : un joueur en pause. Un tiret, et surtout pas un numero apres
@@ -119,7 +119,10 @@ function PlayerRow({ rank, player, points, stats, isMe }) {
 
 export default function LeaderboardPage() {
   const { user } = useAuth();
+  // Deux classements, un par compétition : le Tournoi a le sien, où tout le
+  // monde part de zéro le 5 février. Tous les appels portent la compétition.
   const { competition } = useCompetition();
+  const libelle = LIBELLES[competition];
 
   const [view, setView] = useState('general');
 
@@ -154,8 +157,19 @@ export default function LeaderboardPage() {
   const [loadingRound, setLoadingRound] = useState(false);
 
   useEffect(() => {
-    api.get('/leaderboard')
+    // Changer de compétition repart de zéro : rien de l'une ne doit s'afficher
+    // un instant sous le nom de l'autre.
+    const params = { competition };
+    let vivant = true;
+    setLoading(true);
+    setGeneral([]);
+    setTous(null);
+    setDepuisTous(null);
+    setView('general');
+    setRound(null);
+    api.get('/leaderboard', { params })
       .then((res) => {
+        if (!vivant) return;
         // La réponse est passée d'un tableau à un objet, pour porter le seuil
         // et les critères. Le repli couvre le temps d'un déploiement où le
         // navigateur garde l'ancienne page et le serveur sert déjà la nouvelle
@@ -172,70 +186,45 @@ export default function LeaderboardPage() {
         }
       })
       .catch(console.error)
-      .finally(() => setLoading(false));
+      .finally(() => { if (vivant) setLoading(false); });
 
     // Seules les journees deja jouees : voir plus haut, au selecteur.
-    api.get('/matches/rounds', { params: { jouees: 1 } })
-      .then((res) => setRounds(res.data))
+    api.get('/matches/rounds', { params: { ...params, jouees: 1 } })
+      .then((res) => { if (vivant) setRounds(res.data); })
       .catch(console.error);
 
     // Journee en cours ou derniere jouee : c'est celle qu'on veut voir par defaut.
-    api.get('/matches/next-round')
-      .then((res) => setRound(res.data.currentRound ?? Math.max(1, res.data.round - 1)))
-      .catch(() => setRound(1));
-  }, []);
+    api.get('/matches/next-round', { params })
+      .then((res) => { if (vivant) setRound(res.data.currentRound ?? Math.max(1, res.data.round - 1)); })
+      .catch(() => { if (vivant) setRound(1); });
+    return () => { vivant = false; };
+  }, [competition]);
 
   useEffect(() => {
     if (view !== 'tous' || !depuisTous || tous) return;
     setLoadingTous(true);
-    api.get('/leaderboard', { params: { depuis: depuisTous } })
+    api.get('/leaderboard', { params: { depuis: depuisTous, competition } })
       .then((res) => setTous(res.data.classement || []))
       .catch(console.error)
       .finally(() => setLoadingTous(false));
-  }, [view, depuisTous, tous]);
+  }, [view, depuisTous, tous, competition]);
 
   // Le classement d'une journee n'est charge qu'a l'ouverture de l'onglet.
   useEffect(() => {
     if (view !== 'journee' || !round) return;
     setLoadingRound(true);
+    let vivant = true;
     Promise.all([
-      api.get(`/leaderboard/round/${round}`),
-      api.get(`/matches?round=${round}`),
+      api.get(`/leaderboard/round/${round}`, { params: { competition } }),
+      api.get('/matches', { params: { round, competition } }),
     ])
-      .then(([lb, ms]) => { setRoundBoard(lb.data); setRoundMatches(ms.data); })
+      .then(([lb, ms]) => { if (vivant) { setRoundBoard(lb.data); setRoundMatches(ms.data); } })
       .catch(console.error)
-      .finally(() => setLoadingRound(false));
-  }, [view, round]);
+      .finally(() => { if (vivant) setLoadingRound(false); });
+    return () => { vivant = false; };
+  }, [view, round, competition]);
 
   const finished = roundMatches.filter((m) => m.status === 'FINISHED').length;
-
-  /*
-   * Le classement du Tournoi n'existe pas encore : il arrive à l'étape
-   * suivante, avec ses propres totaux — tout le monde y part de zéro le 5
-   * février. D'ici là, la page le dit plutôt que de montrer le classement du
-   * championnat sous l'onglet « Six Nations », ce qui ferait croire que les
-   * deux se cumulent.
-   *
-   * Placé après tous les `useState` et `useEffect` : React exige qu'ils soient
-   * appelés dans le même ordre à chaque affichage, quel que soit l'onglet.
-   */
-  if (competition === SIX_NATIONS) {
-    const l = LIBELLES[SIX_NATIONS];
-    return (
-      <div className="max-w-2xl mx-auto px-4 py-6">
-        <Bandeau nom="classement" className="mb-5" />
-        <SelecteurCompetition className="mb-4" />
-        <h1 className="font-display text-[26px] font-extrabold leading-none mb-1">🏆 Classement</h1>
-        <p className="text-xs italic text-slate-500 mb-5">{l.saison} · {l.nom}</p>
-        <div className="card text-center py-12">
-          <p className="text-slate-400">Le classement du Tournoi démarre le 5 février.</p>
-          <p className="text-slate-500 text-sm mt-1.5">
-            Un classement à part : tout le monde y part de zéro, joker en poche.
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   if (loading) {
     return <div className="text-center py-16 text-slate-500 animate-pulse">Chargement du classement…</div>;
@@ -250,10 +239,10 @@ export default function LeaderboardPage() {
       <h1 className="font-display text-[26px] font-extrabold leading-none mb-1">🏆 Classement</h1>
       <p className="text-xs italic text-slate-500 mb-4">
         {view === 'general'
-          ? `Saison 2026-2027 · ${depuis && depuis > 1 ? `à partir de la journée ${depuis}` : 'toutes journées confondues'}`
+          ? `${libelle.saison} · ${depuis && depuis > 1 ? `à partir de la journée ${depuis}` : 'toutes journées confondues'}`
           : view === 'tous'
-          ? `Saison 2026-2027 · à partir de la journée ${depuisTous}, quand tout le monde était inscrit`
-          : `Saison 2026-2027 · journée ${round ?? '—'} seule`}
+          ? `${libelle.saison} · à partir de la journée ${depuisTous}, quand tout le monde était inscrit`
+          : `${libelle.saison} · journée ${round ?? '—'} seule`}
       </p>
 
       {/* Général / Journée */}

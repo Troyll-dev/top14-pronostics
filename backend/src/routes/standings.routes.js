@@ -19,7 +19,8 @@ function authorize(req) {
 // GET /api/standings — classement enregistre + forme des equipes
 router.get('/', async (req, res) => {
   try {
-    res.json(await getStandings());
+    // `?competition=SIX_NATIONS` pour le Tournoi ; le Top 14 sans précision.
+    res.json(await getStandings({ competition: req.query.competition }));
   } catch (err) {
     console.error('[classement] lecture :', err.message);
     res.status(500).json({ error: 'Erreur serveur' });

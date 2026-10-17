@@ -8,6 +8,8 @@ import TeamCrest from '../components/TeamCrest';
 import Bandeau from '../components/Bandeau';
 import FaceAFace from '../components/FaceAFace';
 import { matchState, STATE, STATE_CHIP, useNow } from '../utils/matchState';
+import SelecteurCompetition from '../components/SelecteurCompetition';
+import { useCompetition, TOP14 } from '../contexts/CompetitionContext';
 
 function pointsTone(points) {
   return {
@@ -30,6 +32,11 @@ function StateChip({ state }) {
 export default function HomePage() {
   const { user } = useAuth();
   const now = useNow(60000);
+  // Les mêmes blocs pour les deux compétitions : la journée, ses résultats, le
+  // rang au classement des pronos et le haut du tableau. Chaque appel porte la
+  // compétition choisie.
+  const { competition } = useCompetition();
+  const tournoi = competition !== TOP14;
 
   const [round, setRound] = useState(null);           // prochaine journée à pronostiquer
   const [resultsRound, setResultsRound] = useState(null); // journée en cours ou dernière jouée
@@ -41,14 +48,20 @@ export default function HomePage() {
 
   useEffect(() => {
     let alive = true;
+    const params = { competition };
+    setLoading(true);
+    setStandings(null);
+    setMatches([]);
+    setResults([]);
+    setBoard([]);
 
-    api.get('/standings')
+    api.get('/standings', { params })
       .then((res) => alive && setStandings(res.data))
       .catch(() => {});
 
     (async () => {
       try {
-        const next = await api.get('/matches/next-round');
+        const next = await api.get('/matches/next-round', { params });
         if (!alive) return;
 
         const r = next.data.round;
@@ -65,9 +78,9 @@ export default function HomePage() {
         const wanted = [...new Set([r, cr])].filter((x) => x >= 1);
         const [pairs, lb] = await Promise.all([
           Promise.all(
-            wanted.map((x) => api.get(`/matches?round=${x}`).then((q) => [x, q.data]))
+            wanted.map((x) => api.get('/matches', { params: { ...params, round: x } }).then((q) => [x, q.data]))
           ),
-          api.get('/leaderboard'),
+          api.get('/leaderboard', { params }),
         ]);
         if (!alive) return;
 
@@ -87,7 +100,7 @@ export default function HomePage() {
     })();
 
     return () => { alive = false; };
-  }, []);
+  }, [competition]);
 
   /**
    * Les matchs encore ouverts à la saisie, et ce qu'il reste à faire.
@@ -152,6 +165,8 @@ export default function HomePage() {
           vont pas demander s'il a changé — on y a perdu une heure sur la
           vignette des copains. Nouvelle image, nouveau nom. */}
       <Bandeau nom="accueil-pub" className="mb-5" />
+
+      <SelecteurCompetition className="mb-4" />
 
       <h1 className="font-display text-[26px] font-extrabold leading-none mb-1">
         Salut {user?.username} 🏉
@@ -337,7 +352,7 @@ export default function HomePage() {
       {/* Aperçu du championnat */}
       {topFive.length > 0 && (
         <div className="card mb-4">
-          <h2 className="rule-label mb-3">Le championnat</h2>
+          <h2 className="rule-label mb-3">{tournoi ? 'Le Tournoi' : 'Le championnat'}</h2>
 
           <div className="divide-y divide-slate-800">
             {topFive.map((r) => (

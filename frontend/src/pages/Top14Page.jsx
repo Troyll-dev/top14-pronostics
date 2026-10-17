@@ -6,6 +6,8 @@ import TeamCrest from '../components/TeamCrest';
 import { matchState, STATE, STATE_CHIP, useNow } from '../utils/matchState';
 import SelecteurJournee from '../components/SelecteurJournee';
 import Bandeau from '../components/Bandeau';
+import SelecteurCompetition from '../components/SelecteurCompetition';
+import { useCompetition, TOP14, LIBELLES } from '../contexts/CompetitionContext';
 
 function ResultDot({ res }) {
   const cls = {
@@ -103,6 +105,11 @@ const ALERTE = {
 
 export default function Top14Page() {
   const now = useNow(60000);
+  // Le championnat ou le Tournoi : la même page, les mêmes blocs, la même
+  // forme de réponse du serveur. Seuls changent le titre, les zones du
+  // tableau (pas de demi-finales ni de relégation au Tournoi) et la source.
+  const { competition } = useCompetition();
+  const tournoi = competition !== TOP14;
 
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -114,28 +121,43 @@ export default function Top14Page() {
   const [filter, setFilter] = useState('tous');
 
   useEffect(() => {
-    api.get('/standings')
-      .then((res) => setData(res.data))
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    // Changer de compétition repart de zéro, et une réponse arrivée après le
+    // changement n'écrit plus rien.
+    const params = { competition };
+    let vivant = true;
+    setLoading(true);
+    setData(null);
+    setRound(null);
+    setMatches([]);
+    setFilter('tous');
 
-    api.get('/matches/rounds').then((res) => setRounds(res.data)).catch(console.error);
+    api.get('/standings', { params })
+      .then((res) => { if (vivant) setData(res.data); })
+      .catch(console.error)
+      .finally(() => { if (vivant) setLoading(false); });
+
+    api.get('/matches/rounds', { params })
+      .then((res) => { if (vivant) setRounds(res.data); })
+      .catch(console.error);
 
     // On ouvre sur la journée en cours ou la dernière jouée, pas sur la précédente.
     // Le backend renvoie currentRound ; on retombe sur round - 1 si l'API est ancienne.
-    api.get('/matches/next-round')
-      .then((res) => setRound(res.data.currentRound ?? Math.max(1, res.data.round - 1)))
-      .catch(() => setRound(1));
-  }, []);
+    api.get('/matches/next-round', { params })
+      .then((res) => { if (vivant) setRound(res.data.currentRound ?? Math.max(1, res.data.round - 1)); })
+      .catch(() => { if (vivant) setRound(1); });
+    return () => { vivant = false; };
+  }, [competition]);
 
   useEffect(() => {
     if (!round) return;
+    let vivant = true;
     setLoadingMatches(true);
-    api.get(`/matches?round=${round}`)
-      .then((res) => setMatches(res.data))
+    api.get('/matches', { params: { round, competition } })
+      .then((res) => { if (vivant) setMatches(res.data); })
       .catch(console.error)
-      .finally(() => setLoadingMatches(false));
-  }, [round]);
+      .finally(() => { if (vivant) setLoadingMatches(false); });
+    return () => { vivant = false; };
+  }, [round, competition]);
 
   const table = data?.table || [];
   const played = table.filter((r) => r.form?.recent?.length);
@@ -288,9 +310,13 @@ export default function Top14Page() {
           au lieu d'être repoussé sous la ligne de flottaison. */}
       <Bandeau nom="championnat-chien" ratio={3} className="mb-5" />
 
-      <h1 className="font-display text-[26px] font-extrabold leading-none mb-1">Le championnat</h1>
+      <SelecteurCompetition className="mb-4" />
+
+      <h1 className="font-display text-[26px] font-extrabold leading-none mb-1">
+        {tournoi ? 'Le Tournoi' : 'Le championnat'}
+      </h1>
       <p className="text-xs italic text-slate-500 mb-5">
-        Saison {data?.season || '2026-2027'}
+        {tournoi ? LIBELLES[competition].saison : `Saison ${data?.season || '2026-2027'}`}
         {data?.fetchedAt && (
           <> · classement relevé {format(new Date(data.fetchedAt), "d MMMM 'à' HH'h'mm", { locale: fr })}</>
         )}
@@ -417,8 +443,12 @@ export default function Top14Page() {
               <tbody>
                 {table.map((r) => {
                   // Barre de zone : 7 px, assez large pour se lire d'un coup d'œil.
+                  // Pas de zones au Tournoi : ni demi-finales, ni barrages, ni
+                  // relégation. La barre reste, transparente, pour que les
+                  // colonnes s'alignent de la même façon dans les deux pages.
                   const zone =
-                    r.rank <= 2 ? 'border-l-[7px] border-l-green-500'
+                    tournoi ? 'border-l-[7px] border-l-transparent'
+                    : r.rank <= 2 ? 'border-l-[7px] border-l-green-500'
                     : r.rank <= 6 ? 'border-l-[7px] border-l-blue-400'
                     : r.rank >= 14 ? 'border-l-[7px] border-l-red-400'
                     : 'border-l-[7px] border-l-transparent';
@@ -508,9 +538,19 @@ export default function Top14Page() {
           </div>
 
           <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-[11.5px] text-slate-500">
-            <ZoneKey cls="bg-green-500">Demi-finales</ZoneKey>
-            <ZoneKey cls="bg-blue-400">Barrages</ZoneKey>
-            <ZoneKey cls="bg-red-400">Relégation</ZoneKey>
+            {!tournoi && (
+              <>
+                <ZoneKey cls="bg-green-500">Demi-finales</ZoneKey>
+                <ZoneKey cls="bg-blue-400">Barrages</ZoneKey>
+                <ZoneKey cls="bg-red-400">Relégation</ZoneKey>
+              </>
+            )}
+            {tournoi && (
+              <span>
+                Victoire 4 pts · nul 2 · bonus : 4 essais marqués, ou défaite de 7 points ou moins ·
+                Grand Chelem +3
+              </span>
+            )}
             <span>M : matchs joués · Pts M. / Pts E. : points marqués et encaissés · Forme : les cinq derniers, du plus ancien au plus récent</span>
           </div>
         </>
@@ -528,7 +568,9 @@ export default function Top14Page() {
 
       {data?.source && (
         <p className="text-[11px] italic text-slate-600 mt-5">
-          Classement relevé sur {data.source}. Les résultats des matchs proviennent de notre propre
+          {tournoi
+            ? `Classement recalculé à partir des feuilles de match de ${data.source}, essais compris.`
+            : `Classement relevé sur ${data.source}.`} Les résultats des matchs proviennent de notre propre
           synchronisation, la forme des équipes en est calculée. Un match est dit « en cours »
           pendant les 2 h 30 qui suivent son coup d'envoi, tant qu'aucun score n'est enregistré.
         </p>
