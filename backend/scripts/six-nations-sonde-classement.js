@@ -18,6 +18,12 @@
  * le classement se recalcule — bonus compris. Cette troisième passe ouvre
  * donc deux de ces pages et cherche les essais.
  *
+ * Troisième passe : les pages « report » portent un onglet « Live table » et
+ * un bloc « buteurs » (T, C, P, D). Il y a donc un classement et des essais
+ * quelque part dans les données de la page. Cette quatrième passe ne cherche
+ * plus des mots dans le texte : elle relève les noms de champs des données
+ * embarquées, pour voir comment le classement et les essais sont rangés.
+ *
  * Elle n'écrit rien, et interroge l'édition 2026, qui est complète.
  *
  *   node scripts/six-nations-sonde-classement.js
@@ -47,28 +53,36 @@ function extrait(texte, re, largeur = 300) {
 }
 
 (async () => {
-  const pages = [
-    // France–Angleterre, dernier match : 2026 s'y est joué, et il y a eu des
-    // essais des deux côtés. Puis le premier match, et la page « match » sans
-    // « /report », au cas où elle en dirait plus.
-    `/en/m6n/fixtures/${SAISON}/france-v-england-14032026-2110/report`,
-    `/en/m6n/fixtures/${SAISON}/france-v-ireland-05022026-2110/report`,
-    `/en/m6n/fixtures/${SAISON}/france-v-ireland-05022026-2110`,
-  ];
-  for (const chemin of pages) {
-    const p = await lire(chemin);
-    console.log(`\n=== ${p.url} · statut ${p.statut} · ${p.taille} octets`);
-    if (p.statut !== 200) continue;
-    const comptes = {};
-    for (const m of p.t.matchAll(/tries|"try"|tryScorers|scorers|conversions|penalt|drop|bonus|"T"|scoring|timeline|events/gi)) {
-      const k = m[0].toLowerCase();
-      comptes[k] = (comptes[k] || 0) + 1;
+  const chemin = `/en/m6n/fixtures/${SAISON}/france-v-england-14032026-2110/report`;
+  const p = await lire(chemin);
+  console.log(`\n=== ${p.url} · statut ${p.statut} · ${p.taille} octets`);
+  if (p.statut !== 200) process.exit(0);
+
+  // Les noms de champs JSON qui pourraient porter un classement ou des essais.
+  const INTERESSANT = /tr(y|ies)|bonus|point|play|won|lost|draw|position|rank|table|standing|score|grand|slam|team(Id|Code|Name)|abbr/i;
+  const cles = {};
+  for (const m of p.t.matchAll(/"([A-Za-z_][A-Za-z0-9_]{1,40})":/g)) {
+    if (INTERESSANT.test(m[1])) cles[m[1]] = (cles[m[1]] || 0) + 1;
+  }
+  const tri = Object.entries(cles).sort((a, b) => b[1] - a[1]);
+  console.log(`\n  ${tri.length} noms de champs retenus :`);
+  console.log('  ' + tri.map(([k, n]) => `${k}×${n}`).join('  '));
+
+  // Le contexte des plus parlants, deux occurrences chacun.
+  const VOIR = /^(tries|triesFor|triesAgainst|tryBonus|losingBonus|bonusPoints|bonus|points|pointsFor|position|played|won|standings|table|liveTable|type)$/i;
+  for (const [k] of tri.filter(([k]) => VOIR.test(k)).slice(0, 10)) {
+    const re = new RegExp(`"${k}":`, 'g');
+    let n = 0, m;
+    while ((m = re.exec(p.t)) && n < 2) {
+      console.log(`\n  --- "${k}" (${n + 1}) :\n  ${p.t.slice(Math.max(0, m.index - 250), m.index + 350)}`);
+      n++;
     }
-    console.log('  mots-clés :', JSON.stringify(comptes));
-    for (const re of [/tries/, /tryScor|scorers/, /"try"/, /conversion/, /timeline|events/]) {
-      const x = extrait(p.t, re, 450);
-      if (x) console.log(`  --- autour de ${re} :\n  ${x}\n`);
-    }
+  }
+
+  // Et le texte qui suit les libellés des buteurs.
+  for (const re of [/"Try":"T"/, /Show Scorers/, /liveTable/]) {
+    const x = extrait(p.t, re, 50);
+    if (x) console.log(`\n  --- ${re} présent`);
   }
   process.exit(0);
 })().catch((e) => {
