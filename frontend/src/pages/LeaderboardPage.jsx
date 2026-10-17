@@ -4,6 +4,8 @@ import { useAuth } from '../contexts/AuthContext';
 import Avatar from '../components/Avatar';
 import SelecteurJournee from '../components/SelecteurJournee';
 import Bandeau from '../components/Bandeau';
+import SelecteurCompetition from '../components/SelecteurCompetition';
+import { useCompetition, SIX_NATIONS, LIBELLES } from '../contexts/CompetitionContext';
 
 function MedalIcon({ rank }) {
   // Pas de rang : un joueur en pause. Un tiret, et surtout pas un numero apres
@@ -117,6 +119,7 @@ function PlayerRow({ rank, player, points, stats, isMe }) {
 
 export default function LeaderboardPage() {
   const { user } = useAuth();
+  const { competition } = useCompetition();
 
   const [view, setView] = useState('general');
 
@@ -206,6 +209,34 @@ export default function LeaderboardPage() {
 
   const finished = roundMatches.filter((m) => m.status === 'FINISHED').length;
 
+  /*
+   * Le classement du Tournoi n'existe pas encore : il arrive à l'étape
+   * suivante, avec ses propres totaux — tout le monde y part de zéro le 5
+   * février. D'ici là, la page le dit plutôt que de montrer le classement du
+   * championnat sous l'onglet « XV de France », ce qui ferait croire que les
+   * deux se cumulent.
+   *
+   * Placé après tous les `useState` et `useEffect` : React exige qu'ils soient
+   * appelés dans le même ordre à chaque affichage, quel que soit l'onglet.
+   */
+  if (competition === SIX_NATIONS) {
+    const l = LIBELLES[SIX_NATIONS];
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-6">
+        <Bandeau nom="classement" className="mb-5" />
+        <SelecteurCompetition className="mb-4" />
+        <h1 className="font-display text-[26px] font-extrabold leading-none mb-1">🏆 Classement</h1>
+        <p className="text-xs italic text-slate-500 mb-5">{l.saison} · {l.nom}</p>
+        <div className="card text-center py-12">
+          <p className="text-slate-400">Le classement du Tournoi démarre le 5 février.</p>
+          <p className="text-slate-500 text-sm mt-1.5">
+            Un classement à part : tout le monde y part de zéro, joker en poche.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
     return <div className="text-center py-16 text-slate-500 animate-pulse">Chargement du classement…</div>;
   }
@@ -213,6 +244,8 @@ export default function LeaderboardPage() {
   return (
     <div className="max-w-2xl mx-auto px-4 py-6">
       <Bandeau nom="classement" className="mb-5" />
+
+      <SelecteurCompetition className="mb-4" />
 
       <h1 className="font-display text-[26px] font-extrabold leading-none mb-1">🏆 Classement</h1>
       <p className="text-xs italic text-slate-500 mb-4">

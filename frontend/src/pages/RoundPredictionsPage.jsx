@@ -7,6 +7,8 @@ import SelecteurJournee from '../components/SelecteurJournee';
 import IconeJoker from '../components/IconeJoker';
 import IconeAffiche from '../components/IconeAffiche';
 import Bandeau from '../components/Bandeau';
+import SelecteurCompetition from '../components/SelecteurCompetition';
+import { useCompetition } from '../contexts/CompetitionContext';
 
 /**
  * La couleur d'une cellule du tableau.
@@ -117,6 +119,9 @@ function styleCellule(p) {
 
 export default function RoundPredictionsPage() {
   const { user } = useAuth();
+  // Le championnat ou le Tournoi, choisi sur l'une des trois pages et
+  // retrouvé sur les deux autres.
+  const { competition } = useCompetition();
   const [rounds, setRounds] = useState([]);
   const [currentRound, setCurrentRound] = useState(null);
   const [matches, setMatches] = useState([]);
@@ -141,7 +146,18 @@ export default function RoundPredictionsPage() {
   const [afficheMatchId, setAfficheMatchId] = useState(null);
 
   useEffect(() => {
-    api.get('/matches/rounds').then((res) => setRounds(res.data)).catch(console.error);
+    // Changer de compétition repart de zéro : la journée affichée n'a pas de
+    // sens dans l'autre, et le tableau ne doit pas montrer un instant les
+    // pronostics de l'une sous les colonnes de l'autre.
+    const params = { competition };
+    let vivant = true;
+    setCurrentRound(null);
+    setMatches([]);
+    setPredictions([]);
+    setLoading(true);
+    api.get('/matches/rounds', { params })
+      .then((res) => { if (vivant) setRounds(res.data); })
+      .catch(console.error);
 
     /**
      * La journée ouverte par défaut bascule le mercredi.
@@ -161,33 +177,41 @@ export default function RoundPredictionsPage() {
      * Les replis couvrent le temps d'un déploiement, où le navigateur peut
      * avoir la nouvelle page et le serveur l'ancienne réponse.
      */
-    api.get('/matches/next-round')
+    api.get('/matches/next-round', { params })
       .then((res) => {
-        setCurrentRound(res.data.roundSemaine ?? res.data.currentRound ?? res.data.round ?? 1);
+        if (vivant) setCurrentRound(res.data.roundSemaine ?? res.data.currentRound ?? res.data.round ?? 1);
       })
-      .catch(() => setCurrentRound(1));
-  }, []);
+      .catch(() => { if (vivant) setCurrentRound(1); });
+    return () => { vivant = false; };
+  }, [competition]);
 
   useEffect(() => {
     if (!currentRound) return;
+    const params = { competition };
+    let vivant = true;
     setLoading(true);
     Promise.all([
-      api.get(`/matches?round=${currentRound}`),
-      api.get(`/predictions/round/${currentRound}`),
+      api.get('/matches', { params: { ...params, round: currentRound } }),
+      api.get(`/predictions/round/${currentRound}`, { params }),
     ])
       .then(([m, p]) => {
+        if (!vivant) return;
         setMatches(m.data);
         setPredictions(p.data.predictions || []);
       })
       .catch(console.error)
-      .finally(() => setLoading(false));
+      .finally(() => { if (vivant) setLoading(false); });
 
     // Les règles ne sont qu'un habillage : si l'appel échoue, le tableau reste
     // entièrement lisible, simplement sans l'étoile.
-    api.get(`/predictions/round/${currentRound}/regles`)
-      .then((res) => setAfficheMatchId(res.data.afficheMatchId ?? null))
-      .catch(() => setAfficheMatchId(null));
-  }, [currentRound]);
+    api.get(`/predictions/round/${currentRound}/regles`, { params })
+      .then((res) => { if (vivant) setAfficheMatchId(res.data.afficheMatchId ?? null); })
+      .catch(() => { if (vivant) setAfficheMatchId(null); });
+
+    // Une réponse arrivée après un changement de journée ou de compétition
+    // n'écrit plus rien : c'est la suivante qui fait foi.
+    return () => { vivant = false; };
+  }, [currentRound, competition]);
 
   const playersById = {};
   for (const p of predictions) {
@@ -253,6 +277,8 @@ export default function RoundPredictionsPage() {
         tailles="(min-width: 1184px) 1152px, 100vw"
         className="mb-5"
       />
+
+      <SelecteurCompetition className="mb-4" />
 
       <div className="flex items-baseline justify-between gap-3 mb-1">
         <h1 className="font-display text-[26px] font-extrabold leading-none">Résultats</h1>

@@ -180,6 +180,10 @@ function infoMeteo(match, state) {
   if (state !== 'avenir') return null;
 
   if (!match.meteo) {
+    // La météo n'est relevée que pour les stades du championnat. Annoncer
+    // « météo bientôt » sur un match du Tournoi serait promettre ce qui ne
+    // viendra pas : on n'affiche rien.
+    if (match.competition && match.competition !== 'TOP14') return null;
     const jours = (new Date(match.kickoff) - Date.now()) / 86400000;
     if (jours <= 10) return null;   // relevée sous peu, inutile de l'annoncer
     return {

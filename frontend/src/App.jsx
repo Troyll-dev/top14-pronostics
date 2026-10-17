@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { CompetitionProvider } from './contexts/CompetitionContext';
 import Navbar, { RESERVE_BARRE_BAS } from './components/Navbar';
 import JoueursDecor from './components/JoueursDecor';
 import MiseAJour from './components/MiseAJour';
@@ -154,7 +155,12 @@ function AppRoutes() {
 export default function App() {
   return (
     <AuthProvider>
-      <AppRoutes />
+      {/* À l'intérieur de l'authentification : le sélecteur du Tournoi
+          s'affiche d'abord aux seuls administrateurs, il doit donc savoir qui
+          est connecté. */}
+      <CompetitionProvider>
+        <AppRoutes />
+      </CompetitionProvider>
     </AuthProvider>
   );
 }

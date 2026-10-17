@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../api/client';
 import MatchCard from '../components/MatchCard';
 import { matchState, useNow } from '../utils/matchState';
@@ -7,6 +7,8 @@ import Bob from '../components/Bob';
 import IconeJoker from '../components/IconeJoker';
 import FaceAFace from '../components/FaceAFace';
 import Bandeau from '../components/Bandeau';
+import SelecteurCompetition from '../components/SelecteurCompetition';
+import { useCompetition, TOP14, LIBELLES } from '../contexts/CompetitionContext';
 
 const DRAFT_KEY = 't14-brouillons';
 const DRAFT_TTL = 30 * 24 * 3600 * 1000; // un mois
@@ -82,6 +84,10 @@ function RappelJoker({ matches, regles }) {
 }
 
 export default function MatchesPage() {
+  // Le championnat ou le Tournoi. Chaque appel au serveur la transmet : une
+  // journée se désigne par sa compétition et son numéro.
+  const { competition } = useCompetition();
+  const libelle = LIBELLES[competition];
   const [rounds, setRounds] = useState([]);
   const [currentRound, setCurrentRound] = useState(null);
   const [matches, setMatches] = useState([]);
@@ -110,10 +116,28 @@ export default function MatchesPage() {
   // lieu, et non en haut de page loin du bouton qui vient d'être cliqué.
   const [jokerErreur, setJokerErreur] = useState(null);
 
+  /*
+   * Les journées et la journée à pronostiquer, relues à chaque changement de
+   * compétition. On efface d'abord la journée affichée : sans cela, passer du
+   * Top 14 au Tournoi demanderait un instant la « J9 du Tournoi », qui n'existe
+   * pas, avant que la bonne réponse arrive.
+   */
   useEffect(() => {
-    api.get('/matches/rounds').then((res) => setRounds(res.data)).catch(console.error);
-    api.get('/matches/next-round').then((res) => setCurrentRound(res.data.round)).catch(console.error);
-  }, []);
+    const params = { competition };
+    setCurrentRound(null);
+    setMatches([]);
+    setRegles(null);
+    // Un aller-retour rapide entre les deux compétitions ne doit pas laisser la
+    // réponse de la première écrire après celle de la seconde.
+    let vivant = true;
+    api.get('/matches/rounds', { params })
+      .then((res) => { if (vivant) setRounds(res.data); })
+      .catch(console.error);
+    api.get('/matches/next-round', { params })
+      .then((res) => { if (vivant) setCurrentRound(res.data.round); })
+      .catch(console.error);
+    return () => { vivant = false; };
+  }, [competition]);
 
   // Sauvegarde automatique a chaque frappe
   useEffect(() => {
@@ -143,23 +167,37 @@ export default function MatchesPage() {
    * ce qui est affiché : les cartes restent en place et se mettent à jour sous
    * le pouce.
    */
+  /*
+   * Seule la dernière réponse demandée a le droit d'écrire.
+   *
+   * En changeant de compétition, une requête part encore un instant avec
+   * l'ancienne journée — la J9, côté Tournoi — et revient vide. Si elle arrive
+   * après la bonne, elle effacerait les trois matchs qu'on vient d'afficher.
+   * Chaque appel prend donc un numéro, et une réponse dont le numéro n'est plus
+   * le dernier est ignorée.
+   */
+  const demandeMatchs = useRef(0);
+  const demandeRegles = useRef(0);
+
   const fetchMatches = useCallback(({ silencieux = false } = {}) => {
     if (!currentRound) return;
+    const n = ++demandeMatchs.current;
     if (!silencieux) setLoading(true);
-    api.get(`/matches?round=${currentRound}`)
-      .then((res) => setMatches(res.data))
+    api.get('/matches', { params: { round: currentRound, competition } })
+      .then((res) => { if (n === demandeMatchs.current) setMatches(res.data); })
       .catch(console.error)
-      .finally(() => { if (!silencieux) setLoading(false); });
-  }, [currentRound]);
+      .finally(() => { if (!silencieux && n === demandeMatchs.current) setLoading(false); });
+  }, [currentRound, competition]);
 
   const fetchRegles = useCallback(() => {
     if (!currentRound) return;
-    api.get(`/predictions/round/${currentRound}/regles`)
-      .then((res) => setRegles(res.data))
+    const n = ++demandeRegles.current;
+    api.get(`/predictions/round/${currentRound}/regles`, { params: { competition } })
+      .then((res) => { if (n === demandeRegles.current) setRegles(res.data); })
       // Les règles ne sont qu'un habillage : si l'appel échoue, la page reste
       // utilisable pour ce qui compte, c'est-à-dire pronostiquer.
-      .catch(() => setRegles(null));
-  }, [currentRound]);
+      .catch(() => { if (n === demandeRegles.current) setRegles(null); });
+  }, [currentRound, competition]);
 
   useEffect(() => { fetchMatches(); }, [fetchMatches]);
   useEffect(() => { fetchRegles(); }, [fetchRegles]);
@@ -325,6 +363,10 @@ export default function MatchesPage() {
           de fond sur l'un des bords. */}
       <Bandeau nom="mes-pronos-pub" ratio={8 / 3} className="mb-5" />
 
+      {/* Top 14 ou XV de France. Il ne rend rien tant que le Tournoi n'est
+          pas ouvert à tous : la page reste alors celle d'avant. */}
+      <SelecteurCompetition className="mb-4" />
+
       {/* Le nom de la page, au-dessus du titre.
 
           Cette page était la seule à ne pas se nommer : les autres annoncent
@@ -347,7 +389,7 @@ export default function MatchesPage() {
           </span>
         )}
       </div>
-      <p className="text-xs italic text-slate-500 mb-5">Saison 2026-2027 · Championnat de France</p>
+      <p className="text-xs italic text-slate-500 mb-5">{libelle.saison} · {libelle.nom}</p>
 
       {/* Sélecteur de journée */}
       <SelecteurJournee rounds={rounds} valeur={currentRound} onChange={setCurrentRound} className="mb-5" />
@@ -421,7 +463,10 @@ export default function MatchesPage() {
 
           Après son passage on relit tout depuis le serveur plutôt que de
           deviner — même règle que pour le joker. */}
-      {!loading && currentRound && matches.length > 0 && (
+      {/* Bob ne connaît encore que le championnat : il arrive au Tournoi à
+          l'étape suivante. D'ici là, son bloc n'apparaît pas côté XV de
+          France — un bouton qui se ferait refuser vaudrait moins que rien. */}
+      {!loading && currentRound && matches.length > 0 && competition === TOP14 && (
         <Bob
           round={currentRound}
           regles={regles}

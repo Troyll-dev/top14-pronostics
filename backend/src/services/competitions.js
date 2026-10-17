@@ -26,4 +26,21 @@ function lire(valeur, parDefaut = TOP14) {
   return TOUTES.includes(valeur) ? valeur : parDefaut;
 }
 
-module.exports = { TOP14, SIX_NATIONS, TOUTES, lire };
+/**
+ * La saison en cours de chaque compétition, telle qu'elle est écrite en base.
+ *
+ * Le championnat s'étale sur deux années (« 2026-2027 »), le Tournoi tient
+ * dans un printemps (« 2027 »). Les deux variables d'environnement sont celles
+ * que le reste du code lit déjà : changer de saison ne demande donc de toucher
+ * qu'un réglage Railway, pas ce fichier.
+ */
+const SAISONS = {
+  [TOP14]: process.env.SPORTSDB_SEASON || '2026-2027',
+  [SIX_NATIONS]: String(process.env.SIX_NATIONS_ANNEE || 2027),
+};
+
+function saison(competition) {
+  return SAISONS[lire(competition)];
+}
+
+module.exports = { TOP14, SIX_NATIONS, TOUTES, lire, saison };

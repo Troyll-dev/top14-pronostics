@@ -1,13 +1,37 @@
 const { PrismaClient } = require('@prisma/client');
-const { DEPUIS, afficheDeLaJournee, journeeCommencee } = require('../services/rules');
+const { depuis, afficheDeLaJournee, journeeCommencee } = require('../services/rules');
 const { pronostiquerJournee, avisJournee } = require('../services/bob.service');
 const { forme } = require('../services/team-stats.service');
 const { debutSemaine, choisirJournee } = require('../services/semaine');
 
 const prisma = new PrismaClient();
 
-const SEASON = process.env.SPORTSDB_SEASON || '2026-2027';
 const competitions = require('../services/competitions');
+
+/** La saison du championnat : Bob et la « journée de la semaine » en dépendent. */
+const SEASON = competitions.saison(competitions.TOP14);
+
+/**
+ * La compétition et la saison d'une requête.
+ *
+ * Une journée se désigne par les deux : la J1 du Tournoi et la J1 du
+ * championnat n'ont rien en commun. Sans précision, c'est le Top 14 — le
+ * comportement d'avant, que tous les écrans existants retrouvent tels quels.
+ */
+function contexte(valeur) {
+  const competition = competitions.lire(valeur);
+  return { competition, season: competitions.saison(competition) };
+}
+
+/**
+ * Bob ne connaît que le championnat, pour l'instant.
+ *
+ * Il calcule ses scores sur la forme des clubs, lue sur la LNR ; il n'a encore
+ * rien sur lequel fonder un France–Galles. Il viendra au Tournoi à l'étape
+ * suivante, avec ses propres repères. D'ici là, il refuse en le disant, plutôt
+ * que d'inventer des scores sur des chiffres qui ne sont pas les bons.
+ */
+const BOB_TOURNOI = 'Bob s\'entraîne encore pour le Tournoi : il arrive bientôt.';
 
 /**
  * Le plus haut score qu'on accepte.
@@ -85,9 +109,9 @@ function lireScore(v) {
  * changerait la règle en cours de partie. Tant que la journée n'a pas commencé
  * on recalcule ; ensuite on croit ce qui est écrit en base.
  */
-async function afficheDe(round) {
+async function afficheDe(round, { competition, season } = contexte()) {
   const matchs = await prisma.match.findMany({
-    where: { round, season: SEASON },
+    where: { round, season, competition },
     select: { id: true, kickoff: true, featured: true },
   });
   if (!matchs.length) return null;
@@ -197,6 +221,10 @@ exports.lancerBob = async (req, res) => {
   if (!Number.isInteger(round)) {
     return res.status(400).json({ error: 'round requis' });
   }
+  if (competitions.lire(req.body.competition) !== competitions.TOP14) {
+    return res.status(400).json({ error: BOB_TOURNOI });
+  }
+  const DEPUIS = depuis(competitions.TOP14);
 
   const maintenant = new Date();
 
@@ -213,6 +241,7 @@ exports.lancerBob = async (req, res) => {
       where: {
         round,
         season: SEASON,
+        competition: competitions.TOP14,
         status: 'SCHEDULED',
         kickoff: { gt: maintenant },
       },
@@ -236,7 +265,7 @@ exports.lancerBob = async (req, res) => {
     // Un joker posé ailleurs sur la journée compte aussi, même si son match a
     // déjà commencé : Bob n'a pas à en poser un second.
     const jokerAilleurs = await prisma.prediction.findFirst({
-      where: { userId, joker: true, match: { round, season: SEASON } },
+      where: { userId, joker: true, match: { round, season: SEASON, competition: competitions.TOP14 } },
       select: { matchId: true },
     });
 
@@ -373,11 +402,15 @@ exports.setJoker = async (req, res) => {
     const match = await prisma.match.findUnique({ where: { id: matchId } });
     if (!match) return res.status(404).json({ error: 'Match introuvable' });
 
-    if (match.round < DEPUIS) {
-      return res.status(400).json({ error: `Le joker n'est actif qu'à partir de la J${DEPUIS}` });
+    // La règle se lit sur la compétition du match lui-même : le joker du
+    // Tournoi vaut dès la J1, celui du championnat à partir de la J6.
+    const ctx = { competition: match.competition, season: match.season };
+    const seuil = depuis(match.competition);
+    if (match.round < seuil) {
+      return res.status(400).json({ error: `Le joker n'est actif qu'à partir de la J${seuil}` });
     }
 
-    const affiche = await afficheDe(match.round);
+    const affiche = await afficheDe(match.round, ctx);
     if (affiche && affiche.id === match.id) {
       return res.status(400).json({
         error: 'Ce match est déjà le match de la semaine (×3) : garde ton joker pour un autre',
@@ -408,7 +441,7 @@ exports.setJoker = async (req, res) => {
 
     // Le joker de la journée, s'il est posé ailleurs.
     const ancien = await prisma.prediction.findFirst({
-      where: { userId, joker: true, match: { round: match.round, season: SEASON } },
+      where: { userId, joker: true, match: { round: match.round, ...ctx } },
       include: { match: { select: { id: true, kickoff: true } } },
     });
 
@@ -461,14 +494,15 @@ exports.effacerJournee = async (req, res) => {
 
   const userId = req.user.id;
   const maintenant = new Date();
+  const ctx = contexte(req.query.competition);
 
   try {
     const [ouverts, total] = await Promise.all([
       prisma.match.findMany({
-        where: { round, season: SEASON, status: 'SCHEDULED', kickoff: { gt: maintenant } },
+        where: { round, ...ctx, status: 'SCHEDULED', kickoff: { gt: maintenant } },
         select: { id: true },
       }),
-      prisma.prediction.count({ where: { userId, match: { round, season: SEASON } } }),
+      prisma.prediction.count({ where: { userId, match: { round, ...ctx } } }),
     ]);
 
     const { count } = await prisma.prediction.deleteMany({
@@ -502,10 +536,13 @@ exports.effacerJournee = async (req, res) => {
 exports.avisBob = async (req, res) => {
   const round = parseInt(req.params.round, 10);
   if (!Number.isInteger(round)) return res.status(400).json({ error: 'round invalide' });
+  if (competitions.lire(req.query.competition) !== competitions.TOP14) {
+    return res.status(400).json({ error: BOB_TOURNOI });
+  }
 
   try {
     const matchs = await prisma.match.findMany({
-      where: { round, season: SEASON },
+      where: { round, season: SEASON, competition: competitions.TOP14 },
       select: { id: true, homeTeamId: true, awayTeamId: true },
       orderBy: { kickoff: 'asc' },
     });
@@ -546,22 +583,29 @@ exports.avisBob = async (req, res) => {
  */
 exports.getRoundRules = async (req, res) => {
   const round = parseInt(req.params.round, 10);
+  const ctx = contexte(req.query.competition);
+  const seuil = depuis(ctx.competition);
+  const tournoi = ctx.competition !== competitions.TOP14;
   try {
-    const affiche = round >= DEPUIS ? await afficheDe(round) : null;
+    const affiche = round >= seuil ? await afficheDe(round, ctx) : null;
     const joker = await prisma.prediction.findFirst({
-      where: { userId: req.user.id, joker: true, match: { round, season: SEASON } },
+      where: { userId: req.user.id, joker: true, match: { round, ...ctx } },
       select: { matchId: true },
     });
-    const bob = await bobAutorise(round);
+    // L'avance de Bob se compte en journées de championnat : elle n'a pas de
+    // sens pour le Tournoi, où il ne joue pas encore.
+    const bob = tournoi ? { ok: false, limite: null } : await bobAutorise(round);
     res.json({
       round,
-      actif: round >= DEPUIS,
-      depuis: DEPUIS,
+      competition: ctx.competition,
+      actif: round >= seuil,
+      depuis: seuil,
       afficheMatchId: affiche ? affiche.id : null,
       jokerMatchId: joker ? joker.matchId : null,
       bobOk: bob.ok,
       bobLimite: bob.limite,
       bobAvanceMax: BOB_AVANCE_MAX,
+      bobDisponible: !tournoi,
     });
   } catch (err) {
     console.error('[regles]', err);

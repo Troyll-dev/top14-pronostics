@@ -25,9 +25,25 @@ const DEPUIS = Number(process.env.JOKER_DEPUIS || 6);
 const MULT_JOKER = 2;
 const MULT_AFFICHE = 3;
 
+/**
+ * La premiere journee ou les multiplicateurs comptent, selon la competition.
+ *
+ * Le seuil de la J6 est une affaire de championnat : il protege des points
+ * marques avant que la regle existe. Le Tournoi, lui, commence sous les regles
+ * actuelles — tout le monde y part de zero le 5 fevrier, joker en poche. Sans
+ * cette distinction, ses cinq journees seraient toutes « avant la J6 », et ni
+ * le joker ni l'affiche n'y vaudraient quoi que ce soit.
+ *
+ * Une competition inconnue ou absente est traitee comme le Top 14 : c'est le
+ * comportement d'avant, et tout appel qui ne precise rien doit le retrouver.
+ */
+function depuis(competition) {
+  return competition === 'SIX_NATIONS' ? 1 : DEPUIS;
+}
+
 /** Les multiplicateurs s'appliquent-ils a cette journee ? */
-function actif(round) {
-  return Number.isFinite(round) && round >= DEPUIS;
+function actif(round, competition) {
+  return Number.isFinite(round) && round >= depuis(competition);
 }
 
 /**
@@ -38,8 +54,8 @@ function actif(round) {
  * d'abord n'est donc pas un cumul deguise : c'est un filet, pour qu'une donnee
  * incoherente en base donne un resultat previsible plutot qu'un x6 surprise.
  */
-function multiplicateur({ joker = false, affiche = false, round } = {}) {
-  if (!actif(round)) return 1;
+function multiplicateur({ joker = false, affiche = false, round, competition } = {}) {
+  if (!actif(round, competition)) return 1;
   if (affiche) return MULT_AFFICHE;
   if (joker) return MULT_JOKER;
   return 1;
@@ -87,5 +103,5 @@ function journeeCommencee(matchs, maintenant = Date.now()) {
 
 module.exports = {
   DEPUIS, MULT_JOKER, MULT_AFFICHE,
-  actif, multiplicateur, afficheDeLaJournee, journeeCommencee,
+  depuis, actif, multiplicateur, afficheDeLaJournee, journeeCommencee,
 };

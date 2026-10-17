@@ -42,14 +42,20 @@
  * l'est. Afficher le score en direct serait agréable, l'attribuer ne le serait
  * pas, et la première version ne fait que ce qui compte.
  *
- * Le joker et l'affiche ne s'appliquent pas encore au Tournoi : les règles
- * actuelles ne les activent qu'à partir de la J6 du championnat. C'est à
- * corriger avant le premier pronostic du Tournoi, avec les écrans.
+ * ---------------------------------------------------------------------------
+ * L'AFFICHE DE CHAQUE JOURNÉE
+ * ---------------------------------------------------------------------------
+ *
+ * Même règle que le championnat : le match qui commence le plus tard, figé au
+ * premier coup d'envoi de la journée. Le service des horaires du Top 14 la
+ * marque pour ses journées ; celui-ci la marque pour les siennes, à chaque
+ * passe, tant que la journée n'a pas commencé.
  */
 
 const { PrismaClient } = require('@prisma/client');
 const source = require('./sources/six-nations');
 const { SIX_NATIONS } = require('./competitions');
+const { afficheDeLaJournee, journeeCommencee } = require('./rules');
 
 const prisma = new PrismaClient();
 
@@ -63,14 +69,28 @@ const calculatePoints = (...a) => require('../controllers/match.controller').cal
 /** L'édition en cours : le Tournoi qui se joue au printemps qui vient. */
 const ANNEE = Number(process.env.SIX_NATIONS_ANNEE || 2027);
 
-/** Les nations, en base. Le nom est celui qu'on lit en français dans l'appli. */
+/**
+ * Les nations, en base.
+ *
+ * Deux codes par nation, qui ne servent pas à la même chose :
+ *
+ *  - `code` est celui du site du Tournoi. Il sert à lire la page et à former
+ *    l'identifiant des rencontres (`6N-2027-IRE-ENG`), qui ne doit jamais
+ *    changer ;
+ *  - `shortName` est celui qu'on lit dans l'appli, en français : « ANG » et
+ *    « GAL » plutôt que « ENG » et « WAL », dans l'en-tête des colonnes de
+ *    Résultats comme sur les écussons.
+ *
+ * Les nations ont d'abord été créées sous le code du site. `assurerNations` les
+ * renomme d'elle-même au passage suivant : aucune requête à lancer à la main.
+ */
 const NATIONS = [
-  { shortName: 'FRA', name: 'France' },
-  { shortName: 'ENG', name: 'Angleterre' },
-  { shortName: 'IRE', name: 'Irlande' },
-  { shortName: 'SCO', name: 'Écosse' },
-  { shortName: 'WAL', name: 'Pays de Galles' },
-  { shortName: 'ITA', name: 'Italie' },
+  { code: 'FRA', shortName: 'FRA', name: 'France' },
+  { code: 'ENG', shortName: 'ANG', name: 'Angleterre' },
+  { code: 'IRE', shortName: 'IRL', name: 'Irlande' },
+  { code: 'SCO', shortName: 'ECO', name: 'Écosse' },
+  { code: 'WAL', shortName: 'GAL', name: 'Pays de Galles' },
+  { code: 'ITA', shortName: 'ITA', name: 'Italie' },
 ];
 
 /** Au-delà de quatre jours entre deux coups d'envoi, une nouvelle journée commence. */
@@ -80,25 +100,54 @@ const ECART_JOURNEE_MS = 4 * 86400000;
 const identifiant = (annee, home, away) => `6N-${annee}-${home}-${away}`;
 
 /**
- * Les six nations en base. Créées si elles manquent, laissées telles quelles
- * sinon — un nom corrigé à la main ne doit pas être écrasé à chaque passage.
+ * Les six nations en base, rangées par le code du site.
+ *
+ * Créées si elles manquent. Une nation déjà là est reconnue à son code
+ * français, à l'ancien code du site ou à son nom ; si son code n'est pas le
+ * code français, il est corrigé. Le nom, lui, n'est jamais réécrit : un nom
+ * corrigé à la main ne doit pas être écrasé à chaque passage.
  */
 async function assurerNations({ dryRun = false } = {}) {
+  const codes = [...new Set(NATIONS.flatMap((n) => [n.code, n.shortName]))];
   const existantes = await prisma.team.findMany({
-    where: { shortName: { in: NATIONS.map((n) => n.shortName) } },
+    where: {
+      OR: [
+        { shortName: { in: codes } },
+        { name: { in: NATIONS.map((n) => n.name) } },
+      ],
+    },
   });
-  const parCode = new Map(existantes.map((t) => [t.shortName, t]));
+
+  const parCode = new Map();
   const creees = [];
+  const renommees = [];
 
   for (const n of NATIONS) {
-    if (parCode.has(n.shortName)) continue;
-    if (!dryRun) {
-      const t = await prisma.team.create({ data: { name: n.name, shortName: n.shortName } });
-      parCode.set(n.shortName, t);
+    const t =
+      existantes.find((x) => x.shortName === n.shortName) ||
+      existantes.find((x) => x.shortName === n.code) ||
+      existantes.find((x) => x.name === n.name);
+
+    if (!t) {
+      if (!dryRun) {
+        parCode.set(n.code, await prisma.team.create({ data: { name: n.name, shortName: n.shortName } }));
+      }
+      creees.push(n.name);
+      continue;
     }
-    creees.push(n.name);
+
+    if (t.shortName !== n.shortName) {
+      renommees.push(`${n.name} : ${t.shortName} → ${n.shortName}`);
+      parCode.set(
+        n.code,
+        dryRun ? t : await prisma.team.update({ where: { id: t.id }, data: { shortName: n.shortName } }),
+      );
+      continue;
+    }
+
+    parCode.set(n.code, t);
   }
-  return { parCode, creees };
+  return { parCode, creees, renommees };
 }
 
 /**
@@ -140,14 +189,16 @@ function numeroterJournees(matchs) {
 async function syncSixNations({ annee = ANNEE, dryRun = false } = {}) {
   const rapport = {
     ok: true, dryRun, annee,
-    nations: [], crees: [], modifies: [], scores: [], refuses: [], inchanges: 0,
+    nations: [], renommees: [], crees: [], modifies: [], scores: [], refuses: [], inchanges: 0,
+    affiches: [],
   };
 
   const lu = await source.fetchSeason(annee);
   const matchs = numeroterJournees(lu.matchs);
 
-  const { parCode, creees } = await assurerNations({ dryRun });
+  const { parCode, creees, renommees } = await assurerNations({ dryRun });
   rapport.nations = creees;
+  rapport.renommees = renommees;
 
   // Les rencontres signalées par l'analyseur — ordre domicile/extérieur
   // contredit par le stade — ne sont pas écrites. Une affiche inversée
@@ -235,6 +286,14 @@ async function syncSixNations({ annee = ANNEE, dryRun = false } = {}) {
     }
   }
 
+  // Les affiches, une fois les rencontres à jour : un horaire déplacé dans
+  // cette passe peut changer celle d'une journée qui n'a pas encore commencé.
+  const journees = [...new Set(matchs.map((m) => m.round))];
+  for (const round of journees) {
+    const ligne = await marquerAffiche(annee, round, { dryRun });
+    if (ligne) rapport.affiches.push(ligne);
+  }
+
   console.log(
     `[tournoi] ${dryRun ? '(simulation) ' : ''}${annee} : ` +
       `${rapport.crees.length} créé(s), ${rapport.modifies.length} modifié(s), ` +
@@ -242,6 +301,40 @@ async function syncSixNations({ annee = ANNEE, dryRun = false } = {}) {
   );
   if (rapport.refuses.length) console.warn('[tournoi] refus :', rapport.refuses);
   return rapport;
+}
+
+/**
+ * Marque l'affiche d'une journée du Tournoi, si elle doit changer.
+ *
+ * Rend une ligne de rapport quand quelque chose change (ou changerait, en
+ * simulation), `null` sinon. Une journée commencée n'est plus touchée : on ne
+ * déplace pas l'affiche après que des joueurs ont posé leur joker en
+ * conséquence.
+ */
+async function marquerAffiche(annee, round, { dryRun = false } = {}) {
+  const where = { competition: SIX_NATIONS, season: String(annee), round };
+  const matchs = await prisma.match.findMany({
+    where,
+    select: {
+      id: true, kickoff: true, featured: true,
+      homeTeam: { select: { shortName: true } },
+      awayTeam: { select: { shortName: true } },
+    },
+  });
+  if (!matchs.length || journeeCommencee(matchs)) return null;
+
+  const voulue = afficheDeLaJournee(matchs);
+  if (!voulue) return null;
+  const actuelle = matchs.find((m) => m.featured);
+  if (actuelle && actuelle.id === voulue.id) return null;
+
+  if (!dryRun) {
+    await prisma.$transaction([
+      prisma.match.updateMany({ where: { ...where, featured: true }, data: { featured: false } }),
+      prisma.match.update({ where: { id: voulue.id }, data: { featured: true } }),
+    ]);
+  }
+  return `J${round} ${voulue.homeTeam.shortName}–${voulue.awayTeam.shortName}`;
 }
 
 /**
@@ -265,6 +358,6 @@ async function tournoiEnCours(maintenant = new Date(), annee = ANNEE) {
 }
 
 module.exports = {
-  syncSixNations, tournoiEnCours, assurerNations, numeroterJournees,
+  syncSixNations, tournoiEnCours, assurerNations, numeroterJournees, marquerAffiche,
   NATIONS, ANNEE, identifiant,
 };

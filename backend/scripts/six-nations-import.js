@@ -9,7 +9,8 @@
  *   node scripts/six-nations-import.js --ecrire    pour de vrai
  *
  * Relancer l'écriture ne fait rien de plus : les nations et les rencontres déjà
- * en base sont reconnues, seul un horaire ou un stade changé serait mis à jour.
+ * en base sont reconnues, seul un horaire ou un stade changé serait mis à jour,
+ * et l'affiche d'une journée pas encore commencée marquée si elle a changé.
  */
 
 const { syncSixNations } = require('../src/services/six-nations-sync.service');
@@ -28,9 +29,11 @@ const ECRIRE = process.argv.includes('--ecrire');
   };
 
   bloc('nations à créer', r.nations);
+  bloc('nations à renommer (code français)', r.renommees || []);
   bloc('rencontres à créer', r.crees);
   bloc('rencontres à mettre à jour', r.modifies);
   bloc('scores définitifs', r.scores);
+  bloc('affiches de journée (×3) à marquer', r.affiches || []);
   bloc('REFUS', r.refuses);
   console.log(`\n  inchangées : ${r.inchanges}`);
 

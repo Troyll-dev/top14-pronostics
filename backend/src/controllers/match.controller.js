@@ -13,8 +13,15 @@ const prisma = new PrismaClient();
 // continuent d'obtenir exactement la même réponse. Le Tournoi devra la demander
 // explicitement.
 exports.getMatches = async (req, res) => {
-  const { round, season = '2026-2027' } = req.query;
   const competition = competitions.lire(req.query.competition);
+  // La saison par défaut dépend de la compétition : « 2026-2027 » pour le
+  // championnat, « 2027 » pour le Tournoi. Un écran qui ne demande que la
+  // compétition obtient donc la bonne saison sans avoir à la connaître.
+  const { round, season = competitions.saison(competition) } = req.query;
+  // La forme, les séries, le classement et les rotations sont des chiffres de
+  // championnat, lus sur la LNR. Les demander pour le Tournoi rendrait au mieux
+  // un bloc vide, au pire les chiffres d'un club sous le nom d'une nation.
+  const chiffresClubs = competition === competitions.TOP14;
   try {
     const where = { season, competition };
     if (round) where.round = parseInt(round);
@@ -53,7 +60,7 @@ exports.getMatches = async (req, res) => {
     let f = null;
     let s = null;
     let classement = null;
-    if (round) {
+    if (round && chiffresClubs) {
       try {
         f = await forme({ season, avantRound: parseInt(round) });
       } catch (err) {
@@ -115,7 +122,7 @@ exports.getMatches = async (req, res) => {
      * son intention, et le chiffre le dit en trois mots.
      */
     let rot = null;
-    if (round) {
+    if (round && chiffresClubs) {
       try {
         rot = await rotations({ season, round: parseInt(round) });
       } catch (err) {
@@ -244,10 +251,19 @@ exports.updateResult = async (req, res) => {
   }
 };
 
-// GET /api/matches/teams — liste des équipes
+// GET /api/matches/teams — liste des clubs du championnat
+//
+// Les six nations du Tournoi sont dans la même table que les clubs. Cette liste
+// sert aux écrans du championnat : elle ne garde donc que les équipes qui
+// jouent au moins un match du Top 14, et la France n'y apparaît pas entre
+// Clermont et La Rochelle.
 exports.getTeams = async (req, res) => {
   try {
-    const teams = await prisma.team.findMany({ orderBy: { name: 'asc' } });
+    const duTop14 = { some: { competition: competitions.TOP14 } };
+    const teams = await prisma.team.findMany({
+      where: { OR: [{ homeMatches: duTop14 }, { awayMatches: duTop14 }] },
+      orderBy: { name: 'asc' },
+    });
     res.json(teams);
   } catch (err) {
     res.status(500).json({ error: 'Erreur serveur' });
@@ -284,6 +300,9 @@ async function calculatePoints(match) {
       joker: pred.joker,
       affiche,
       round: match.round,
+      // Sans elle, une rencontre du Tournoi passerait pour une journée de
+      // championnat d'avant la J6, et ni joker ni affiche ne compteraient.
+      competition: match.competition,
     });
     await prisma.prediction.update({ where: { id: pred.id }, data: { basePoints, points } });
   }
@@ -302,7 +321,7 @@ async function calculatePoints(match) {
  */
 async function estLAffiche(match) {
   const journee = await prisma.match.findMany({
-    where: { round: match.round, season: match.season },
+    where: { round: match.round, season: match.season, competition: match.competition },
     select: { id: true, kickoff: true, featured: true },
   });
   if (!journee.length) return false;
