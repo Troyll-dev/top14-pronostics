@@ -83,6 +83,91 @@ function RappelJoker({ matches, regles }) {
   );
 }
 
+/**
+ * « Tout effacer », côté Tournoi.
+ *
+ * Au championnat, ce geste vit dans le bloc de Bob, puisqu'il est le pendant de
+ * son remplissage. Bob n'étant pas encore au Tournoi, son bloc n'y apparaît pas
+ * — et l'effacement avait disparu avec lui. Le revoici, seul, avec la même
+ * confirmation en deux temps et le même serveur derrière : les matchs déjà
+ * commencés sont épargnés, et la réponse dit combien.
+ *
+ * À l'étape de Bob pour le Tournoi, ce bloc lui rendra la place.
+ */
+function EffacerJournee({ round, competition, poses, onFait }) {
+  const [confirme, setConfirme] = useState(false);
+  const [envoi, setEnvoi] = useState(false);
+  const [bilan, setBilan] = useState(null);
+  const [erreur, setErreur] = useState(null);
+
+  // Une autre journée, un autre bilan.
+  useEffect(() => { setConfirme(false); setBilan(null); setErreur(null); }, [round, competition]);
+
+  const effacer = async () => {
+    setEnvoi(true);
+    setErreur(null);
+    try {
+      const { data } = await api.delete(`/predictions/round/${round}`, { params: { competition } });
+      setBilan(data);
+      setConfirme(false);
+      onFait?.();
+    } catch (err) {
+      setErreur(err.response?.data?.error || 'Impossible d\'effacer');
+    } finally {
+      setEnvoi(false);
+    }
+  };
+
+  if (poses === 0 && !bilan) return null;
+
+  return (
+    <div className="card mb-5">
+      <div className="flex items-center justify-between gap-3 text-[12.5px]">
+        <span className="text-slate-500">
+          {poses > 0
+            ? `${poses} prono${poses > 1 ? 's posés' : ' posé'} sur cette journée`
+            : 'Aucun prono sur cette journée'}
+        </span>
+        {poses > 0 && (confirme ? (
+          <span className="flex items-center gap-2">
+            <span className="text-slate-500">Tout effacer ?</span>
+            <button
+              onClick={effacer}
+              disabled={envoi}
+              className="font-display font-bold text-red-400 hover:text-red-300 transition-colors"
+            >
+              Oui
+            </button>
+            <button
+              onClick={() => setConfirme(false)}
+              className="text-slate-500 hover:text-amber-400 transition-colors"
+            >
+              Non
+            </button>
+          </span>
+        ) : (
+          <button
+            onClick={() => setConfirme(true)}
+            className="text-slate-500 hover:text-red-400 transition-colors"
+          >
+            Tout effacer
+          </button>
+        ))}
+      </div>
+      {bilan && (
+        <p className="mt-2 text-[12.5px] text-slate-400">
+          {bilan.effaces > 0
+            ? `${bilan.effaces} prono${bilan.effaces > 1 ? 's effacés' : ' effacé'}.`
+            : 'Rien à effacer.'}
+          {bilan.conserves > 0 &&
+            ` ${bilan.conserves} conservé${bilan.conserves > 1 ? 's' : ''} : ${bilan.conserves > 1 ? 'ces matchs ont' : 'ce match a'} déjà commencé.`}
+        </p>
+      )}
+      {erreur && <p className="mt-2 text-[12.5px] text-red-400">{erreur}</p>}
+    </div>
+  );
+}
+
 export default function MatchesPage() {
   // Le championnat ou le Tournoi. Chaque appel au serveur la transmet : une
   // journée se désigne par sa compétition et son numéro.
@@ -473,6 +558,16 @@ export default function MatchesPage() {
           matches={matches}
           aRemplir={pending.length}
           aValider={toSave.length}
+          onFait={() => { fetchMatches({ silencieux: true }); fetchRegles(); }}
+        />
+      )}
+
+      {/* Côté Tournoi, l'effacement seul, à la place de Bob. */}
+      {!loading && currentRound && matches.length > 0 && competition !== TOP14 && (
+        <EffacerJournee
+          round={currentRound}
+          competition={competition}
+          poses={matches.filter(hasPrediction).length}
           onFait={() => { fetchMatches({ silencieux: true }); fetchRegles(); }}
         />
       )}

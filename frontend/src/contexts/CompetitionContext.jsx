@@ -19,7 +19,9 @@ export const SIX_NATIONS = 'SIX_NATIONS';
 /** Ce que chaque compétition affiche en sous-titre, page par page. */
 export const LIBELLES = {
   [TOP14]: { court: 'Top 14', saison: 'Saison 2026-2027', nom: 'Championnat de France' },
-  [SIX_NATIONS]: { court: 'XV de France', saison: 'Tournoi 2027', nom: 'Tournoi des Six Nations' },
+  // « Édition 2027 » et non « Tournoi 2027 » : le sous-titre se lit
+  // « saison · nom », et le mot Tournoi y figurait deux fois.
+  [SIX_NATIONS]: { court: 'XV de France', saison: 'Édition 2027', nom: 'Tournoi des Six Nations' },
 };
 
 /**
