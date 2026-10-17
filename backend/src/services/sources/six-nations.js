@@ -385,12 +385,31 @@ function compter(camp) {
  * C'est le garde-fou de cette lecture, et il est arithmétique : cinq points
  * l'essai, deux la transformation, trois la pénalité ou le drop. Un essai de
  * pénalité vaut sept ; selon la façon dont le site le range, il peut compter
- * pour un essai seul ou pour un essai et sa transformation — on accepte les
- * deux lectures, et aucune autre. Une liste de buteurs incomplète ne passe pas.
+ * pour un essai seul ou pour un essai et sa transformation.
+ *
+ * **Une transformation peut manquer, un essai non.** Le site oublie parfois
+ * la dernière transformation d'un match : sur France–Irlande 2026, l'essai
+ * d'Attissogbe à la 80e est bien là, la transformation de Ramos qui suit
+ * n'apparaît ni dans les buteurs ni dans la chronologie — 34 points relevés
+ * pour un score de 36. Or le classement n'a besoin que des essais : une
+ * transformation absente ne change rien au bonus. On l'accepte donc, et
+ * seulement elle : un écart pair, pas plus grand que le nombre d'essais non
+ * transformés. Un essai ou une pénalité manquants donnent un écart impair (5,
+ * 7, 3) et restent refusés.
+ *
+ * Rend `{ ok, transformationsManquantes }`.
  */
 function concorde(c) {
   const base = 5 * c.essais + 2 * c.transformations + 3 * (c.penalites + c.drops);
-  return c.score === base || c.score === base + 2 * c.essaisPenalite;
+  if (c.score === base || c.score === base + 2 * c.essaisPenalite) {
+    return { ok: true, transformationsManquantes: 0 };
+  }
+  const ecart = c.score - base;
+  const nonTransformes = c.essais - c.transformations;
+  if (ecart > 0 && ecart % 2 === 0 && ecart / 2 <= nonTransformes) {
+    return { ok: true, transformationsManquantes: ecart / 2 };
+  }
+  return { ok: false, transformationsManquantes: 0 };
 }
 
 /**
@@ -408,7 +427,9 @@ function parseRapport(html) {
     const home = compter(obj.home);
     const away = compter(obj.away);
     for (const [cote, c] of [['domicile', home], ['extérieur', away]]) {
-      if (!concorde(c)) {
+      const v = concorde(c);
+      c.transformationsManquantes = v.transformationsManquantes;
+      if (!v.ok) {
         throw new Error(
           `buteurs incomplets côté ${cote} : ${c.essais} E, ${c.transformations} T, ` +
           `${c.penalites} P, ${c.drops} D ne font pas ${c.score}`

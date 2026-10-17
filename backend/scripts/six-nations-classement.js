@@ -30,7 +30,12 @@ const ECRIRE = process.argv.includes('--ecrire') && annee === ANNEE;
     const d = m.decompte;
     console.log(
       `    ${m.home}–${m.away}  ${String(m.homeScore).padStart(2)}–${String(m.awayScore).padEnd(2)}` +
-      `   essais ${d.home.essais}–${d.away.essais}`
+      `   essais ${d.home.essais}–${d.away.essais}` +
+      // Une transformation que la feuille de match a oubliée : sans effet sur le
+      // classement, mais on le dit plutôt que de le taire.
+      ((d.home.transformationsManquantes || d.away.transformationsManquantes)
+        ? `   (transformation absente de la feuille : ${d.home.transformationsManquantes || 0}–${d.away.transformationsManquantes || 0})`
+        : '')
     );
   }
 
