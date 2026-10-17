@@ -13,6 +13,11 @@
  * ressemblent à un classement, et un lien de feuille de match pour voir si les
  * essais y figurent.
  *
+ * Deuxième passe : le site ne publie aucun lien de classement. Il publie en
+ * revanche, pour chaque match joué, une page « report ». Si les essais y sont,
+ * le classement se recalcule — bonus compris. Cette troisième passe ouvre
+ * donc deux de ces pages et cherche les essais.
+ *
  * Elle n'écrit rien, et interroge l'édition 2026, qui est complète.
  *
  *   node scripts/six-nations-sonde-classement.js
@@ -35,12 +40,6 @@ async function lire(chemin) {
   }
 }
 
-/** Les liens internes d'une page, dédoublonnés. */
-function liens(t) {
-  const tous = [...t.matchAll(/"href":"([^"]+)"|href="([^"]+)"/g)].map((m) => m[1] || m[2]);
-  return [...new Set(tous.filter((h) => h.startsWith('/') || h.includes('sixnationsrugby.com')))];
-}
-
 function extrait(texte, re, largeur = 300) {
   const m = new RegExp(re.source, 'i').exec(texte);
   if (!m) return null;
@@ -48,36 +47,26 @@ function extrait(texte, re, largeur = 300) {
 }
 
 (async () => {
-  const pages = [await lire('/en/m6n'), await lire(`/en/m6n/fixtures/${SAISON}`)];
-  const tous = new Set();
-  for (const p of pages) {
+  const pages = [
+    // France–Angleterre, dernier match : 2026 s'y est joué, et il y a eu des
+    // essais des deux côtés. Puis le premier match, et la page « match » sans
+    // « /report », au cas où elle en dirait plus.
+    `/en/m6n/fixtures/${SAISON}/france-v-england-14032026-2110/report`,
+    `/en/m6n/fixtures/${SAISON}/france-v-ireland-05022026-2110/report`,
+    `/en/m6n/fixtures/${SAISON}/france-v-ireland-05022026-2110`,
+  ];
+  for (const chemin of pages) {
+    const p = await lire(chemin);
     console.log(`\n=== ${p.url} · statut ${p.statut} · ${p.taille} octets`);
-    const l = liens(p.t);
-    l.forEach((x) => tous.add(x));
-    console.log(`  ${l.length} liens internes. Ceux du Tournoi masculin :`);
-    console.log('  ' + l.filter((x) => x.includes('/m6n')).slice(0, 80).join('\n  '));
-  }
-
-  // Les liens qui ressemblent à un classement, ouverts un par un.
-  const classements = [...tous].filter((x) => /stand|table|tabl|rank|ladder/i.test(x)).slice(0, 6);
-  console.log(`\n### Liens de classement trouvés : ${classements.length ? classements.join('  ') : 'aucun'}`);
-  for (const c of classements) {
-    const p = await lire(c);
-    console.log(`\n=== ${p.url} · statut ${p.statut} · ${p.taille} octets`);
-    for (const re of [/tries/, /bonus/, /"FRA"|France/, /played|"P"/]) {
-      const x = extrait(p.t, re);
-      if (x) console.log(`  --- autour de ${re} :\n  ${x}\n`);
+    if (p.statut !== 200) continue;
+    const comptes = {};
+    for (const m of p.t.matchAll(/tries|"try"|tryScorers|scorers|conversions|penalt|drop|bonus|"T"|scoring|timeline|events/gi)) {
+      const k = m[0].toLowerCase();
+      comptes[k] = (comptes[k] || 0) + 1;
     }
-  }
-
-  // Une feuille de match, pour savoir si les essais s'y lisent.
-  const feuilles = [...tous].filter((x) => /match|centre|report/i.test(x) && /m6n/.test(x)).slice(0, 3);
-  console.log(`\n### Feuilles de match candidates : ${feuilles.join('  ') || 'aucune'}`);
-  if (feuilles[0]) {
-    const p = await lire(feuilles[0]);
-    console.log(`\n=== ${p.url} · statut ${p.statut} · ${p.taille} octets`);
-    for (const re of [/tries/, /"try"|Try/, /conversion/]) {
-      const x = extrait(p.t, re);
+    console.log('  mots-clés :', JSON.stringify(comptes));
+    for (const re of [/tries/, /tryScor|scorers/, /"try"/, /conversion/, /timeline|events/]) {
+      const x = extrait(p.t, re, 450);
       if (x) console.log(`  --- autour de ${re} :\n  ${x}\n`);
     }
   }
