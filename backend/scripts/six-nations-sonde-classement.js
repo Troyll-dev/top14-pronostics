@@ -24,7 +24,14 @@
  * plus des mots dans le texte : elle relève les noms de champs des données
  * embarquées, pour voir comment le classement et les essais sont rangés.
  *
- * Elle n'écrit rien, et interroge l'édition 2026, qui est complète.
+ * Quatrième passe : le bloc « Live table » mène à « View Full Table »,
+ * `/en/m6n/fixtures/202600/table`. Ses colonnes sont celles qu'il nous faut —
+ * Pos, P, W, D, L, PF, PA, DIFF, TF, TA, BP, Pts. Mais dans la page « report »
+ * le tableau est vide : il est chargé ensuite par le navigateur. Cette
+ * cinquième passe ouvre la page du tableau elle-même, pour 2026 (terminé) et
+ * 2027 (pas commencé), et relève aussi les adresses d'API qu'elle contient.
+ *
+ * Elle n'écrit rien.
  *
  *   node scripts/six-nations-sonde-classement.js
  */
@@ -53,36 +60,24 @@ function extrait(texte, re, largeur = 300) {
 }
 
 (async () => {
-  const chemin = `/en/m6n/fixtures/${SAISON}/france-v-england-14032026-2110/report`;
-  const p = await lire(chemin);
-  console.log(`\n=== ${p.url} · statut ${p.statut} · ${p.taille} octets`);
-  if (p.statut !== 200) process.exit(0);
+  for (const saison of ['202600', '202700']) {
+    const p = await lire(`/en/m6n/fixtures/${saison}/table`);
+    console.log(`\n=== ${p.url} · statut ${p.statut} · ${p.taille} octets`);
+    if (p.statut !== 200) continue;
 
-  // Les noms de champs JSON qui pourraient porter un classement ou des essais.
-  const INTERESSANT = /tr(y|ies)|bonus|point|play|won|lost|draw|position|rank|table|standing|score|grand|slam|team(Id|Code|Name)|abbr/i;
-  const cles = {};
-  for (const m of p.t.matchAll(/"([A-Za-z_][A-Za-z0-9_]{1,40})":/g)) {
-    if (INTERESSANT.test(m[1])) cles[m[1]] = (cles[m[1]] || 0) + 1;
-  }
-  const tri = Object.entries(cles).sort((a, b) => b[1] - a[1]);
-  console.log(`\n  ${tri.length} noms de champs retenus :`);
-  console.log('  ' + tri.map(([k, n]) => `${k}×${n}`).join('  '));
+    // Les champs du tableau, et combien de fois ils apparaissent : six fois
+    // chacun si les six lignes sont dans la page.
+    const champs = ['triesFor', 'triesAgainst', 'bonusPoint', 'bonusPoints', 'pointsFor', 'played', 'position', 'points'];
+    console.log('  comptes :', champs.map((c) => `${c}×${(p.t.match(new RegExp(`"${c}":`, 'g')) || []).length}`).join('  '));
 
-  // Le contexte des plus parlants, deux occurrences chacun.
-  const VOIR = /^(tries|triesFor|triesAgainst|tryBonus|losingBonus|bonusPoints|bonus|points|pointsFor|position|played|won|standings|table|liveTable|type)$/i;
-  for (const [k] of tri.filter(([k]) => VOIR.test(k)).slice(0, 10)) {
-    const re = new RegExp(`"${k}":`, 'g');
-    let n = 0, m;
-    while ((m = re.exec(p.t)) && n < 2) {
-      console.log(`\n  --- "${k}" (${n + 1}) :\n  ${p.t.slice(Math.max(0, m.index - 250), m.index + 350)}`);
-      n++;
-    }
-  }
+    // Une ligne : le premier « triesFor » suivi d'un nombre, avec son contexte.
+    const re = /"triesFor":\s*"?\d/;
+    const x = extrait(p.t, re, 700);
+    console.log(x ? `  --- une ligne du tableau :\n  ${x}` : '  aucun « triesFor » numérique dans la page');
 
-  // Et le texte qui suit les libellés des buteurs.
-  for (const re of [/"Try":"T"/, /Show Scorers/, /liveTable/]) {
-    const x = extrait(p.t, re, 50);
-    if (x) console.log(`\n  --- ${re} présent`);
+    // Les adresses d'API, s'il y en a : le tableau peut venir de là.
+    const api = [...new Set([...p.t.matchAll(/https?:\/\/[a-z0-9.-]*(?:api|stats|feed|data)[a-z0-9.-]*\/[^"'\s<>]{0,120}/gi)].map((m) => m[0]))];
+    console.log(`  adresses d'API : ${api.length ? '\n    ' + api.slice(0, 15).join('\n    ') : 'aucune'}`);
   }
   process.exit(0);
 })().catch((e) => {
