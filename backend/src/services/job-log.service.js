@@ -78,6 +78,7 @@ const TACHES = {
   METEO: 'meteo',
   RAPPELS: 'rappels',
   BILAN: 'bilan',
+  TOURNOI: 'tournoi',
 };
 
 /**
@@ -116,6 +117,9 @@ const SEUILS_JOURS = {
   [TACHES.CLASSEMENT]: 2,
   [TACHES.RAPPELS]: 9,
   [TACHES.BILAN]: 9,
+  // Toutes les heures pendant le Tournoi, une fois par jour le reste de
+  // l'année : deux jours sans réussite, c'est une panne dans les deux cas.
+  [TACHES.TOURNOI]: 2,
 };
 
 /**

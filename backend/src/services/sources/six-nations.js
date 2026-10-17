@@ -137,6 +137,18 @@ const RE_MI_TEMPS = /fixturesResultsCard_halfTimeScore__[^"]*"[^[]*\["HT"[^\]]*?
 const RE_CAMP = /fixturesResultsCard_teamContainer__/g;
 
 /**
+ * La marque d'une rencontre terminée.
+ *
+ * La carte d'un match joué porte, sur son score de mi-temps, la classe
+ * `fixturesResultsCard_finished__`. Un score affiché ne suffit pas : pendant le
+ * match la carte en montre un aussi, et il change à chaque essai. Attribuer des
+ * points sur un score en cours ferait bouger le classement à chaque action.
+ * Seule cette marque dit que le score est définitif — même règle que pour la
+ * LNR, où un score n'est retenu qu'une fois homologué.
+ */
+const RE_TERMINE = /fixturesResultsCard_finished__/;
+
+/**
  * Les deux camps d'une carte.
  *
  * On decoupe sur le conteneur d'equipe plutot que de relever les noms puis les
@@ -238,6 +250,7 @@ function parseSeason(html, { annee = null } = {}) {
       awayScore: ext.score,
       miTemps: ht ? { home: Number(ht[1]), away: Number(ht[2]) } : null,
       joue: dom.score !== null && ext.score !== null,
+      termine: dom.score !== null && ext.score !== null && RE_TERMINE.test(carte),
       ordreVerifie,
     });
   });

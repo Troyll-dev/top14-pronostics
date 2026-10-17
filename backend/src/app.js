@@ -26,6 +26,7 @@ const { startCompositionCron } = require('./cron/composition.cron');
 const { startStatsCron } = require('./cron/stats.cron');
 const { startMeteoCron } = require('./cron/meteo.cron');
 const { startSanteCron } = require('./cron/sante.cron');
+const { startSixNationsCron } = require('./cron/six-nations.cron');
 
 const app = express();
 
@@ -119,6 +120,13 @@ app.listen(PORT, () => {
    * tourne plus doit se voir, meme quand ce qu'elle produit est accessoire.
    */
   startMeteoCron();
+
+  /*
+   * Le Tournoi des Six Nations : le calendrier, puis les scores. Lu sur le site
+   * officiel, toutes les heures pendant les six semaines du Tournoi et une fois
+   * par jour le reste de l'année — voir six-nations-sync.service.js.
+   */
+  startSixNationsCron();
 
   /**
    * Et la tache qui surveille les autres.
