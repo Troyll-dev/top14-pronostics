@@ -31,15 +31,26 @@ const get = async (url) => {
 };
 
 (async () => {
-  const sb = await get(`${API}/scoreboard?dates=20260201-20260320&limit=50`);
-  console.log(`\n=== scoreboard 2026 · statut ${sb.statut}`);
-  const events = sb.data?.events || [];
-  console.log(`  ${events.length} rencontres`);
+  // Le format « intervalle de dates » est refusé (400) pour le rugby. On
+  // essaie l'année seule, puis chaque jour de match de 2026, un par un.
+  for (const q of ['?dates=2026', '', '?dates=20260205']) {
+    const r = await get(`${API}/scoreboard${q}`);
+    console.log(`  scoreboard${q || ' (sans paramètre)'} · statut ${r.statut} · ${(r.data?.events || []).length} rencontres`);
+  }
+  const JOURS = ['20260205', '20260207', '20260214', '20260215', '20260221', '20260222', '20260306', '20260307', '20260314'];
+  const vus = new Map();
+  for (const j of JOURS) {
+    const r = await get(`${API}/scoreboard?dates=${j}`);
+    for (const e of r.data?.events || []) vus.set(e.id, e);
+    if (r.statut !== 200) console.log(`  ${j} · statut ${r.statut}`);
+  }
+  const events = [...vus.values()];
+  console.log(`\n=== 2026, jour par jour : ${events.length} rencontres`);
   const lignes = events.map((e) => {
     const c = e.competitions?.[0]?.competitors || [];
     const h = c.find((x) => x.homeAway === 'home');
     const a = c.find((x) => x.homeAway === 'away');
-    return { id: e.id, date: e.date, h: h?.team?.abbreviation, a: a?.team?.abbreviation, hs: h?.score, as: a?.score, hn: h?.team?.displayName, an: a?.team?.displayName };
+    return { id: e.id, date: e.date, hs: h?.score, as: a?.score, hn: h?.team?.displayName, an: a?.team?.displayName };
   });
   for (const l of lignes) console.log(`    ${l.id}  ${l.date?.slice(0, 10)}  ${l.hn} ${l.hs}–${l.as} ${l.an}`);
 
